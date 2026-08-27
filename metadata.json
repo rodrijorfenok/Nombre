@@ -1,0 +1,6 @@
+{
+  "name": "LitroBar San Miguel",
+  "description": "Venta interactiva de tragos en vasos de 1 litro con delivery y take away en San Miguel, Buenos Aires.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
