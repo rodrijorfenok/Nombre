@@ -266,6 +266,27 @@ app.get("/comprobante/:slug/:id", (req, res) => {
   res.sendFile(path.resolve(c.archivo));
 });
 
+// Política de privacidad pública (Meta la pide para publicar la app de WhatsApp).
+app.get("/privacidad", (_req, res) => {
+  const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
+  const nombres = todos.map((c) => esc(c.negocio.nombre)).join(", ") || "el local";
+  res.type("html").send(`<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Política de privacidad · Mostrador</title><style>body{font:16px/1.55 system-ui,sans-serif;max-width:720px;margin:32px auto;padding:0 16px;color:#222}h1{font-size:24px}h2{font-size:18px;margin-top:28px}</style></head><body>
+<h1>Política de privacidad</h1>
+<p>Este servicio es el asistente de pedidos por WhatsApp de ${nombres} ("el local"). Explica qué datos usamos cuando nos escribís por WhatsApp y para qué.</p>
+<h2>Qué datos recibimos</h2>
+<ul><li>Tu número de WhatsApp y el nombre de tu perfil.</li><li>Los mensajes que nos mandás: lo que pedís, tu nombre, la dirección de entrega y la forma de pago.</li><li>Las imágenes que envíes, por ejemplo el comprobante de una transferencia.</li></ul>
+<h2>Para qué los usamos</h2>
+<p>Solo para tomar, preparar, cobrar y entregar tu pedido, y para responder tus consultas. No los vendemos ni los usamos para publicidad.</p>
+<h2>Con quién se comparten</h2>
+<p>Con el personal del local que prepara y entrega el pedido. Los mensajes se procesan con WhatsApp (Meta) y con un servicio de inteligencia artificial (Anthropic) que ayuda a interpretar el pedido; ambos actúan como proveedores y no usan tus datos para otros fines.</p>
+<h2>Cuánto tiempo se guardan</h2>
+<p>Las conversaciones se borran a los 14 días y los comprobantes a los 90 días. El registro del pedido (productos, total, fecha) se conserva para la contabilidad del local.</p>
+<h2>Tus derechos</h2>
+<p>Podés pedir ver, corregir o borrar tus datos escribiéndonos por el mismo WhatsApp, y lo resolvemos a la brevedad.</p>
+</body></html>`);
+});
+
 app.get("/salud", (_req, res) =>
   void res.json({
     ok: true,
