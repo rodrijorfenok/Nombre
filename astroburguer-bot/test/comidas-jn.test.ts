@@ -63,3 +63,30 @@ test("zona según la ubicación compartida por el cliente", async () => {
   assert.match(zonaPorUbicacion(n, -34.554, -58.7), /FUERA/);
   assert.equal(zonaPorUbicacion(negocio, -34.5, -58.7), "", "sin ubicación del local no calcula");
 });
+
+test("Comidas JN: abre viernes a domingo y feriados de 20 a 00", async () => {
+  const { estaAbierto, proximaApertura } = await import("../src/tiempos.ts");
+  const ar = (fechaHora: string) => new Date(`${fechaHora}:00-03:00`);
+  assert.equal(estaAbierto(negocio, ar("2026-11-27T21:00")), true, "viernes 21 h");
+  assert.equal(estaAbierto(negocio, ar("2026-11-28T23:59")), true, "sábado 23:59");
+  assert.equal(estaAbierto(negocio, ar("2026-11-29T00:30")), false, "domingo 00:30 (ya cerró el sábado)");
+  assert.equal(estaAbierto(negocio, ar("2026-11-27T19:59")), false, "viernes antes de abrir");
+  assert.equal(estaAbierto(negocio, ar("2026-11-30T21:00")), false, "lunes");
+  assert.equal(estaAbierto(negocio, ar("2026-12-08T21:00")), true, "martes 8/12 feriado");
+  assert.equal(proximaApertura(negocio, ar("2026-11-30T12:00")), "el viernes a las 20:00");
+  assert.equal(proximaApertura(negocio, ar("2026-12-07T12:00")), "mañana a las 20:00", "el 8/12 es feriado");
+});
+
+test("el encargado marca un feriado por WhatsApp", async () => {
+  const { Bot } = await import("../src/bot.ts");
+  const { Store } = await import("../src/db.ts");
+  const { comandoStaff } = await import("../src/staff.ts");
+  const { estaAbierto } = await import("../src/tiempos.ts");
+  const bot = new Bot({ store: new Store(":memory:"), menu, negocio, client: {} as never, mensajero: { enviarTexto: async () => {} }, esperaRafagaMs: 0 });
+  const lunes = new Date("2027-06-14T21:00:00-03:00");
+  assert.equal(estaAbierto(bot.negocio, lunes), false);
+  assert.match((await comandoStaff(bot, "feriado 14/6/2027"))!, /2027-06-14 marcado como feriado/);
+  assert.equal(estaAbierto(bot.negocio, lunes), true);
+  await comandoStaff(bot, "no feriado 14/6/2027");
+  assert.equal(estaAbierto(bot.negocio, lunes), false);
+});

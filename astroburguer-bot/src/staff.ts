@@ -20,6 +20,7 @@ export const AYUDA_STAFF = `🛠️ *Comandos del local*
 • carta — precios y faltantes de hoy
 • demora M — sumar M minutos a todos los tiempos (demora 0 = normal)
 • cerrar / abrir / auto — forzar local cerrado, abierto o volver al horario
+• feriado / feriado 14/6 — abrir en horario de feriado hoy o esa fecha (no feriado 14/6 lo quita)
 • bot off / bot on — apagar o prender el bot para TODOS (apagado, los mensajes te llegan a vos)
 • atender N — tomar vos la charla del pedido N
 • r N mensaje — responderle vos al cliente del pedido N
@@ -58,6 +59,29 @@ export async function comandoStaff(bot: Bot, texto: string): Promise<string | nu
     if (!p) return `⚠️ No encuentro el pedido ${mt[1]}.`;
     bot.store.setAjuste(`humano:${p.telefono}`, new Date(Date.now() + 12 * 3_600_000).toISOString());
     return `🙋 Ahora atendés vos a ${p.cliente ?? p.telefono} (pedido #${p.id}). Respondé con *r ${p.id} mensaje*; para devolvérselo al bot: *bot ${p.id}*`;
+  }
+  // Feriados: "feriado" = hoy; "feriado 14/6" o "feriado 2027-06-14" = esa fecha; "no feriado 14/6" lo quita.
+  mt = t.match(/^(no )?feriado(?: (hoy|\d{1,2}\/\d{1,2}(?:\/\d{2,4})?|\d{4}-\d{2}-\d{2}))?$/);
+  if (mt) {
+    const tz = bot.negocio.zonaHoraria;
+    const hoy = new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+    let fecha = hoy;
+    if (mt[2] && mt[2] !== "hoy") {
+      if (mt[2].includes("-")) fecha = mt[2];
+      else {
+        const [d, m, a] = mt[2].split("/");
+        const anio = a ? (a.length === 2 ? `20${a}` : a) : hoy.slice(0, 4);
+        fecha = `${anio}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+        if (!a && fecha < hoy) fecha = `${Number(anio) + 1}${fecha.slice(4)}`; // "feriado 2/1" en diciembre = el año que viene
+      }
+    }
+    const f = bot.negocio.feriados;
+    if (mt[1]) {
+      bot.store.setAjuste(`feriado:${fecha}`, null);
+      return `🗓️ ${fecha} ya no figura como feriado.`;
+    }
+    bot.store.setAjuste(`feriado:${fecha}`, "1");
+    return `🗓️ ${fecha} marcado como feriado: el bot toma pedidos de ${f?.abre ?? "20:00"} a ${f?.cierra ?? "00:00"}.`;
   }
   if (t === "estado bot" || t === "estado") {
     return bot.apagado ? "⏸️ El bot está APAGADO (escribí *bot on*)." : "▶️ El bot está PRENDIDO (escribí *bot off* para apagarlo).";

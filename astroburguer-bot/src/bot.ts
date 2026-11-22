@@ -101,7 +101,7 @@ const MAX_VUELTAS_HERRAMIENTAS = 10;
 export class Bot {
   readonly store: Store;
   readonly menuBase: Menu;
-  readonly negocio: Negocio;
+  private readonly negocioBase: Negocio;
   readonly mensajero: Mensajero;
   private readonly client: Anthropic;
   private readonly reloj: () => Date;
@@ -116,7 +116,7 @@ export class Bot {
   constructor(o: OpcionesBot) {
     this.store = o.store;
     this.menuBase = o.menu;
-    this.negocio = o.negocio;
+    this.negocioBase = o.negocio;
     this.client = o.client;
     this.mensajero = o.mensajero;
     this.reloj = o.reloj ?? (() => new Date());
@@ -136,6 +136,14 @@ export class Bot {
 
   get turnosEnCurso() {
     return this.colas.size;
+  }
+
+  /** Datos del local + feriados que el encargado marcó por WhatsApp ("feriado"). */
+  get negocio(): Negocio {
+    const extra = Object.keys(this.store.ajustesConPrefijo("feriado:"));
+    if (!extra.length) return this.negocioBase;
+    const f = this.negocioBase.feriados ?? { fechas: [], abre: this.negocioBase.horarios[0]?.abre ?? "20:00", cierra: this.negocioBase.horarios[0]?.cierra ?? "00:00" };
+    return { ...this.negocioBase, feriados: { ...f, fechas: [...f.fechas, ...extra] } };
   }
 
   /** Menú con los precios y faltantes que el local cargó hoy por WhatsApp. */

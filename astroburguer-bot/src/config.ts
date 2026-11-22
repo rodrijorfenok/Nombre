@@ -51,6 +51,15 @@ export const NegocioSchema = z.object({
   zonaHoraria: z.string().default("America/Argentina/Buenos_Aires"),
   direccionLocal: z.string(),
   horarios: z.array(Horario),
+  /** feriados en que el local abre (aunque no sea un día habitual), con su horario */
+  feriados: z
+    .object({
+      fechas: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).default([]),
+      abre: z.string().regex(/^\d{2}:\d{2}$/).default("20:00"),
+      cierra: z.string().regex(/^\d{2}:\d{2}$/).default("00:00"),
+    })
+    .nullable()
+    .default(null),
   asistente: z
     .object({
       /** nombre con el que se presenta el asistente; vacío = habla como "el local" */

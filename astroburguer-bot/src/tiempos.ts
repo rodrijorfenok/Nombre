@@ -95,43 +95,54 @@ const aMin = (hhmm: string) => {
   return h * 60 + m;
 };
 
-/** Soporta horarios que cruzan la medianoche (19:30 a 00:30). */
+function fechaLocal(d: Date, tz: string): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+}
+
+/** Tramos de apertura de una fecha: los del día de la semana + el horario de feriado si corresponde. */
+function tramosDelDia(negocio: Negocio, fecha: string, diaSemana: number): { abre: number; cierra: number }[] {
+  const tramos = negocio.horarios.filter((h) => h.dias.includes(diaSemana)).map((h) => ({ abre: aMin(h.abre), cierra: aMin(h.cierra) }));
+  if (negocio.feriados?.fechas.includes(fecha)) tramos.push({ abre: aMin(negocio.feriados.abre), cierra: aMin(negocio.feriados.cierra) });
+  return tramos;
+}
+
+/** Soporta horarios que cruzan la medianoche (20:00 a 00:00, 19:30 a 01:00) y feriados. */
 export function estaAbierto(negocio: Negocio, ahora = new Date()): boolean {
-  const { dia, minutos } = partesLocales(ahora, negocio.zonaHoraria);
-  for (const h of negocio.horarios) {
-    const abre = aMin(h.abre);
-    const cierra = aMin(h.cierra);
-    if (cierra > abre) {
-      if (h.dias.includes(dia) && minutos >= abre && minutos < cierra) return true;
-    } else {
-      // cruza medianoche: tramo del mismo día desde "abre", y tramo del día siguiente hasta "cierra"
-      if (h.dias.includes(dia) && minutos >= abre) return true;
-      const ayer = (dia + 6) % 7;
-      if (h.dias.includes(ayer) && minutos < cierra) return true;
-    }
+  const tz = negocio.zonaHoraria;
+  const { dia, minutos } = partesLocales(ahora, tz);
+  for (const t of tramosDelDia(negocio, fechaLocal(ahora, tz), dia)) {
+    if (t.cierra > t.abre ? minutos >= t.abre && minutos < t.cierra : minutos >= t.abre) return true;
+  }
+  // tramo de ayer que sigue después de medianoche
+  const ayer = new Date(ahora.getTime() - 86_400_000);
+  for (const t of tramosDelDia(negocio, fechaLocal(ayer, tz), (dia + 6) % 7)) {
+    if (t.cierra <= t.abre && minutos < t.cierra) return true;
   }
   return false;
 }
 
 export function textoHorarios(negocio: Negocio): string {
   const nombres = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
-  return negocio.horarios.map((h) => `${h.dias.map((d) => nombres[d]).join(", ")}: ${h.abre} a ${h.cierra}`).join("; ");
+  const base = negocio.horarios.map((h) => `${h.dias.map((d) => nombres[d]).join(", ")}: ${h.abre} a ${h.cierra}`).join("; ");
+  return negocio.feriados ? `${base}; feriados: ${negocio.feriados.abre} a ${negocio.feriados.cierra}` : base;
 }
 
-/** "hoy a las 19:30", "mañana a las 19:30", "el martes a las 19:30" o null si no hay horarios. */
+/** "hoy a las 20:00", "mañana a las 20:00", "el viernes a las 20:00" o null si no hay horarios. */
 export function proximaApertura(negocio: Negocio, ahora = new Date()): string | null {
   const nombres = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
-  const { dia, minutos } = partesLocales(ahora, negocio.zonaHoraria);
+  const tz = negocio.zonaHoraria;
+  const { dia, minutos } = partesLocales(ahora, tz);
   for (let d = 0; d < 8; d++) {
+    const fecha = new Date(ahora.getTime() + d * 86_400_000);
     const diaSemana = (dia + d) % 7;
-    const aperturas = negocio.horarios
-      .filter((h) => h.dias.includes(diaSemana))
-      .map((h) => h.abre)
-      .filter((abre) => d > 0 || aMin(abre) > minutos)
-      .sort();
+    const aperturas = tramosDelDia(negocio, fechaLocal(fecha, tz), diaSemana)
+      .map((t) => t.abre)
+      .filter((abre) => d > 0 || abre > minutos)
+      .sort((a, b) => a - b);
     if (aperturas.length) {
       const cuando = d === 0 ? "hoy" : d === 1 ? "mañana" : `el ${nombres[diaSemana]}`;
-      return `${cuando} a las ${aperturas[0]}`;
+      const hh = `${String(Math.floor(aperturas[0] / 60)).padStart(2, "0")}:${String(aperturas[0] % 60).padStart(2, "0")}`;
+      return `${cuando} a las ${hh}`;
     }
   }
   return null;
