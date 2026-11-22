@@ -76,8 +76,10 @@ export const NegocioSchema = z.object({
       derivarCuando: z.array(z.string()).default([]),
       /** minutos que el bot queda en pausa con ese cliente después de derivarlo a una persona */
       minutosAtencionHumana: z.number().default(30),
+      /** situaciones que ya pasaron en el local y cómo se resolvieron (salen del análisis de chats viejos) */
+      casos: z.array(z.object({ situacion: z.string(), respuesta: z.string() })).default([]),
     })
-    .default({ nombre: "", tono: "canchero", emojis: true, datosExtra: [], sugerencia: "una bebida o unas papas", derivarCuando: [], minutosAtencionHumana: 30 }),
+    .default({ nombre: "", tono: "canchero", emojis: true, datosExtra: [], sugerencia: "una bebida o unas papas", derivarCuando: [], minutosAtencionHumana: 30, casos: [] }),
   /** coordenadas del local (para calcular la zona cuando el cliente comparte su ubicación) */
   ubicacion: z.object({ lat: z.number(), lng: z.number() }).nullable().default(null),
   pago: z.object({
@@ -108,6 +110,8 @@ export const NegocioSchema = z.object({
     minutosPorTanda: z.number(),
     minutosPorUnidadExtra: z.number(),
     unidadesSinRecargo: z.number().int(),
+    /** minutos desde que el pedido entró a cocina en los que el cliente todavía puede sumarle productos */
+    minutosParaAgregar: z.number().default(10),
   }),
   equipo: z
     .object({

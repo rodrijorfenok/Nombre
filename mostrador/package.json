@@ -15,7 +15,8 @@
     "validar": "node --no-warnings --import tsx scripts/validar.ts",
     "ensayo": "node --no-warnings --env-file-if-exists=.env --import tsx scripts/ensayo.ts",
     "demo-guiada": "node --no-warnings --import tsx scripts/demo-guiada.ts",
-    "probar-comprobante": "node --no-warnings --env-file-if-exists=.env --import tsx scripts/probar-comprobante.ts"
+    "probar-comprobante": "node --no-warnings --env-file-if-exists=.env --import tsx scripts/probar-comprobante.ts",
+    "analizar-chats": "node --no-warnings --env-file-if-exists=.env --import tsx scripts/analizar-chats.ts"
   },
   "engines": {
     "node": ">=22.13"

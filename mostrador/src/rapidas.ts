@@ -1,7 +1,7 @@
 import type { Menu, Negocio } from "./config.ts";
 import { textoMenu } from "./herramientas.ts";
 import { normalizar, pesos } from "./money.ts";
-import { calcularTotales, type Pedido } from "./order.ts";
+import { cuentas, type Pedido } from "./order.ts";
 import { horaLocal, proximaApertura, textoHorarios } from "./tiempos.ts";
 
 /**
@@ -123,8 +123,10 @@ export function respuestaRapida(texto: string, ctx: ContextoRapido): string[] | 
     case "alias": {
       const datos = `Alias: *${negocio.pago.alias}*${negocio.pago.cvu ? `\nCVU: ${negocio.pago.cvu}` : ""}\nTitular: ${negocio.pago.titular}`;
       if (pedido.estado === "esperando_pago") {
-        const total = calcularTotales(menu, negocio, pedido).total;
-        return [`${datos}\n\nEl total es *${pesos(total)}*. ${usted ? "Cuando transfiera, envíeme" : "Cuando transfieras, mandame"} la captura del comprobante.`];
+        const c = cuentas(menu, negocio, pedido);
+        const monto = c.transferenciaBase;
+        const texto = c.efectivo > 0 ? `Por transferencia van *${pesos(monto)}* (el resto, ${pesos(c.efectivo)}, en efectivo).` : `El total es *${pesos(monto)}*.`;
+        return [`${datos}\n\n${texto} ${usted ? "Cuando transfiera, envíeme" : "Cuando transfieras, mandame"} la captura del comprobante.`];
       }
       if (pedido.estado === "armando") return null; // que la IA lo encamine: primero hay que cerrar el pedido
       return [datos];

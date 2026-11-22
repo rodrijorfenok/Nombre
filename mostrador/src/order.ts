@@ -22,8 +22,17 @@ export interface LineaPedido {
   extras: string[];
   sinIngredientes: string[];
   observacion: string;
+  /** cambiar un ingrediente por otro que el local ya usa: "cebolla caramelizada" → "cebolla brunoise" */
+  reemplazos?: Reemplazo[];
+  /** 0/undefined = pedido original; 1, 2… = agregado después de que entró a cocina */
+  tanda?: number;
   /** precio unitario congelado al cargar la línea: si el local cambia precios, los pedidos en curso no cambian */
   precioUnitario?: number;
+}
+
+export interface Reemplazo {
+  quitar: string;
+  poner: string;
 }
 
 export interface Entrega {
@@ -35,8 +44,27 @@ export interface Entrega {
 }
 
 export interface Pago {
-  metodo: "transferencia" | "efectivo";
+  /** mixto = una parte en efectivo (montoEfectivo) y el resto por transferencia */
+  metodo: "transferencia" | "efectivo" | "mixto";
+  /** billete con el que paga la parte en efectivo, para llevar el vuelto */
   pagaCon?: number;
+  /** solo mixto: cuánto paga en efectivo */
+  montoEfectivo?: number;
+}
+
+/** Productos sumados a un pedido que ya estaba en cocina. */
+export interface Agregado {
+  tanda: number;
+  /** ISO */
+  en: string;
+  monto: number;
+  pago: "efectivo" | "transferencia";
+  /** transferencia acreditada (en efectivo se cobra al entregar) */
+  pagado: boolean;
+  /** pagos parciales por transferencia de este agregado */
+  pagadoParcial?: number;
+  /** ya se mandó la comanda de este agregado a cocina */
+  comandaEnviada: boolean;
 }
 
 export interface Pedido {
@@ -54,6 +82,11 @@ export interface Pedido {
   horaEstimada?: string;
   minutosEstimados?: [number, number];
   pagoVerificado?: boolean;
+  /** ISO: cuándo entró a cocina (para el plazo en que se le pueden sumar cosas) */
+  enCocinaDesde?: string;
+  agregados?: Agregado[];
+  /** ISO: la cocina avisó al cliente que faltan ~5 minutos */
+  avisoCasiListo?: string;
   proximaLinea: number;
 }
 
@@ -70,6 +103,7 @@ export interface LineaInput {
   extras?: string[];
   sin_ingredientes?: string[];
   observacion?: string;
+  reemplazos?: { quitar: string; poner: string }[];
 }
 
 function buscarProducto(menu: Menu, id: string): Producto {
@@ -119,6 +153,33 @@ function resolverExtras(menu: Menu, p: Producto, extras: string[] = []) {
   });
 }
 
+/** Ingredientes con los que trabaja el local (los de toda la carta). */
+export function ingredientesDelLocal(menu: Menu): string[] {
+  return [...new Set(menu.productos.flatMap((p) => p.ingredientes))];
+}
+
+function resolverReemplazos(menu: Menu, p: Producto, input: { quitar: string; poner: string }[] = []): Reemplazo[] {
+  return input.map(({ quitar, poner }) => {
+    const sacar = p.ingredientes.find((i) => normalizar(i) === normalizar(quitar)) ?? p.ingredientes.find((i) => normalizar(i).includes(normalizar(quitar)));
+    if (!sacar) {
+      throw new ErrorPedido(
+        p.ingredientes.length
+          ? `"${p.nombre}" no lleva "${quitar}". Ingredientes: ${p.ingredientes.join(", ")}.`
+          : `"${p.nombre}" no tiene ingredientes cargados: anotá el pedido en observacion.`,
+      );
+    }
+    const delLocal = ingredientesDelLocal(menu);
+    const nuevo = delLocal.find((i) => normalizar(i) === normalizar(poner)) ?? delLocal.find((i) => normalizar(i).includes(normalizar(poner)));
+    if (!nuevo) {
+      throw new ErrorPedido(
+        `El local no trabaja con "${poner}", así que no se puede hacer ese cambio. Ingredientes que sí hay: ${delLocal.join(", ")}. Si el cliente insiste, derivar_a_humano.`,
+      );
+    }
+    if (normalizar(nuevo) === normalizar(sacar)) throw new ErrorPedido(`"${sacar}" ya viene en "${p.nombre}": no hace falta cambiarlo.`);
+    return { quitar: sacar, poner: nuevo };
+  });
+}
+
 export function agregarLinea(menu: Menu, pedido: Pedido, input: LineaInput): LineaPedido {
   const p = buscarProducto(menu, input.producto_id);
   const cantidad = input.cantidad ?? 1;
@@ -132,6 +193,8 @@ export function agregarLinea(menu: Menu, pedido: Pedido, input: LineaInput): Lin
     sinIngredientes: (input.sin_ingredientes ?? []).map((s) => s.trim()).filter(Boolean),
     observacion: (input.observacion ?? "").trim(),
   };
+  const reemplazos = resolverReemplazos(menu, p, input.reemplazos);
+  if (reemplazos.length) linea.reemplazos = reemplazos;
   linea.precioUnitario = calcularUnitario(menu, linea);
   pedido.lineas.push(linea);
   return linea;
@@ -144,6 +207,7 @@ export interface CambiosLinea {
   extras?: string[];
   sin_ingredientes?: string[];
   observacion?: string;
+  reemplazos?: { quitar: string; poner: string }[];
 }
 
 /** Los campos enviados reemplazan a los actuales; los omitidos quedan igual. */
@@ -159,6 +223,10 @@ export function modificarLinea(menu: Menu, pedido: Pedido, c: CambiosLinea): Lin
   if (c.extras) l.extras = resolverExtras(menu, p, c.extras);
   if (c.sin_ingredientes) l.sinIngredientes = c.sin_ingredientes.map((s) => s.trim()).filter(Boolean);
   if (c.observacion !== undefined) l.observacion = c.observacion.trim();
+  if (c.reemplazos) {
+    const r = resolverReemplazos(menu, p, c.reemplazos);
+    l.reemplazos = r.length ? r : undefined;
+  }
   if (c.opciones || c.extras) l.precioUnitario = calcularUnitario(menu, l);
   return l;
 }
@@ -177,7 +245,9 @@ export interface DetalleLinea {
   opciones: string[];
   extras: { nombre: string; precio: number }[];
   sin: string[];
+  cambios: Reemplazo[];
   observacion: string;
+  tanda: number;
   precioUnitario: number;
   subtotal: number;
 }
@@ -220,7 +290,9 @@ export function detalleLinea(menu: Menu, l: LineaPedido): DetalleLinea {
     opciones,
     extras,
     sin: l.sinIngredientes,
+    cambios: l.reemplazos ?? [],
     observacion: l.observacion,
+    tanda: l.tanda ?? 0,
     precioUnitario: unit,
     subtotal: unit * l.cantidad,
   };
@@ -245,6 +317,7 @@ export function textoLinea(d: DetalleLinea): string {
   const partes = [`${d.cantidad}x ${d.nombre}${d.opciones.length ? ` (${d.opciones.join(", ")})` : ""}`];
   for (const e of d.extras) partes.push(`   + ${e.nombre} ${pesos(e.precio)}`);
   if (d.sin.length) partes.push(`   Sin: ${d.sin.join(", ")}`);
+  for (const c of d.cambios) partes.push(`   Cambio: ${c.quitar} → ${c.poner}`);
   if (d.observacion) partes.push(`   Obs: ${d.observacion}`);
   partes.push(`   ${d.cantidad > 1 ? `${d.cantidad} x ${pesos(d.precioUnitario)} = ` : ""}${pesos(d.subtotal)}`);
   return partes.join("\n");
@@ -271,13 +344,7 @@ export function resumenCliente(menu: Menu, negocio: Negocio, pedido: Pedido): st
     out.push(`\n📍 ${pedido.entrega.direccion}${pedido.entrega.entreCalles ? ` (entre ${pedido.entrega.entreCalles})` : ""}`);
     if (pedido.entrega.referencias) out.push(`   ${pedido.entrega.referencias}`);
   }
-  if (pedido.pago) {
-    out.push(
-      `💳 Pago: ${pedido.pago.metodo === "transferencia" ? "Transferencia" : "Efectivo"}${
-        pedido.pago.metodo === "efectivo" && pedido.pago.pagaCon ? ` (paga con ${pesos(pedido.pago.pagaCon)}, vuelto ${pesos(pedido.pago.pagaCon - t.total)})` : ""
-      }`,
-    );
-  }
+  if (pedido.pago) out.push(`💳 Pago: ${textoPago(menu, negocio, pedido)}`);
   return out.join("\n");
 }
 
@@ -295,10 +362,61 @@ export function faltantes(menu: Menu, negocio: Negocio, pedido: Pedido): string[
       f.push(`el pedido mínimo para delivery es ${pesos(negocio.delivery.pedidoMinimo)} (hoy suma ${pesos(t.subtotal)})`);
     }
   }
-  if (!pedido.pago) f.push("medio de pago (transferencia o efectivo)");
-  if (pedido.pago?.metodo === "efectivo") {
-    const t = calcularTotales(menu, negocio, pedido);
-    if (pedido.pago.pagaCon !== undefined && pedido.pago.pagaCon < t.total) f.push(`el monto con el que paga (${pesos(pedido.pago.pagaCon)}) no cubre el total ${pesos(t.total)}`);
+  if (!pedido.pago) f.push("medio de pago (transferencia, efectivo o una parte de cada uno)");
+  if (pedido.pago && pedido.pago.metodo !== "transferencia") {
+    const total = calcularTotales(menu, negocio, pedido).total;
+    if (pedido.pago.metodo === "mixto") {
+      const ef = pedido.pago.montoEfectivo ?? 0;
+      if (!(ef > 0)) f.push("cuánto paga en efectivo (el resto va por transferencia)");
+      else if (ef >= total) f.push(`la parte en efectivo (${pesos(ef)}) cubre todo el total ${pesos(total)}: entonces es pago en efectivo, no mixto`);
+    }
+    const efectivo = cuentas(menu, negocio, pedido).efectivo;
+    if (pedido.pago.pagaCon !== undefined && pedido.pago.pagaCon < efectivo) f.push(`el billete con el que paga (${pesos(pedido.pago.pagaCon)}) no cubre lo que paga en efectivo ${pesos(efectivo)}`);
   }
   return f;
+}
+
+export interface Cuentas {
+  total: number;
+  /** total del pedido original (sin agregados) */
+  base: number;
+  /** parte del pedido original que se paga por transferencia */
+  transferenciaBase: number;
+  /** todo lo que se cobra en efectivo al entregar o retirar (original + agregados en efectivo) */
+  efectivo: number;
+  /** agregados por transferencia que todavía no se acreditaron */
+  agregadosPorTransferir: Agregado[];
+}
+
+/** Cuánto se paga de cada forma. Es la única fuente de esos montos. */
+export function cuentas(menu: Menu, negocio: Negocio, pedido: Pedido): Cuentas {
+  const total = calcularTotales(menu, negocio, pedido).total;
+  const agregados = pedido.agregados ?? [];
+  const base = total - agregados.reduce((a, x) => a + x.monto, 0);
+  const m = pedido.pago?.metodo;
+  const efectivoBase = m === "efectivo" ? base : m === "mixto" ? Math.min(base, pedido.pago?.montoEfectivo ?? 0) : 0;
+  const transferenciaBase = m === "transferencia" || m === "mixto" ? base - efectivoBase : 0;
+  const efectivoAgregados = agregados.filter((a) => a.pago === "efectivo").reduce((s, a) => s + a.monto, 0);
+  return {
+    total,
+    base,
+    transferenciaBase,
+    efectivo: efectivoBase + efectivoAgregados,
+    agregadosPorTransferir: agregados.filter((a) => a.pago === "transferencia" && !a.pagado),
+  };
+}
+
+/** "Transferencia", "Efectivo (paga con $X, vuelto $Y)", "Transferencia $X + efectivo $Y"… */
+export function textoPago(menu: Menu, negocio: Negocio, pedido: Pedido): string {
+  if (!pedido.pago) return "sin definir";
+  const c = cuentas(menu, negocio, pedido);
+  const vuelto = pedido.pago.pagaCon && pedido.pago.pagaCon > c.efectivo ? ` (paga con ${pesos(pedido.pago.pagaCon)}, vuelto ${pesos(pedido.pago.pagaCon - c.efectivo)})` : "";
+  switch (pedido.pago.metodo) {
+    case "transferencia":
+      return "Transferencia";
+    case "efectivo":
+      return `Efectivo${vuelto}`;
+    case "mixto":
+      return `Transferencia ${pesos(c.transferenciaBase)} + efectivo ${pesos(pedido.pago.montoEfectivo ?? 0)}${vuelto}`;
+  }
 }

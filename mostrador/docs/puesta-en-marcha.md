@@ -108,6 +108,21 @@ Desde el panel también se puede activar con el link *Activar impresión automá
 
 **Demo de Comidas JN:** la carta ya está cargada en `clientes/comidas-jn/`. Usá las variables `COMIDAS_JN_WA_PHONE_ID`, `COMIDAS_JN_WA_TOKEN`, `COMIDAS_JN_PANEL_TOKEN`, `COMIDAS_JN_ENCARGADOS` y `COMIDAS_JN_COCINA` en lugar de las de `ASTROBURGUER_` (el panel queda en `/panel/comidas-jn?token=...`). Para probarla en la terminal: `npm run chat -- comidas-jn`.
 
+## Durante el turno: lo que maneja el bot solo
+
+- **Cambios de ingredientes** ("cebolla brunoise en vez de caramelizada"): sin costo, y solo con ingredientes que el local ya usa. En la comanda sale como `🔁 CAMBIAR`.
+- **Pago mixto** (parte efectivo, parte transferencia): el bot pide el comprobante por la parte transferida y la comanda dice cuánto cobrar en efectivo.
+- **Sumar algo a un pedido que ya está en cocina**: se puede durante los primeros 10 minutos (se cambia en `negocio.json` → `cocina.minutosParaAgregar`). Cocina recibe una comanda aparte que dice "sale junto con el pedido #N" y el cliente recibe la nueva hora y cuánto paga.
+- **Aviso de 5 minutos**: cuando a un pedido le falten unos 5 minutos, tocá **⏰ faltan 5 min** en el panel (o escribí `aviso N`). Al cliente le llega "ya podés venir a retirarlo" (o "sale en 5 minutos" si es delivery). Después, **🔔 listo** como siempre.
+
+## Aprender de los chats viejos del local
+
+1. En el celular del local, abrí cada chat de cliente → ⋮ → **Más** → **Exportar chat** → **Sin archivos**. Cuantos más chats, mejor (20 o 30 alcanzan para empezar). En iPhone sale un .zip: adentro está el `_chat.txt`.
+2. Juntá los `.txt` en una carpeta y corré `npm run analizar-chats -- carpeta`. Sale un reporte con las preguntas frecuentes, los pedidos especiales, los problemas y los casos "situación → cómo lo resolvió el local".
+3. Revisá el reporte y corré `npm run analizar-chats -- carpeta --aplicar comidas-jn` para sumarle los casos al bot. Publicá el cambio y desde ahí el bot responde con esa misma idea cuando pasa algo parecido.
+
+Los chats se anonimizan antes de analizarlos (sin nombres ni teléfonos de clientes).
+
 ## 5. n8n o Make (opcional, para sumar cosas)
 
 El bot ya toma los pedidos solo. n8n o Make sirven para **conectar lo que pasa después**: anotar cada pedido en una planilla, mandar un mail o avisar en otro sistema.

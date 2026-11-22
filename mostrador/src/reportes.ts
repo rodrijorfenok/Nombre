@@ -1,6 +1,6 @@
 import type { Menu, Negocio } from "./config.ts";
 import { pesos } from "./money.ts";
-import { calcularTotales, type Pedido } from "./order.ts";
+import { calcularTotales, cuentas, type Pedido } from "./order.ts";
 
 /**
  * Reporte de ventas por jornada. Una jornada va de las 06:00 de un día a las 06:00 del siguiente,
@@ -41,7 +41,7 @@ export interface ResumenVentas {
 const VALIDOS = new Set(["esperando_pago", "pago_en_revision", "en_cocina", "listo", "en_camino", "entregado"]);
 
 export function calcularResumen(menu: Menu, negocio: Negocio, pedidos: Pedido[]): ResumenVentas {
-  const validos = pedidos.filter((p) => VALIDOS.has(p.estado) && (p.pago?.metodo !== "transferencia" || p.pagoVerificado || p.estado === "entregado"));
+  const validos = pedidos.filter((p) => VALIDOS.has(p.estado) && (p.pago?.metodo === "efectivo" || p.pagoVerificado || p.estado === "entregado"));
   const r: ResumenVentas = {
     pedidos: validos.length,
     facturado: 0,
@@ -59,11 +59,12 @@ export function calcularResumen(menu: Menu, negocio: Negocio, pedidos: Pedido[])
   const porHora = new Map<string, number>();
   for (const p of validos) {
     const t = calcularTotales(menu, negocio, p);
+    const efectivo = cuentas(menu, negocio, p).efectivo;
     r.facturado += t.total;
     if (p.entrega?.modo === "delivery") r.delivery++;
     else r.takeAway++;
-    if (p.pago?.metodo === "transferencia") r.transferencia += t.total;
-    else r.efectivo += t.total;
+    r.efectivo += efectivo;
+    r.transferencia += t.total - efectivo;
     for (const l of t.lineas) unidades.set(l.nombre, (unidades.get(l.nombre) ?? 0) + l.cantidad);
     const hora = new Intl.DateTimeFormat("es-AR", { timeZone: negocio.zonaHoraria, hour: "2-digit", hourCycle: "h23" }).format(new Date(p.confirmadoEn ?? p.creadoEn));
     porHora.set(hora, (porHora.get(hora) ?? 0) + 1);

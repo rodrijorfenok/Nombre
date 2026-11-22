@@ -9,7 +9,7 @@ import { cargarClientes, env, type Cliente } from "./config.ts";
 import { Store } from "./db.ts";
 import { pesos } from "./money.ts";
 import { calcularTotales } from "./order.ts";
-import { comandoStaff } from "./staff.ts";
+import { comandoCocina, comandoStaff } from "./staff.ts";
 import { montarDemo } from "./demo.ts";
 import { horaLocal } from "./tiempos.ts";
 import { aEntrante, firmaValida, parsearWebhook, WhatsAppCloud, type MensajeWebhook } from "./whatsapp.ts";
@@ -117,6 +117,15 @@ async function procesarEntrante(local: Local, m: MensajeWebhook) {
         return;
       }
     }
+    // La cocina puede avisar "faltan 5 min", marcar listo o salido desde su WhatsApp.
+    if (local.cliente.negocio.equipo.cocina.some((n) => mismoNumero(n, m.from)) && m.tipo === "text") {
+      const r = await comandoCocina(local.bot, m.texto ?? "");
+      if (r) {
+        await local.wa.enviarTexto(m.from, r);
+        local.store.marcarEntrante(m.id, "hecho");
+        return;
+      }
+    }
     await local.bot.recibir(m.from, await aEntrante(local.wa, m));
     local.store.marcarEntrante(m.id, "hecho");
   } catch (e) {
@@ -183,15 +192,21 @@ app.get("/panel/:slug", (req, res) => {
         <td>${p.horaEstimada ? horaLocal(new Date(p.horaEstimada), negocio.zonaHoraria) : ""}</td>
         <td class="acc"><a href="/comanda/${slug}/${p.id}?token=${tk}" target="_blank">🖨️ comanda</a>
         ${["esperando_pago", "pago_en_revision"].includes(p.estado) ? boton("pago ok", "✅ pago ok") : ""}
+        ${(p.agregados ?? []).filter((a) => a.comandaEnviada).map((a) => `<a href="/comanda/${slug}/${p.id}?token=${tk}&tanda=${a.tanda}" target="_blank">➕ agregado ${a.tanda}</a>`).join(" ")}
+        ${p.estado === "en_cocina" ? (p.avisoCasiListo ? "<small>⏰ avisado</small>" : boton("aviso", "⏰ faltan 5 min")) : ""}
         ${p.estado === "en_cocina" ? boton("listo", "🔔 listo") : ""}
         ${p.entrega?.modo === "delivery" && ["en_cocina", "listo"].includes(p.estado) ? boton("sale", "🛵 salió") : ""}
         ${boton("entregado", "📦 entregado")}</td></tr>`;
     })
     .join("");
+  // Trabajos de impresión: la comanda de cada pedido en cocina y la de cada agregado ya mandado a cocina.
   const enCocina = store
     .pedidosActivos()
     .filter((p) => p.estado === "en_cocina")
-    .map((p) => p.id);
+    .flatMap((p) => [
+      { clave: String(p.id), url: `/comanda/${slug}/${p.id}?token=${tk}` },
+      ...(p.agregados ?? []).filter((a) => a.comandaEnviada).map((a) => ({ clave: `${p.id}-${a.tanda}`, url: `/comanda/${slug}/${p.id}?token=${tk}&tanda=${a.tanda}` })),
+    ]);
   const linkAuto = `/panel/${slug}?token=${tk}${auto ? "" : "&auto=1"}`;
   const avisoAuto = auto
     ? `🖨️ <b>Impresión automática activada</b> · <span id="impr"></span> · <a href="${linkAuto}">desactivar</a>`
@@ -205,15 +220,16 @@ app.get("/panel/:slug", (req, res) => {
   let hechas = [];
   try { hechas = JSON.parse(localStorage.getItem(KEY) || "[]"); } catch {}
   const guardar = () => { try { localStorage.setItem(KEY, JSON.stringify(hechas.slice(-300))); } catch {} };
-  const pendientes = enCocina.filter((id) => !hechas.includes(id));
+  const pendientes = enCocina.filter((j) => !hechas.includes(j.clave) && !hechas.includes(Number(j.clave)));
   const recargar = () => setTimeout(() => location.reload(), 10000);
   const siguiente = () => {
-    const id = pendientes.shift();
-    if (id === undefined) { estado.textContent = "esperando pedidos (se revisa cada 10 s)"; return recargar(); }
+    const job = pendientes.shift();
+    if (job === undefined) { estado.textContent = "esperando pedidos (se revisa cada 10 s)"; return recargar(); }
+    const id = job.clave;
     estado.textContent = "imprimiendo comanda #" + id + "…";
     const f = document.createElement("iframe");
     f.style.cssText = "position:absolute;width:0;height:0;border:0;visibility:hidden";
-    f.src = "/comanda/${slug}/" + id + "?token=${tk}";
+    f.src = job.url;
     f.onload = () => {
       try {
         f.contentWindow.focus();
@@ -255,7 +271,9 @@ app.get("/comanda/:slug/:id", (req, res) => {
   if (!local) return void res.sendStatus(401);
   const p = local.store.pedido(Number(req.params.id));
   if (!p) return void res.sendStatus(404);
-  res.type("html").send(comandaHtml(local.bot.menu, local.cliente.negocio, p));
+  const tanda = Number(req.query.tanda) || undefined;
+  if (tanda && !p.agregados?.some((a) => a.tanda === tanda)) return void res.sendStatus(404);
+  res.type("html").send(comandaHtml(local.bot.menu, local.cliente.negocio, p, tanda));
 });
 
 app.get("/comprobante/:slug/:id", (req, res) => {

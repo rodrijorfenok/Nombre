@@ -2,7 +2,7 @@ import type { Bot } from "./bot.ts";
 import { buscarItem } from "./catalogo.ts";
 import { comandaTexto } from "./comanda.ts";
 import { pesos } from "./money.ts";
-import { calcularTotales, type EstadoPedido } from "./order.ts";
+import { calcularTotales, cuentas, type EstadoPedido, type Pedido } from "./order.ts";
 import { horaLocal } from "./tiempos.ts";
 
 export const AYUDA_STAFF = `🛠️ *Comandos del local*
@@ -11,6 +11,7 @@ export const AYUDA_STAFF = `🛠️ *Comandos del local*
 • ver N — comanda del pedido N
 • pago ok N — aprobar transferencia y mandar a cocina
 • pago no N motivo — rechazar comprobante
+• aviso N — faltan ~5 min: le avisa al cliente que ya puede venir a retirar (o que sale el delivery)
 • listo N — pedido listo (take away: avisa que retire)
 • sale N — salió el delivery
 • entregado N — cerrar pedido
@@ -91,11 +92,13 @@ export async function comandoStaff(bot: Bot, texto: string): Promise<string | nu
   if (t === "estado bot" || t === "estado") {
     return bot.apagado ? "⏸️ El bot está APAGADO (escribí *bot on*)." : "▶️ El bot está PRENDIDO (escribí *bot off* para apagarlo).";
   }
-  const m = t.match(/^(pedidos|ver|pago ok|pago no|listo|sale|salio|salió|entregado|cancelar|demora|cerrar|abrir|auto|ayuda|responder|r|bot)\b ?(\d+)? ?(.*)$/);
+  // "5 min 12", "5min 12", "casi 12" = aviso 12
+  const t2 = t.replace(/^(5 ?min(utos)?|casi( listo)?|avisar)\b/, "aviso");
+  const m = t2.match(/^(pedidos|ver|pago ok|pago no|aviso|listo|sale|salio|salió|entregado|cancelar|demora|cerrar|abrir|auto|ayuda|responder|r|bot)\b ?(\d+)? ?(.*)$/);
   if (!m) return null;
   const [, cmd, numStr, resto] = m;
   // "listo", "ver", "sale"… sin número de pedido no son comandos: puede ser el encargado charlando o haciendo un pedido.
-  if (!numStr && ["ver", "pago ok", "pago no", "listo", "sale", "salio", "salió", "entregado", "cancelar", "responder", "r", "bot"].includes(cmd)) return null;
+  if (!numStr && ["ver", "pago ok", "pago no", "aviso", "listo", "sale", "salio", "salió", "entregado", "cancelar", "responder", "r", "bot"].includes(cmd)) return null;
   const n = numStr ? Number(numStr) : NaN;
   const { store, menu, negocio, mensajero } = bot;
 
@@ -137,6 +140,12 @@ export async function comandoStaff(bot: Bot, texto: string): Promise<string | nu
         return comandaTexto(menu, negocio, necesitaPedido());
       case "pago ok": {
         const p = necesitaPedido();
+        if (p.estado === "en_cocina" && cuentas(menu, negocio, p).agregadosPorTransferir.length) {
+          for (const c of store.comprobantesDePedido(p.id!)) if (c.veredicto === "revisar") store.actualizarVeredicto(c.id, "aprobado");
+          const n = await bot.aprobarAgregados(p);
+          await avisar(p.telefono, `✅ ¡Recibimos el pago de lo que sumaste! Sale todo junto con tu pedido #${p.id}.`, `[El local aprobó el pago de lo sumado al pedido #${p.id}.]`);
+          return `👍 Pedido #${p.id}: ${n === 1 ? "agregado aprobado" : `${n} agregados aprobados`} y enviado a cocina.`;
+        }
         if (!["esperando_pago", "pago_en_revision"].includes(p.estado)) return `El pedido #${p.id} está ${ETIQUETA[p.estado]}, no esperando pago.`;
         for (const c of store.comprobantesDePedido(p.id!)) if (c.veredicto === "revisar") store.actualizarVeredicto(c.id, "aprobado");
         bot.pasarACocina(p);
@@ -161,12 +170,22 @@ export async function comandoStaff(bot: Bot, texto: string): Promise<string | nu
         );
         return `Pedido #${p.id}: comprobante rechazado y cliente avisado.`;
       }
+      case "aviso": {
+        const p = necesitaPedido();
+        if (!["en_cocina", "listo"].includes(p.estado)) return `El pedido #${p.id} está ${ETIQUETA[p.estado]}: el aviso es para pedidos en cocina.`;
+        if (p.avisoCasiListo) return `Al cliente del pedido #${p.id} ya se le avisó a las ${horaLocal(new Date(p.avisoCasiListo), negocio.zonaHoraria)}.`;
+        p.avisoCasiListo = new Date().toISOString();
+        store.guardarPedido(p);
+        await avisar(p.telefono, textoCasiListo(bot, p), `[La cocina avisó que al pedido #${p.id} le faltan unos 5 minutos.]`);
+        return `⏰ Avisado: al pedido #${p.id} le faltan ~5 min.`;
+      }
       case "listo": {
         const p = necesitaPedido();
         p.estado = "listo";
         store.guardarPedido(p);
         if (p.entrega?.modo === "take_away") {
-          const cobrar = p.pago?.metodo === "efectivo" ? ` Recordá traer ${pesos(calcularTotales(menu, negocio, p).total)} en efectivo.` : "";
+          const ef = cuentas(menu, negocio, p).efectivo;
+          const cobrar = ef > 0 ? ` Recordá traer ${pesos(ef)} en efectivo.` : "";
           await avisar(p.telefono, `🔔 ¡Tu pedido #${p.id} está listo! Ya podés pasar a retirarlo por ${negocio.direccionLocal}.${cobrar}`, `[Pedido #${p.id} listo para retirar.]`);
         }
         return `Pedido #${p.id} marcado como listo.`;
@@ -217,6 +236,23 @@ export async function comandoStaff(bot: Bot, texto: string): Promise<string | nu
     return `⚠️ ${(e as Error).message}`;
   }
   return null;
+}
+
+/** Mensaje al cliente cuando la cocina avisa que faltan unos 5 minutos. */
+export function textoCasiListo(bot: Bot, p: Pedido): string {
+  const { menu, negocio } = bot;
+  const ef = cuentas(menu, negocio, p).efectivo;
+  if (p.entrega?.modo === "delivery") {
+    return `⏰ ¡Tu pedido #${p.id} sale en unos 5 minutos! 🛵${ef > 0 ? ` Tené a mano ${pesos(ef)} en efectivo.` : ""}`;
+  }
+  return `⏰ ¡Tu pedido #${p.id} está casi listo! En unos 5 minutos lo tenés: ya podés venir a retirarlo por ${negocio.direccionLocal}, así te lo llevás calentito 🙌${ef > 0 ? `\nTraé ${pesos(ef)} en efectivo.` : ""}`;
+}
+
+/** Lo que puede hacer un teléfono de cocina (no toca precios, pagos ni el bot). */
+export async function comandoCocina(bot: Bot, texto: string): Promise<string | null> {
+  const t = texto.trim().toLowerCase().replace(/\s+/g, " ").replace(/^[#/]/, "");
+  if (!/^(pedidos|ver \d|aviso \d|5 ?min(utos)? \d|casi( listo)? \d|avisar \d|listo \d|sale \d|salio \d|salió \d)/.test(t)) return null;
+  return comandoStaff(bot, texto);
 }
 
 function unico(bot: Bot, nombre: string) {

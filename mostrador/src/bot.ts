@@ -8,7 +8,7 @@ import { env, soportaFallbacks, type Menu, type Negocio } from "./config.ts";
 import { Store, type Conversacion, type Mensaje } from "./db.ts";
 import { definicionesHerramientas, ejecutarHerramienta, type ContextoHerramientas, type Efecto } from "./herramientas.ts";
 import { pesos } from "./money.ts";
-import { calcularTotales, ErrorPedido, type Pedido } from "./order.ts";
+import { calcularTotales, cuentas, ErrorPedido, type Agregado, type Pedido } from "./order.ts";
 import { systemPrompt } from "./prompt.ts";
 import { respuestaRapida } from "./rapidas.ts";
 import { calcularResumen, inicioJornada, textoResumen } from "./reportes.ts";
@@ -211,7 +211,8 @@ export class Bot {
     const conv = this.conversacionVigente(telefono);
     const pedido = this.store.pedido(conv.pedidoId!)! as PedidoConPendiente;
 
-    if (msg.tipo === "imagen" && ["esperando_pago", "pago_en_revision"].includes(pedido.estado)) {
+    const esperaPago = ["esperando_pago", "pago_en_revision"].includes(pedido.estado) || cuentas(this.menu, this.negocio, pedido).agregadosPorTransferir.length > 0;
+    if (msg.tipo === "imagen" && esperaPago) {
       await this.procesarComprobante(conv, pedido, msg.datos, msg.mime);
       return;
     }
@@ -425,7 +426,7 @@ export class Bot {
   private async aplicarEfecto(e: Efecto, telefono: string) {
     switch (e.tipo) {
       case "comanda":
-        await this.enviarComanda(e.pedidoId);
+        await this.enviarComanda(e.pedidoId, e.tanda);
         break;
       case "avisar_staff":
         await this.avisarStaff(e.texto);
@@ -458,7 +459,11 @@ export class Bot {
 
   private async procesarComprobante(conv: Conversacion, pedido: PedidoConPendiente, datos: Buffer, mime: MediaType, archivoExistente?: string) {
     const archivo = archivoExistente ?? this.guardarArchivo(pedido.id!, datos, mime);
-    const total = calcularTotales(this.menu, this.negocio, pedido).total;
+    const c = cuentas(this.menu, this.negocio, pedido);
+    // Qué se está pagando: el pedido (o su parte por transferencia, si es mixto) o un agregado sumado en cocina.
+    const delPedido = ["esperando_pago", "pago_en_revision"].includes(pedido.estado);
+    const agregado: Agregado | undefined = delPedido ? undefined : c.agregadosPorTransferir[0];
+    const total = agregado ? agregado.monto : c.transferenciaBase;
 
     let extraidos: DatosComprobante | null = null;
     try {
@@ -468,10 +473,12 @@ export class Bot {
     }
     const duplicado = extraidos?.numero_operacion ? this.store.operacionYaUsada(extraidos.numero_operacion, pedido.id) : null;
     // Pagos parciales anteriores del mismo pedido: este comprobante tiene que cubrir el saldo.
-    const pagadoAntes = this.store
-      .comprobantesDePedido(pedido.id!)
-      .filter((c) => c.veredicto === "parcial")
-      .reduce((a, c) => a + (c.monto ?? 0), 0);
+    const pagadoAntes = agregado
+      ? (agregado.pagadoParcial ?? 0)
+      : this.store
+          .comprobantesDePedido(pedido.id!)
+          .filter((x) => x.veredicto === "parcial" && !x.motivos.some((m) => m.startsWith("agregado")))
+          .reduce((a, x) => a + (x.monto ?? 0), 0);
     const r = evaluarComprobante(extraidos, {
       total: Math.max(0, total - pagadoAntes),
       pagadoAntes,
@@ -487,10 +494,15 @@ export class Bot {
       numeroOperacion: extraidos?.numero_operacion ?? null,
       monto: extraidos?.monto ?? null,
       veredicto: r.veredicto,
-      motivos: r.motivos,
+      motivos: agregado ? [`agregado ${agregado.tanda}`, ...r.motivos] : r.motivos,
       datos: extraidos,
     });
     pedido.comprobantePendiente = undefined;
+
+    if (agregado) {
+      await this.comprobanteDeAgregado(conv, pedido, agregado, r, extraidos, comp.id, total);
+      return;
+    }
 
     const linkImagen = this.publicUrl && this.negocio.panel.token ? `\n🖼️ ${this.publicUrl}/comprobante/${this.slug}/${comp.id}?token=${this.negocio.panel.token}` : "";
     let texto = r.mensajeCliente;
@@ -512,10 +524,49 @@ export class Bot {
     this.registrarEvento(conv.telefono, `[El cliente envió un comprobante. Verificación automática: ${r.veredicto} (${r.motivos.join("; ")}).]`, texto);
   }
 
+  /** Comprobante por lo que se sumó a un pedido que ya estaba en cocina. */
+  private async comprobanteDeAgregado(
+    conv: Conversacion,
+    pedido: Pedido,
+    agregado: Agregado,
+    r: ReturnType<typeof evaluarComprobante>,
+    extraidos: DatosComprobante | null,
+    comprobanteId: number,
+    monto: number,
+  ) {
+    const ag = pedido.agregados!.find((x) => x.tanda === agregado.tanda)!;
+    let texto = r.mensajeCliente;
+    if (r.veredicto === "aprobado") {
+      ag.pagado = true;
+      texto = `✅ ¡Recibí el pago de lo que sumaste! Sale todo junto con tu pedido #${pedido.id}.`;
+    } else if (r.veredicto === "parcial") {
+      ag.pagadoParcial = (ag.pagadoParcial ?? 0) + (extraidos?.monto ?? 0);
+    } else if (r.veredicto === "revisar") {
+      const link = this.publicUrl && this.negocio.panel.token ? `\n🖼️ ${this.publicUrl}/comprobante/${this.slug}/${comprobanteId}?token=${this.negocio.panel.token}` : "";
+      await this.avisarStaff(
+        `🔎 Revisar comprobante del agregado al pedido #${pedido.id} (${pedido.cliente ?? pedido.telefono}) por ${pesos(monto)}.\nMotivos: ${r.motivos.join("; ")}${link}\nRespondé *pago ok ${pedido.id}* o *pago no ${pedido.id} <motivo>*.`,
+      );
+    }
+    this.store.guardarPedido(pedido);
+    await this.mensajero.enviarTexto(conv.telefono, texto);
+    if (ag.pagado && !ag.comandaEnviada) await this.enviarComanda(pedido.id!, ag.tanda);
+    this.registrarEvento(conv.telefono, `[El cliente envió el comprobante de lo que sumó al pedido. Verificación automática: ${r.veredicto} (${r.motivos.join("; ")}).]`, texto);
+  }
+
+  /** El local aprueba a mano los agregados pagados por transferencia (comando "pago ok N" con el pedido en cocina). */
+  async aprobarAgregados(pedido: Pedido): Promise<number> {
+    const pendientes = cuentas(this.menu, this.negocio, pedido).agregadosPorTransferir;
+    for (const a of pendientes) pedido.agregados!.find((x) => x.tanda === a.tanda)!.pagado = true;
+    this.store.guardarPedido(pedido);
+    for (const a of pendientes) if (!a.comandaEnviada) await this.enviarComanda(pedido.id!, a.tanda);
+    return pendientes.length;
+  }
+
   /** Recalcula el tiempo desde ahora (el pago puede llegar tarde) y marca en cocina. */
   pasarACocina(pedido: Pedido) {
-    if (pedido.pago?.metodo === "transferencia") pedido.pagoVerificado = true;
+    if (pedido.pago?.metodo === "transferencia" || pedido.pago?.metodo === "mixto") pedido.pagoVerificado = true;
     pedido.estado = "en_cocina";
+    pedido.enCocinaDesde = this.reloj().toISOString();
     const est = estimarEspera(this.menu, this.negocio, pedido, Math.max(0, this.store.cargaCocina() - 1), Number(this.store.ajuste("demora_extra") ?? 0), this.reloj());
     pedido.minutosEstimados = est.rango;
     pedido.horaEstimada = est.horaEstimada.toISOString();
@@ -669,13 +720,24 @@ export class Bot {
 
   // ------------------------- avisos -------------------------
 
-  async enviarComanda(pedidoId: number) {
+  /** Manda a cocina la comanda del pedido, o solo la de un agregado (tanda) sumado después. */
+  async enviarComanda(pedidoId: number, tanda?: number) {
     const p = this.store.pedido(pedidoId);
     if (!p) return;
-    const texto = comandaTexto(this.menu, this.negocio, p);
-    const link = this.publicUrl && this.negocio.panel.token ? `\n🖨️ ${this.publicUrl}/comanda/${this.slug}/${p.id}?token=${this.negocio.panel.token}&print=1` : "";
+    if (tanda) {
+      const ag = p.agregados?.find((a) => a.tanda === tanda);
+      if (!ag) return;
+      ag.comandaEnviada = true;
+      this.store.guardarPedido(p);
+    }
+    const texto = comandaTexto(this.menu, this.negocio, p, tanda);
+    const link =
+      this.publicUrl && this.negocio.panel.token
+        ? `\n🖨️ ${this.publicUrl}/comanda/${this.slug}/${p.id}?token=${this.negocio.panel.token}${tanda ? `&tanda=${tanda}` : ""}&print=1`
+        : "";
     for (const n of this.negocio.equipo.cocina) await this.mensajero.enviarTexto(n, texto + link).catch((e) => console.error("[comanda]", e));
-    console.log(`[${this.negocio.nombre}] comanda #${p.id} enviada a cocina`);
+    if (tanda) await this.avisarStaff(`➕ El cliente del pedido #${p.id} sumó productos (agregado ${tanda}). Ya está en la comanda.`);
+    console.log(`[${this.negocio.nombre}] comanda #${p.id}${tanda ? ` (agregado ${tanda})` : ""} enviada a cocina`);
   }
 
   async avisarStaff(texto: string) {
