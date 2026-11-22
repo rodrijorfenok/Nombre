@@ -94,7 +94,10 @@
   "panel": {
     "token": "env:COMIDAS_JN_PANEL_TOKEN"
   },
-  "ubicacion": null,
+  "ubicacion": {
+    "lat": -34.56234,
+    "lng": -58.7677
+  },
   "feriados": {
     "abre": "20:00",
     "cierra": "00:00",
