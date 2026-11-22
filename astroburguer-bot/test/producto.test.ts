@@ -200,3 +200,37 @@ test("palabras sueltas como 'listo' o 'sale' sin número no se toman como comand
   assert.equal(await comandoStaff(bot, "dale sale"), null);
   assert.match((await comandoStaff(bot, "pedidos"))!, /No hay pedidos activos/);
 });
+
+test("derivar a una persona: el bot se calla, reenvía al local y el local responde con 'r N'", async () => {
+  const guion = [
+    { stop_reason: "tool_use", content: [{ type: "tool_use", id: "d1", name: "derivar_a_humano", input: { motivo: "quiere bacon en la hamburguesa" } }] },
+    { stop_reason: "end_turn", content: [{ type: "text", text: "Ya te responde alguien del local 🙌" }] },
+  ];
+  let llamadas = 0;
+  const client = { beta: { messages: { create: async () => (llamadas++, guion.shift()) } } } as unknown as Anthropic;
+  const enviados: { tel: string; texto: string }[] = [];
+  const store = new Store(":memory:");
+  const neg = { ...negocio, equipo: { encargados: ["5491100000001"], cocina: [] } };
+  const bot = new Bot({ store, menu, negocio: neg, client, mensajero: { enviarTexto: async (tel, texto) => void enviados.push({ tel, texto }) }, reloj: () => SABADO_21, dataDir, esperaRafagaMs: 0 });
+
+  await bot.recibir("549111", { tipo: "texto", texto: "le podés agregar bacon a la doble?" });
+  assert.ok(bot.enAtencionHumana("549111"));
+  const aviso = enviados.find((e) => e.tel === "5491100000001")!.texto;
+  assert.match(aviso, /Te necesitan.*pedido #1/s);
+  assert.match(aviso, /r 1 tu mensaje/);
+
+  // mientras atiende una persona, el bot no llama a la IA y reenvía
+  await bot.recibir("549111", { tipo: "texto", texto: "hola? sigue ahí?" });
+  assert.equal(llamadas, 2);
+  assert.match(enviados.at(-1)!.texto, /💬 #1 .*hola\? sigue ahí\?/);
+
+  // el encargado responde (respetando mayúsculas) y después devuelve al bot
+  assert.match((await comandoStaff(bot, "r 1 Sí, te lo ponemos por $2.500 extra 👍"))!, /Enviado/);
+  assert.deepEqual(enviados.at(-1), { tel: "549111", texto: "Sí, te lo ponemos por $2.500 extra 👍" });
+  assert.match((await comandoStaff(bot, "bot 1"))!, /vuelve a atender/);
+  assert.equal(bot.enAtencionHumana("549111"), false);
+
+  // el historial queda con lo que dijo el local, para que la IA siga con contexto
+  const hist = JSON.stringify(store.conversacion("549111")!.mensajes);
+  assert.match(hist, /te lo ponemos por \$2\.500/);
+});

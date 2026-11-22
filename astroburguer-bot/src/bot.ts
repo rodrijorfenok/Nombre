@@ -151,7 +151,7 @@ export class Bot {
   // ------------------------------------------------------------------
 
   private async procesar(telefono: string, msg: Entrante) {
-    if (msg.tipo === "audio") {
+    if (msg.tipo === "audio" && !this.enAtencionHumana(telefono)) {
       await this.mensajero.enviarTexto(telefono, "Por ahora no puedo escuchar audios 🙏 ¿Me lo escribís así no se me escapa nada?");
       return;
     }
@@ -160,6 +160,11 @@ export class Bot {
 
     if (msg.tipo === "imagen" && ["esperando_pago", "pago_en_revision"].includes(pedido.estado)) {
       await this.procesarComprobante(conv, pedido, msg.datos, msg.mime);
+      return;
+    }
+
+    if (this.enAtencionHumana(telefono)) {
+      await this.reenviarAlLocal(conv, pedido, msg);
       return;
     }
 
@@ -189,7 +194,7 @@ export class Bot {
         contenido = [
           {
             type: "text",
-            text: `[El cliente compartió su ubicación: ${msg.direccion ?? ""} ${msg.nombre ?? ""} (lat ${msg.lat}, lng ${msg.lng}). Si no dio calle, altura y entre calles, pedíselas.]`,
+            text: `[El cliente compartió su ubicación: ${msg.direccion ?? ""} ${msg.nombre ?? ""} (lat ${msg.lat}, lng ${msg.lng}). ${zonaPorUbicacion(this.negocio, msg.lat, msg.lng)} Si no dio calle, altura y entre calles, pedíselas.]`,
           },
         ];
         break;
@@ -208,6 +213,9 @@ export class Bot {
       }
       case "otro":
         contenido = [{ type: "text", text: `[El cliente envió ${msg.descripcion}, que no se puede procesar.]` }];
+        break;
+      case "audio":
+        contenido = [{ type: "text", text: "[El cliente envió un audio, que no se puede escuchar. Pedile que lo escriba.]" }];
         break;
     }
     await this.turnoAgente(conv, pedido, contenido);
@@ -331,6 +339,9 @@ export class Bot {
       case "avisar_staff":
         await this.avisarStaff(e.texto);
         break;
+      case "atencion_humana":
+        await this.iniciarAtencionHumana(e.pedidoId, e.motivo);
+        break;
       case "verificar_comprobante_pendiente": {
         const p = this.store.pedido(e.pedidoId) as PedidoConPendiente | null;
         if (p?.comprobantePendiente && fs.existsSync(p.comprobantePendiente)) {
@@ -428,6 +439,82 @@ export class Bot {
     if (c) this.agregarAlHistorial(c, evento, textoEnviado);
   }
 
+  // ------------------------- atención humana -------------------------
+
+  enAtencionHumana(telefono: string): boolean {
+    const hasta = this.store.ajuste(`humano:${telefono}`);
+    return Boolean(hasta && new Date(hasta).getTime() > this.reloj().getTime());
+  }
+
+  private extenderAtencionHumana(telefono: string) {
+    const min = this.negocio.asistente.minutosAtencionHumana;
+    this.store.setAjuste(`humano:${telefono}`, new Date(this.reloj().getTime() + min * 60_000).toISOString());
+  }
+
+  /** El bot deja de responderle a este cliente y le pasa la charla al local. */
+  async iniciarAtencionHumana(pedidoId: number, motivo: string) {
+    const p = this.store.pedido(pedidoId);
+    if (!p) return;
+    this.extenderAtencionHumana(p.telefono);
+    const conv = this.store.conversacion(p.telefono);
+    const ultimos = (conv?.mensajes ?? [])
+      .filter((m) => m.role === "user" && typeof m.content !== "string")
+      .flatMap((m) => (m.content as Anthropic.Beta.BetaContentBlockParam[]).filter((b) => b.type === "text").map((b) => (b as { text: string }).text))
+      .filter((t) => !t.startsWith("["))
+      .slice(-3);
+    const resumen = p.lineas.length ? `\n🛒 ${calcularTotales(this.menu, this.negocio, p).lineas.map((l) => `${l.cantidad}x ${l.nombre}`).join(", ")}` : "";
+    await this.avisarStaff(
+      `🙋 *Te necesitan* — pedido #${p.id} · ${p.cliente ?? "cliente"} (${p.telefono})\nMotivo: ${motivo}${resumen}` +
+        (ultimos.length ? `\nÚltimo que escribió: "${ultimos.join(" / ")}"` : "") +
+        `\n\n✍️ Respondele: *r ${p.id} tu mensaje*\n🤖 Para que el bot siga: *bot ${p.id}*\n(si nadie responde en ${this.negocio.asistente.minutosAtencionHumana} min, el bot retoma solo)`,
+    );
+  }
+
+  /** Mientras atiende una persona, todo lo que manda el cliente se reenvía al local. */
+  private async reenviarAlLocal(conv: Conversacion, pedido: PedidoConPendiente, msg: Entrante) {
+    let texto: string;
+    switch (msg.tipo) {
+      case "texto":
+        texto = msg.texto;
+        break;
+      case "ubicacion":
+        texto = `📍 ubicación: https://maps.google.com/?q=${msg.lat},${msg.lng} ${msg.direccion ?? ""}`;
+        break;
+      case "imagen": {
+        const f = this.guardarArchivo(pedido.id!, msg.datos, msg.mime);
+        texto = `📷 mandó una imagen${msg.caption ? `: ${msg.caption}` : ""} (guardada en ${path.basename(f)})`;
+        break;
+      }
+      case "audio":
+        texto = "🎤 mandó un audio (pedile que lo escriba)";
+        break;
+      default:
+        texto = `mandó ${msg.descripcion}`;
+    }
+    await this.avisarStaff(`💬 #${pedido.id} ${pedido.cliente ?? pedido.telefono}: ${texto}\n↩️ *r ${pedido.id} …*  ·  🤖 *bot ${pedido.id}*`);
+    this.agregarAlHistorial(conv, msg.tipo === "texto" ? msg.texto : `[${texto}]`, "[Este mensaje lo está atendiendo una persona del local; el bot no respondió.]");
+  }
+
+  /** El local le escribe al cliente a través del bot (comando "r N mensaje"). */
+  async responderComoLocal(pedidoId: number, texto: string): Promise<string> {
+    const p = this.store.pedido(pedidoId);
+    if (!p) throw new Error(`No encuentro el pedido ${pedidoId}.`);
+    this.extenderAtencionHumana(p.telefono);
+    await this.mensajero.enviarTexto(p.telefono, texto);
+    this.registrarEvento(p.telefono, "[Mensaje escrito por una persona del local]", texto);
+    return `✅ Enviado a ${p.cliente ?? p.telefono}. Cuando termines: *bot ${p.id}*`;
+  }
+
+  /** Devuelve la conversación al bot (comando "bot N"). */
+  devolverAlBot(pedidoId: number): string {
+    const p = this.store.pedido(pedidoId);
+    if (!p) throw new Error(`No encuentro el pedido ${pedidoId}.`);
+    this.store.setAjuste(`humano:${p.telefono}`, null);
+    const c = this.store.conversacion(p.telefono);
+    if (c) this.agregarAlHistorial(c, "[Aviso del local: la persona terminó de atender; el bot vuelve a responder. Seguí con el pedido teniendo en cuenta lo que se habló.]", "Entendido.");
+    return `🤖 El bot vuelve a atender a ${p.cliente ?? p.telefono} (pedido #${p.id}).`;
+  }
+
   // ------------------------- avisos -------------------------
 
   async enviarComanda(pedidoId: number) {
@@ -443,4 +530,19 @@ export class Bot {
     for (const n of this.negocio.equipo.encargados) await this.mensajero.enviarTexto(n, texto).catch((e) => console.error("[staff]", e));
     console.log(`[${this.negocio.nombre}] ${texto}`);
   }
+}
+
+/** Distancia del cliente al local en cuadras (línea recta × 1,3 por el recorrido real) y zona que le toca. */
+export function zonaPorUbicacion(negocio: Negocio, lat: number, lng: number): string {
+  if (!negocio.ubicacion) return "";
+  const R = 6371;
+  const rad = (g: number) => (g * Math.PI) / 180;
+  const dLat = rad(lat - negocio.ubicacion.lat);
+  const dLng = rad(lng - negocio.ubicacion.lng);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(rad(negocio.ubicacion.lat)) * Math.cos(rad(lat)) * Math.sin(dLng / 2) ** 2;
+  const km = 2 * R * Math.asin(Math.sqrt(a)) * 1.3;
+  const cuadras = Math.round(km * 10);
+  const zona = negocio.delivery.zonas.find((z) => z.hastaCuadras !== undefined && cuadras <= z.hastaCuadras);
+  if (zona) return `Está a unas ${cuadras} cuadras del local: corresponde la zona ${zona.id} (${zona.nombre}).`;
+  return `Está a unas ${cuadras} cuadras del local: queda FUERA del área de delivery. Ofrecé take away o derivá a una persona.`;
 }

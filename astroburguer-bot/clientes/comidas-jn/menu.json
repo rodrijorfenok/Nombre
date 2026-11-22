@@ -101,7 +101,7 @@
       "id": "clasica",
       "categoria": "hamburguesas",
       "nombre": "Hamburguesa Clásica",
-      "descripcion": "Medallón de carne, queso tybo, lechuga y tomate.",
+      "descripcion": "Medallón de carne, queso tybo, lechuga y tomate. Viene con papas fritas y lata de Coca-Cola o Sprite.",
       "precio": 11500,
       "ingredientes": [
         "queso tybo",
@@ -134,6 +134,21 @@
               "precio": 3000
             }
           ]
+        },
+        {
+          "grupo": "bebida",
+          "valores": [
+            {
+              "id": "coca",
+              "nombre": "Lata de Coca-Cola",
+              "precio": 0
+            },
+            {
+              "id": "sprite",
+              "nombre": "Lata de Sprite",
+              "precio": 0
+            }
+          ]
         }
       ]
     },
@@ -141,7 +156,7 @@
       "id": "super-americana",
       "categoria": "hamburguesas",
       "nombre": "Super Americana",
-      "descripcion": "Medallón de carne, cheddar, bacon, cebolla caramelizada y barbacoa. Viene con papas fritas y bebida incluidas.",
+      "descripcion": "Medallón de carne, cheddar, bacon, cebolla caramelizada y barbacoa. Viene con papas fritas y lata de Coca-Cola o Sprite.",
       "precio": 11500,
       "ingredientes": [
         "cheddar",
@@ -174,6 +189,21 @@
               "precio": 3000
             }
           ]
+        },
+        {
+          "grupo": "bebida",
+          "valores": [
+            {
+              "id": "coca",
+              "nombre": "Lata de Coca-Cola",
+              "precio": 0
+            },
+            {
+              "id": "sprite",
+              "nombre": "Lata de Sprite",
+              "precio": 0
+            }
+          ]
         }
       ]
     },
@@ -181,7 +211,7 @@
       "id": "cuarto-de-libra",
       "categoria": "hamburguesas",
       "nombre": "Cuarto de Libra",
-      "descripcion": "Medallón de carne, cheddar, cebolla brunoise, ketchup y mostaza. Viene con papas fritas y bebida incluidas.",
+      "descripcion": "Medallón de carne, cheddar, cebolla brunoise, ketchup y mostaza. Viene con papas fritas y lata de Coca-Cola o Sprite.",
       "precio": 11500,
       "ingredientes": [
         "cheddar",
@@ -212,6 +242,21 @@
               "id": "triple",
               "nombre": "Triple",
               "precio": 3000
+            }
+          ]
+        },
+        {
+          "grupo": "bebida",
+          "valores": [
+            {
+              "id": "coca",
+              "nombre": "Lata de Coca-Cola",
+              "precio": 0
+            },
+            {
+              "id": "sprite",
+              "nombre": "Lata de Sprite",
+              "precio": 0
             }
           ]
         }
@@ -393,7 +438,7 @@
       "id": "milas-con-fritas",
       "categoria": "milanesas",
       "nombre": "Milanesas con fritas p/2",
-      "descripcion": "Dos milanesas + papas fritas para 2 personas (promo \"¡Hoy sale con fritas!\").",
+      "descripcion": "Dos milanesas + papas fritas para 2 personas.",
       "precio": 24000,
       "ingredientes": [],
       "apodos": [

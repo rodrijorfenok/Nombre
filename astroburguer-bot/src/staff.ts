@@ -20,6 +20,8 @@ export const AYUDA_STAFF = `🛠️ *Comandos del local*
 • carta — precios y faltantes de hoy
 • demora M — sumar M minutos a todos los tiempos (demora 0 = normal)
 • cerrar / abrir / auto — forzar local cerrado, abierto o volver al horario
+• r N mensaje — responderle vos al cliente del pedido N
+• bot N — que el bot vuelva a atender a ese cliente
 • ayuda`;
 
 const ETIQUETA: Record<EstadoPedido, string> = {
@@ -38,11 +40,11 @@ export async function comandoStaff(bot: Bot, texto: string): Promise<string | nu
   const t = texto.trim().toLowerCase().replace(/\s+/g, " ").replace(/^[#/]/, "");
   const catalogo = await comandoCatalogo(bot, t);
   if (catalogo) return catalogo;
-  const m = t.match(/^(pedidos|ver|pago ok|pago no|listo|sale|salio|salió|entregado|cancelar|demora|cerrar|abrir|auto|ayuda)\b ?(\d+)? ?(.*)$/);
+  const m = t.match(/^(pedidos|ver|pago ok|pago no|listo|sale|salio|salió|entregado|cancelar|demora|cerrar|abrir|auto|ayuda|responder|r|bot)\b ?(\d+)? ?(.*)$/);
   if (!m) return null;
   const [, cmd, numStr, resto] = m;
   // "listo", "ver", "sale"… sin número de pedido no son comandos: puede ser el encargado charlando o haciendo un pedido.
-  if (!numStr && ["ver", "pago ok", "pago no", "listo", "sale", "salio", "salió", "entregado", "cancelar"].includes(cmd)) return null;
+  if (!numStr && ["ver", "pago ok", "pago no", "listo", "sale", "salio", "salió", "entregado", "cancelar", "responder", "r", "bot"].includes(cmd)) return null;
   const n = numStr ? Number(numStr) : NaN;
   const { store, menu, negocio, mensajero } = bot;
 
@@ -60,6 +62,15 @@ export async function comandoStaff(bot: Bot, texto: string): Promise<string | nu
     switch (cmd) {
       case "ayuda":
         return AYUDA_STAFF;
+      case "r":
+      case "responder": {
+        // el texto original, sin pasar a minúsculas
+        const original = texto.trim().replace(/^[#/]?\s*(responder|r)\s+\d+\s*/i, "");
+        if (!original) return `Escribí el mensaje después del número: r ${n} hola, ¿qué necesitás?`;
+        return await bot.responderComoLocal(n, original);
+      }
+      case "bot":
+        return bot.devolverAlBot(n);
       case "pedidos": {
         const ps = store.pedidosActivos();
         if (!ps.length) return "No hay pedidos activos.";

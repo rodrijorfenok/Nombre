@@ -97,7 +97,7 @@ const DESCRIPCIONES: Record<NombreHerramienta, string> = {
   cancelar_pedido: "Cancela el pedido si todavía no entró a cocina.",
   nuevo_pedido: "Empieza un pedido nuevo cuando el anterior ya está confirmado y el cliente quiere hacer otro aparte.",
   derivar_a_humano:
-    "Avisa al personal del local para que atienda: reclamos, pedidos de catering o eventos, alergias severas, problemas de pago o cualquier cosa que no puedas resolver.",
+    "Pasa la conversación a una persona del local: el bot deja de responder a este cliente hasta que el local lo libere. Usalo ante reclamos, pedidos especiales que no están en la carta, situaciones de la lista 'Derivar a una persona', o cuando no estés seguro de la respuesta. Más vale derivar que responder mal.",
 };
 
 export function definicionesHerramientas(): Anthropic.Beta.BetaTool[] {
@@ -112,6 +112,7 @@ export function definicionesHerramientas(): Anthropic.Beta.BetaTool[] {
 export type Efecto =
   | { tipo: "comanda"; pedidoId: number }
   | { tipo: "avisar_staff"; texto: string }
+  | { tipo: "atencion_humana"; pedidoId: number; motivo: string }
   | { tipo: "verificar_comprobante_pendiente"; pedidoId: number };
 
 export interface ContextoHerramientas {
@@ -366,11 +367,8 @@ export function ejecutarHerramienta(nombre: string, input: unknown, ctx: Context
       return `Pedido nuevo #${nuevo.id} iniciado (vacío).`;
     }
     case "derivar_a_humano": {
-      ctx.efectos.push({
-        tipo: "avisar_staff",
-        texto: `🙋 Cliente ${pedido.cliente ?? ""} (${pedido.telefono}) necesita atención${pedido.id ? ` — pedido #${pedido.id}` : ""}: ${a.motivo}`,
-      });
-      return "Aviso enviado al personal. Decile al cliente que en breve lo contacta una persona del local.";
+      ctx.efectos.push({ tipo: "atencion_humana", pedidoId: pedido.id!, motivo: a.motivo });
+      return "Listo: una persona del local toma la conversación. Decile al cliente, en una línea y con buena onda, que ya le responde alguien del local. No agregues nada más.";
     }
   }
 }

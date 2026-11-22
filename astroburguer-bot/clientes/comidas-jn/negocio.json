@@ -2,7 +2,7 @@
   "nombre": "Comidas JN",
   "rubro": "local de comida rápida (hamburguesas, pizzas, milanesas y papas)",
   "zonaHoraria": "America/Argentina/Buenos_Aires",
-  "direccionLocal": "COMPLETAR dirección del local",
+  "direccionLocal": "La Pinta 3351, entre Arricau y Marconi (José C. Paz, límite con San Miguel)",
   "horarios": [
     {
       "dias": [
@@ -22,43 +22,59 @@
     "tono": "canchero",
     "emojis": true,
     "datosExtra": [
-      "La Super Americana y el Cuarto de Libra vienen con papas fritas y bebida incluidas.",
-      "Las promos de milanesas con fritas son para 2 personas.",
-      "Las pizzas especiales de la Promo N°1 se eligen entre: jamón y morrón, calabresa, jamón y tomate, fugazzeta, jamón y huevo, jamón y queso."
+      "Todas las hamburguesas vienen con papas fritas y una lata de Coca-Cola o Sprite a elección. No se venden bebidas sueltas.",
+      "Las milanesas con fritas son para 2 personas.",
+      "En la Promo N°1 la pizza especial se elige entre las especiales de $14.000: jamón y morrón, calabresa, jamón y tomate, fugazzeta, jamón y huevo, jamón y queso. La Pizza JN no entra en la promo.",
+      "Los agregados (cheddar y bacon) son solo para las papas fritas."
     ],
-    "sugerencia": "unas papas fritas (hay cono, porción individual, grande o caja)"
+    "sugerencia": "unas papas fritas (hay cono, porción individual, grande o caja de pizza)",
+    "derivarCuando": [
+      "El cliente pide agregados (cheddar, bacon u otro) en una hamburguesa o en algo que no sean papas: eso lo decide el local."
+    ],
+    "minutosAtencionHumana": 30
   },
   "pago": {
-    "alias": "COMPLETAR.ALIAS",
+    "alias": "comidas.jn.mp",
     "cvu": "",
-    "titular": "COMPLETAR titular de la cuenta",
-    "banco": "",
+    "titular": "Adelma Isabel Nieva",
+    "banco": "Mercado Pago",
     "aceptaEfectivo": true,
     "comandaAntesDelPago": false,
     "minutosValidezComprobante": 180
   },
   "delivery": {
-    "pedidoMinimo": 10000,
+    "pedidoMinimo": 9500,
     "zonas": [
       {
         "id": "z1",
-        "nombre": "Zona 1 (hasta 15 cuadras)",
-        "referencia": "Centro y barrios pegados al local",
+        "nombre": "Zona 1 (hasta 10 cuadras)",
+        "referencia": "Alrededores del local: Barrio Arricau, a ambos lados de Arricau (José C. Paz / San Miguel). Reparto en bici.",
+        "hastaCuadras": 10,
         "costo": 1500,
         "minutos": 10
       },
       {
         "id": "z2",
-        "nombre": "Zona 2 (15 a 30 cuadras)",
-        "referencia": "Barrios cercanos",
+        "nombre": "Zona 2 (11 a 20 cuadras)",
+        "referencia": "Bici o moto.",
+        "hastaCuadras": 20,
         "costo": 2500,
-        "minutos": 18
+        "minutos": 15
       },
       {
         "id": "z3",
-        "nombre": "Zona 3 (30 a 50 cuadras)",
-        "referencia": "Barrios alejados",
+        "nombre": "Zona 3 (21 a 35 cuadras)",
+        "referencia": "Solo moto.",
+        "hastaCuadras": 35,
         "costo": 3500,
+        "minutos": 20
+      },
+      {
+        "id": "z4",
+        "nombre": "Zona 4 (36 a 50 cuadras)",
+        "referencia": "Solo moto. Más lejos de 50 cuadras no llegamos.",
+        "hastaCuadras": 50,
+        "costo": 4500,
         "minutos": 25
       }
     ]
@@ -79,5 +95,6 @@
   },
   "panel": {
     "token": "env:COMIDAS_JN_PANEL_TOKEN"
-  }
+  },
+  "ubicacion": null
 }

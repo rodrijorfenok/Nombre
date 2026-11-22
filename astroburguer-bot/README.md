@@ -40,8 +40,20 @@ agotado napo / hay napo    marcar faltante o repuesto
 carta                      precios y faltantes de hoy
 demora 15                  +15 min a todos los tiempos (demora 0 = normal)
 cerrar / abrir / auto      forzar cerrado, abierto o volver al horario
+r 12 mensaje               responderle vos al cliente del pedido 12 (cuando el bot te lo derivó)
+bot 12                     que el bot vuelva a atender a ese cliente
 ayuda
 ```
+
+## Cuando el bot no debe responder: atención humana
+
+Ante la duda, el bot no inventa: deriva a una persona. Lo hace con reclamos, alergias, pedidos especiales, cuando el cliente pide hablar con alguien y en las situaciones que cada local define en `asistente.derivarCuando` (por ejemplo, "agregados en hamburguesas").
+
+Desde ese momento:
+- El bot le dice al cliente que ya le responde alguien y **deja de contestarle**.
+- El encargado recibe en su WhatsApp el motivo, el pedido y lo último que escribió el cliente, y cada mensaje nuevo del cliente se le reenvía.
+- El encargado contesta desde su celular con `r 12 tu mensaje`, y el cliente lo recibe desde el número del local.
+- Con `bot 12` el bot retoma la charla, sabiendo lo que se habló. Si nadie responde en 30 minutos (configurable), retoma solo.
 
 ## Sumar un local nuevo (unos 30 minutos)
 

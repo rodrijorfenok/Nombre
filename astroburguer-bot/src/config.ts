@@ -61,8 +61,14 @@ export const NegocioSchema = z.object({
       datosExtra: z.array(z.string()).default([]),
       /** producto para sugerir una sola vez si el cliente no pidió bebida ni acompañamiento */
       sugerencia: z.string().default("una bebida o unas papas"),
+      /** situaciones en las que NO responde la IA sino una persona del local */
+      derivarCuando: z.array(z.string()).default([]),
+      /** minutos que el bot queda en pausa con ese cliente después de derivarlo a una persona */
+      minutosAtencionHumana: z.number().default(30),
     })
-    .default({ nombre: "", tono: "canchero", emojis: true, datosExtra: [], sugerencia: "una bebida o unas papas" }),
+    .default({ nombre: "", tono: "canchero", emojis: true, datosExtra: [], sugerencia: "una bebida o unas papas", derivarCuando: [], minutosAtencionHumana: 30 }),
+  /** coordenadas del local (para calcular la zona cuando el cliente comparte su ubicación) */
+  ubicacion: z.object({ lat: z.number(), lng: z.number() }).nullable().default(null),
   pago: z.object({
     alias: z.string(),
     cvu: z.string().default(""),
@@ -79,6 +85,8 @@ export const NegocioSchema = z.object({
         id: z.string(),
         nombre: z.string(),
         referencia: z.string().default(""),
+        /** límite de la zona en cuadras desde el local (1 cuadra ≈ 100 m) */
+        hastaCuadras: z.number().optional(),
         costo: z.number(),
         minutos: z.number(),
       }),
