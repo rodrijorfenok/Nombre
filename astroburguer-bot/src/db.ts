@@ -8,6 +8,8 @@ export type Mensaje = Anthropic.Beta.BetaMessageParam;
 
 export interface Conversacion {
   telefono: string;
+  /** system prompt con el que empezó esta conversación: se mantiene fijo toda su vida */
+  system?: string;
   mensajes: Mensaje[];
   pedidoId: number | null;
   actualizadoEn: string;
@@ -46,6 +48,7 @@ export class Store {
       CREATE TABLE IF NOT EXISTS conversaciones (
         telefono TEXT PRIMARY KEY,
         mensajes TEXT NOT NULL,
+        system TEXT,
         pedido_id INTEGER,
         actualizado_en TEXT NOT NULL
       );
@@ -109,19 +112,19 @@ export class Store {
   // ---------- conversaciones ----------
   conversacion(telefono: string): Conversacion | null {
     const r = this.db.prepare("SELECT * FROM conversaciones WHERE telefono = ?").get(telefono) as
-      | { telefono: string; mensajes: string; pedido_id: number | null; actualizado_en: string }
+      | { telefono: string; mensajes: string; system: string | null; pedido_id: number | null; actualizado_en: string }
       | undefined;
     if (!r) return null;
-    return { telefono: r.telefono, mensajes: JSON.parse(r.mensajes), pedidoId: r.pedido_id, actualizadoEn: r.actualizado_en };
+    return { telefono: r.telefono, system: r.system ?? undefined, mensajes: JSON.parse(r.mensajes), pedidoId: r.pedido_id, actualizadoEn: r.actualizado_en };
   }
 
   guardarConversacion(c: Conversacion) {
     this.db
       .prepare(
-        `INSERT INTO conversaciones (telefono, mensajes, pedido_id, actualizado_en) VALUES (?, ?, ?, ?)
-         ON CONFLICT(telefono) DO UPDATE SET mensajes = excluded.mensajes, pedido_id = excluded.pedido_id, actualizado_en = excluded.actualizado_en`,
+        `INSERT INTO conversaciones (telefono, mensajes, system, pedido_id, actualizado_en) VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(telefono) DO UPDATE SET mensajes = excluded.mensajes, system = excluded.system, pedido_id = excluded.pedido_id, actualizado_en = excluded.actualizado_en`,
       )
-      .run(c.telefono, JSON.stringify(c.mensajes), c.pedidoId, new Date().toISOString());
+      .run(c.telefono, JSON.stringify(c.mensajes), c.system ?? null, c.pedidoId, c.actualizadoEn);
   }
 
   // ---------- comprobantes ----------
@@ -181,6 +184,11 @@ export class Store {
   setAjuste(clave: string, valor: string | null) {
     if (valor === null) this.db.prepare("DELETE FROM ajustes WHERE clave = ?").run(clave);
     else this.db.prepare("INSERT INTO ajustes (clave, valor) VALUES (?, ?) ON CONFLICT(clave) DO UPDATE SET valor = excluded.valor").run(clave, valor);
+  }
+
+  ajustesConPrefijo(prefijo: string): Record<string, string> {
+    const rows = this.db.prepare("SELECT clave, valor FROM ajustes WHERE clave LIKE ? || '%'").all(prefijo) as { clave: string; valor: string }[];
+    return Object.fromEntries(rows.map((r) => [r.clave.slice(prefijo.length), r.valor]));
   }
 
   /** Idempotencia de webhooks: WhatsApp reintenta entregas. Devuelve false si ya se procesó. */

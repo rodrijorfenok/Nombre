@@ -22,6 +22,8 @@ export interface LineaPedido {
   extras: string[];
   sinIngredientes: string[];
   observacion: string;
+  /** precio unitario congelado al cargar la línea: si el local cambia precios, los pedidos en curso no cambian */
+  precioUnitario?: number;
 }
 
 export interface Entrega {
@@ -73,7 +75,7 @@ export interface LineaInput {
 function buscarProducto(menu: Menu, id: string): Producto {
   const p = menu.productos.find((x) => x.id === id);
   if (!p) throw new ErrorPedido(`No existe el producto "${id}". Usá ver_menu para ver los ids válidos.`);
-  if (!p.disponible) throw new ErrorPedido(`"${p.nombre}" no está disponible hoy.`);
+  if (!p.disponible) throw new ErrorPedido(`"${p.nombre}" está AGOTADO hoy. Ofrecé una alternativa parecida.`);
   return p;
 }
 
@@ -108,6 +110,7 @@ function resolverOpciones(p: Producto, input: { grupo: string; valor: string }[]
 function resolverExtras(menu: Menu, p: Producto, extras: string[] = []) {
   return extras.map((e) => {
     const ex = menu.extras.find((x) => x.id === e || normalizar(x.nombre) === normalizar(e));
+    if (ex && !ex.disponible) throw new ErrorPedido(`El extra "${ex.nombre}" está agotado hoy.`);
     if (!ex || !p.extras.includes(ex.id)) {
       const permitidos = p.extras.map((id) => menu.extras.find((x) => x.id === id)!).map((x) => `${x.id} (${x.nombre} ${pesos(x.precio)})`);
       throw new ErrorPedido(`El extra "${e}" no se puede agregar a "${p.nombre}". Extras posibles: ${permitidos.join(", ") || "ninguno"}.`);
@@ -129,6 +132,7 @@ export function agregarLinea(menu: Menu, pedido: Pedido, input: LineaInput): Lin
     sinIngredientes: (input.sin_ingredientes ?? []).map((s) => s.trim()).filter(Boolean),
     observacion: (input.observacion ?? "").trim(),
   };
+  linea.precioUnitario = calcularUnitario(menu, linea);
   pedido.lineas.push(linea);
   return linea;
 }
@@ -155,6 +159,7 @@ export function modificarLinea(menu: Menu, pedido: Pedido, c: CambiosLinea): Lin
   if (c.extras) l.extras = resolverExtras(menu, p, c.extras);
   if (c.sin_ingredientes) l.sinIngredientes = c.sin_ingredientes.map((s) => s.trim()).filter(Boolean);
   if (c.observacion !== undefined) l.observacion = c.observacion.trim();
+  if (c.opciones || c.extras) l.precioUnitario = calcularUnitario(menu, l);
   return l;
 }
 
@@ -185,6 +190,10 @@ export interface Totales {
   zona?: { id: string; nombre: string; costo: number; minutos: number };
 }
 
+function calcularUnitario(menu: Menu, l: LineaPedido): number {
+  return detalleLinea(menu, { ...l, precioUnitario: undefined }).precioUnitario;
+}
+
 export function detalleLinea(menu: Menu, l: LineaPedido): DetalleLinea {
   const p = menu.productos.find((x) => x.id === l.productoId);
   if (!p) throw new ErrorPedido(`Producto ${l.productoId} ya no existe en el menú.`);
@@ -202,6 +211,7 @@ export function detalleLinea(menu: Menu, l: LineaPedido): DetalleLinea {
     unit += e.precio;
     return { nombre: e.nombre, precio: e.precio };
   });
+  if (l.precioUnitario !== undefined) unit = l.precioUnitario;
   return {
     linea: l.linea,
     cantidad: l.cantidad,

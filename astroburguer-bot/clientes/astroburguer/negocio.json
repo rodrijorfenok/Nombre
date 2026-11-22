@@ -1,10 +1,31 @@
 {
   "nombre": "Astroburguer",
+  "rubro": "hamburguesería, pizzería y rotisería",
   "zonaHoraria": "America/Argentina/Buenos_Aires",
   "direccionLocal": "COMPLETAR: calle y número del local",
   "horarios": [
-    { "dias": [2, 3, 4, 5, 6, 0], "abre": "19:30", "cierra": "00:30" }
+    {
+      "dias": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        0
+      ],
+      "abre": "19:30",
+      "cierra": "00:30"
+    }
   ],
+  "asistente": {
+    "nombre": "",
+    "tono": "canchero",
+    "emojis": true,
+    "datosExtra": [
+      "Las papas son caseras y los medallones se hacen en el local todos los días."
+    ],
+    "sugerencia": "unas Papas Astro o una bebida"
+  },
   "pago": {
     "alias": "ASTROBURGUER.MP",
     "cvu": "0000003100000000000000",
@@ -45,5 +66,16 @@
     "minutosPorTanda": 12,
     "minutosPorUnidadExtra": 1.5,
     "unidadesSinRecargo": 3
+  },
+  "equipo": {
+    "encargados": [],
+    "cocina": []
+  },
+  "whatsapp": {
+    "phoneNumberId": "env:ASTROBURGUER_WA_PHONE_ID",
+    "token": "env:ASTROBURGUER_WA_TOKEN"
+  },
+  "panel": {
+    "token": "env:ASTROBURGUER_PANEL_TOKEN"
   }
 }

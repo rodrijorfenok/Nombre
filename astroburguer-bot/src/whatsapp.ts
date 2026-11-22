@@ -9,11 +9,11 @@ export class WhatsAppCloud implements Mensajero {
   private base: string;
 
   constructor(
-    private token = process.env.WHATSAPP_TOKEN ?? "",
-    private phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID ?? "",
+    private token: string,
+    readonly phoneNumberId: string,
     version = process.env.GRAPH_API_VERSION ?? "v23.0",
   ) {
-    if (!token || !phoneNumberId) throw new Error("Faltan WHATSAPP_TOKEN o WHATSAPP_PHONE_NUMBER_ID");
+    if (!token || !phoneNumberId) throw new Error("Faltan el token o el phoneNumberId de WhatsApp");
     this.base = `https://graph.facebook.com/${version}`;
   }
 
@@ -29,11 +29,17 @@ export class WhatsAppCloud implements Mensajero {
     }
   }
 
-  async marcarLeido(messageId: string) {
+  /** Marca el mensaje como leído (tildes azules) y muestra "escribiendo…" mientras se arma la respuesta. */
+  async marcarLeido(messageId: string, escribiendo = true) {
     await fetch(`${this.base}/${this.phoneNumberId}/messages`, {
       method: "POST",
       headers: { Authorization: `Bearer ${this.token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ messaging_product: "whatsapp", status: "read", message_id: messageId }),
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        status: "read",
+        message_id: messageId,
+        ...(escribiendo ? { typing_indicator: { type: "text" } } : {}),
+      }),
     }).catch(() => {});
   }
 
@@ -57,6 +63,8 @@ export function firmaValida(cuerpo: Buffer, firma: string | undefined, appSecret
 }
 
 export interface MensajeWebhook {
+  /** número de WhatsApp del local que recibió el mensaje (para saber a qué local va) */
+  phoneNumberId: string;
   id: string;
   from: string;
   nombrePerfil?: string;
@@ -76,7 +84,7 @@ export function parsearWebhook(body: any): MensajeWebhook[] {
       const v = change?.value;
       const perfiles = new Map<string, string>((v?.contacts ?? []).map((c: any) => [c.wa_id, c.profile?.name]));
       for (const m of v?.messages ?? []) {
-        const base: MensajeWebhook = { id: m.id, from: m.from, nombrePerfil: perfiles.get(m.from), tipo: m.type };
+        const base: MensajeWebhook = { phoneNumberId: String(v?.metadata?.phone_number_id ?? ""), id: m.id, from: m.from, nombrePerfil: perfiles.get(m.from), tipo: m.type };
         switch (m.type) {
           case "text":
             base.texto = m.text?.body;

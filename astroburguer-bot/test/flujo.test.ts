@@ -2,17 +2,16 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type Anthropic from "@anthropic-ai/sdk";
 import { Bot, type Mensajero } from "../src/bot.ts";
-import { cargarConfig, env } from "../src/config.ts";
+import { cargarConfig } from "../src/config.ts";
 import { Store } from "../src/db.ts";
 import { comandoStaff } from "../src/staff.ts";
 
-const { menu, negocio } = cargarConfig("config");
+const { menu, negocio } = cargarConfig("clientes/astroburguer");
 const CLIENTE = "5491122223333";
 const COCINA = "5491199990000";
 const STAFF = "5491188880000";
-env.kitchenNumbers.push(COCINA);
-env.staffNumbers.push(STAFF);
-env.dataDir = `${process.env.TMPDIR ?? "/tmp"}/astro-test-${process.pid}`;
+negocio.equipo = { cocina: [COCINA], encargados: [STAFF] };
+const dataDir = `${process.env.TMPDIR ?? "/tmp"}/astro-test-${process.pid}`;
 
 /** sábado 21:00 en Argentina: local abierto */
 const reloj = () => new Date("2026-11-22T00:00:00Z");
@@ -92,7 +91,7 @@ test("pedido completo por transferencia: agrega, confirma, verifica comprobante 
   });
   const store = new Store(":memory:");
   const { m, enviados } = bandeja();
-  const bot = new Bot(store, menu, negocio, client, m, reloj);
+  const bot = new Bot({ store, menu, negocio, client, mensajero: m, reloj, dataDir, esperaRafagaMs: 0 });
 
   await bot.recibir(CLIENTE, { tipo: "texto", texto: "hola! quiero 2 doble orbita sin cebolla con huevo y una muzza grande con piso" });
   await bot.recibir(CLIENTE, { tipo: "texto", texto: "delivery a Mitre 1234 entre Perón y Belgrano, soy Lucía, pago por transferencia" });
@@ -166,7 +165,7 @@ test("efectivo va directo a cocina; errores de herramientas vuelven al modelo", 
   const { client, llamadas } = clienteFalso(guion, null);
   const store = new Store(":memory:");
   const { m, enviados } = bandeja();
-  const bot = new Bot(store, menu, negocio, client, m, reloj);
+  const bot = new Bot({ store, menu, negocio, client, mensajero: m, reloj, dataDir, esperaRafagaMs: 0 });
 
   await bot.recibir(CLIENTE, { tipo: "texto", texto: "una mila napo" });
   const resultado = llamadas[1].messages.at(-1).content[0];
@@ -196,7 +195,7 @@ test("fuera de horario no se puede confirmar", async () => {
   const { client, llamadas } = clienteFalso(guion, null);
   const { m } = bandeja();
   const store = new Store(":memory:");
-  const bot = new Bot(store, menu, negocio, client, m, () => new Date("2026-11-23T23:00:00Z")); // lunes
+  const bot = new Bot({ store, menu, negocio, client, mensajero: m, reloj: () => new Date("2026-11-23T23:00:00Z"), dataDir, esperaRafagaMs: 0 }); // lunes
   await bot.recibir(CLIENTE, { tipo: "texto", texto: "un agua" });
   const res = llamadas[1].messages.at(-1).content.at(-1);
   assert.equal(res.is_error, true);

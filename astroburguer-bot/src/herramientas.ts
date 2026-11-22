@@ -37,6 +37,9 @@ export const Esquemas = {
   enviar_menu: z.strictObject({
     categoria: z.string().optional().describe("id de categoría para mandar solo esa parte; omitir para el menú completo"),
   }),
+  consultar_precios: z.strictObject({
+    productos: z.array(z.string()).min(1).describe("ids de productos o extras a consultar"),
+  }),
   agregar_productos: z.strictObject({ items: z.array(LineaIn).min(1) }),
   modificar_producto: z.strictObject({
     linea: z.number().int().describe("número de línea [n] que muestra ver_pedido"),
@@ -76,6 +79,8 @@ export type NombreHerramienta = keyof typeof Esquemas;
 const DESCRIPCIONES: Record<NombreHerramienta, string> = {
   enviar_menu:
     "Envía al cliente el menú con precios (completo o de una categoría) como mensaje aparte. Usalo cuando pida la carta o no sepa qué pedir; después no repitas el menú en tu respuesta.",
+  consultar_precios:
+    "Precio vigente, variantes, extras con su costo y disponibilidad de los productos indicados. Usalo cuando pregunten cuánto sale algo o antes de ofrecer una alternativa.",
   agregar_productos:
     "Agrega uno o más productos al pedido. Si falta una opción obligatoria (tamaño, carne, guarnición...) devuelve error con las alternativas: preguntale al cliente. Devuelve el pedido actualizado con precios.",
   modificar_producto: "Cambia una línea existente del pedido (cantidad, opciones, extras, ingredientes a sacar u observación).",
@@ -141,7 +146,7 @@ export function textoMenu(menu: Menu, categoria?: string): string {
   }
   if (!categoria) {
     out.push("➕ *EXTRAS*");
-    out.push(menu.extras.map((e) => `${e.nombre} ${pesos(e.precio)}`).join(" · "));
+    out.push(menu.extras.filter((e) => e.disponible).map((e) => `${e.nombre} ${pesos(e.precio)}`).join(" · "));
   }
   return out.join("\n").trim();
 }
@@ -188,6 +193,27 @@ export function ejecutarHerramienta(nombre: string, input: unknown, ctx: Context
     case "enviar_menu": {
       ctx.salida.push(textoMenu(menu, a.categoria));
       return "Menú enviado al cliente.";
+    }
+    case "consultar_precios": {
+      return (a.productos as string[])
+        .map((id) => {
+          const p = menu.productos.find((x) => x.id === id);
+          if (p) {
+            const variantes = p.opciones
+              .map((g) => `${g.grupo}: ${g.valores.map((v) => `${v.nombre} ${pesos(p.precio + v.precio)}`).join(" / ")}`)
+              .join("; ");
+            const extras = p.extras
+              .map((eid) => menu.extras.find((e) => e.id === eid)!)
+              .filter((e) => e.disponible)
+              .map((e) => `${e.nombre} +${pesos(e.precio)}`)
+              .join(", ");
+            return `${p.nombre}: ${p.disponible ? "" : "AGOTADO HOY. "}${variantes || pesos(p.precio)}${extras ? ` | extras: ${extras}` : ""}`;
+          }
+          const e = menu.extras.find((x) => x.id === id);
+          if (e) return `${e.nombre} (extra): +${pesos(e.precio)}${e.disponible ? "" : " — AGOTADO HOY"}`;
+          return `${id}: no existe en el menú`;
+        })
+        .join("\n");
     }
     case "agregar_productos": {
       const aviso = puedeEditar(ctx);

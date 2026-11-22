@@ -14,6 +14,8 @@ const Producto = z.object({
   opciones: z.array(GrupoOpcion).default([]),
   extras: z.array(z.string()).default([]),
   disponible: z.boolean().default(true),
+  /** palabras con que la gente lo pide: "napo", "muzza", "la de bacon" */
+  apodos: z.array(z.string()).default([]),
 });
 const Categoria = z.object({
   id: z.string(),
@@ -21,7 +23,7 @@ const Categoria = z.object({
   emoji: z.string().default(""),
   prepMin: z.number(),
 });
-const Extra = z.object({ id: z.string(), nombre: z.string(), precio: z.number() });
+const Extra = z.object({ id: z.string(), nombre: z.string(), precio: z.number(), disponible: z.boolean().default(true) });
 
 export const MenuSchema = z.object({
   moneda: z.string().default("ARS"),
@@ -38,9 +40,22 @@ const Horario = z.object({
 
 export const NegocioSchema = z.object({
   nombre: z.string(),
-  zonaHoraria: z.string(),
+  rubro: z.string().default("hamburguesería y rotisería"),
+  zonaHoraria: z.string().default("America/Argentina/Buenos_Aires"),
   direccionLocal: z.string(),
   horarios: z.array(Horario),
+  asistente: z
+    .object({
+      /** nombre con el que se presenta el asistente; vacío = habla como "el local" */
+      nombre: z.string().default(""),
+      tono: z.enum(["canchero", "cordial", "formal"]).default("canchero"),
+      emojis: z.boolean().default(true),
+      /** datos sueltos que el asistente puede contar: "hacemos todo casero", "las papas son caseras" */
+      datosExtra: z.array(z.string()).default([]),
+      /** producto para sugerir una sola vez si el cliente no pidió bebida ni acompañamiento */
+      sugerencia: z.string().default("una bebida o unas papas"),
+    })
+    .default({ nombre: "", tono: "canchero", emojis: true, datosExtra: [], sugerencia: "una bebida o unas papas" }),
   pago: z.object({
     alias: z.string(),
     cvu: z.string().default(""),
@@ -68,18 +83,56 @@ export const NegocioSchema = z.object({
     minutosPorUnidadExtra: z.number(),
     unidadesSinRecargo: z.number().int(),
   }),
+  equipo: z
+    .object({
+      /** reciben avisos y pueden mandar comandos (pago ok, precio, agotado…) */
+      encargados: z.array(z.string()).default([]),
+      /** reciben las comandas */
+      cocina: z.array(z.string()).default([]),
+    })
+    .default({ encargados: [], cocina: [] }),
+  whatsapp: z
+    .object({
+      phoneNumberId: z.string().default(""),
+      token: z.string().default(""),
+    })
+    .default({ phoneNumberId: "", token: "" }),
+  panel: z.object({ token: z.string().default("") }).default({ token: "" }),
 });
 
 export type Menu = z.infer<typeof MenuSchema>;
 export type Producto = z.infer<typeof Producto>;
 export type Negocio = z.infer<typeof NegocioSchema>;
 
-export function cargarConfig(dir = process.env.CONFIG_DIR ?? "config"): { menu: Menu; negocio: Negocio } {
-  const leer = (f: string) => JSON.parse(fs.readFileSync(path.join(dir, f), "utf8"));
+export interface Cliente {
+  /** nombre de la carpeta en clientes/ */
+  slug: string;
+  menu: Menu;
+  negocio: Negocio;
+}
+
+/** Reemplaza "env:NOMBRE" por process.env.NOMBRE para no guardar secretos en el JSON. */
+function resolverEnv(v: unknown): unknown {
+  if (typeof v === "string" && v.startsWith("env:")) return process.env[v.slice(4)] ?? "";
+  if (Array.isArray(v)) return v.map(resolverEnv);
+  if (v && typeof v === "object") return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, resolverEnv(x)]));
+  return v;
+}
+
+export function cargarConfig(dir: string): Cliente {
+  const leer = (f: string) => resolverEnv(JSON.parse(fs.readFileSync(path.join(dir, f), "utf8")));
   const menu = MenuSchema.parse(leer("menu.json"));
   const negocio = NegocioSchema.parse(leer("negocio.json"));
   validarReferencias(menu);
-  return { menu, negocio };
+  return { slug: path.basename(path.resolve(dir)), menu, negocio };
+}
+
+/** Carga todos los locales de clientes/ (una carpeta por local). */
+export function cargarClientes(dir = env.clientesDir): Cliente[] {
+  return fs
+    .readdirSync(dir, { withFileTypes: true })
+    .filter((d) => d.isDirectory() && !d.name.startsWith("_") && fs.existsSync(path.join(dir, d.name, "negocio.json")))
+    .map((d) => cargarConfig(path.join(dir, d.name)));
 }
 
 function validarReferencias(menu: Menu) {
@@ -97,10 +150,14 @@ function validarReferencias(menu: Menu) {
 export const env = {
   model: process.env.CLAUDE_MODEL ?? "claude-opus-5-5",
   effort: (process.env.CLAUDE_EFFORT ?? "low") as "low" | "medium" | "high" | "xhigh" | "max",
-  dbPath: process.env.DB_PATH ?? "data/astroburguer.db",
+  clientesDir: process.env.CLIENTES_DIR ?? "clientes",
   dataDir: process.env.DATA_DIR ?? "data",
-  staffNumbers: (process.env.STAFF_NUMBERS ?? "").split(",").map((s) => s.trim()).filter(Boolean),
-  kitchenNumbers: (process.env.KITCHEN_NUMBERS ?? "").split(",").map((s) => s.trim()).filter(Boolean),
-  panelToken: process.env.PANEL_TOKEN ?? "",
   publicUrl: process.env.PUBLIC_URL ?? "",
+  /** milisegundos que se espera para juntar mensajes seguidos del mismo cliente */
+  esperaRafagaMs: Number(process.env.ESPERA_RAFAGA_MS ?? 2500),
 };
+
+/** Los fallbacks del servidor solo existen para algunos modelos (Haiku no los tiene). */
+export function soportaFallbacks(model: string): boolean {
+  return /^claude-(opus-5|fable-5|sonnet-5-5)/.test(model);
+}

@@ -6,7 +6,7 @@ import { cargarConfig } from "../src/config.ts";
 import { agregarLinea, calcularTotales, ErrorPedido, faltantes, modificarLinea, pedidoNuevo, resumenCliente } from "../src/order.ts";
 import { estaAbierto, estimarEspera } from "../src/tiempos.ts";
 
-const { menu, negocio } = cargarConfig("config");
+const { menu, negocio } = cargarConfig("clientes/astroburguer");
 
 test("suma precios con opciones, extras y cantidad", () => {
   const p = pedidoNuevo("1");

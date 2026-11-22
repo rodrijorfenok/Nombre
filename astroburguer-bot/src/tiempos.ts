@@ -117,3 +117,22 @@ export function textoHorarios(negocio: Negocio): string {
   const nombres = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
   return negocio.horarios.map((h) => `${h.dias.map((d) => nombres[d]).join(", ")}: ${h.abre} a ${h.cierra}`).join("; ");
 }
+
+/** "hoy a las 19:30", "mañana a las 19:30", "el martes a las 19:30" o null si no hay horarios. */
+export function proximaApertura(negocio: Negocio, ahora = new Date()): string | null {
+  const nombres = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+  const { dia, minutos } = partesLocales(ahora, negocio.zonaHoraria);
+  for (let d = 0; d < 8; d++) {
+    const diaSemana = (dia + d) % 7;
+    const aperturas = negocio.horarios
+      .filter((h) => h.dias.includes(diaSemana))
+      .map((h) => h.abre)
+      .filter((abre) => d > 0 || aMin(abre) > minutos)
+      .sort();
+    if (aperturas.length) {
+      const cuando = d === 0 ? "hoy" : d === 1 ? "mañana" : `el ${nombres[diaSemana]}`;
+      return `${cuando} a las ${aperturas[0]}`;
+    }
+  }
+  return null;
+}

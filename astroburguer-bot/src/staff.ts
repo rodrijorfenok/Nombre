@@ -1,4 +1,5 @@
 import type { Bot } from "./bot.ts";
+import { buscarItem } from "./catalogo.ts";
 import { comandaTexto } from "./comanda.ts";
 import { pesos } from "./money.ts";
 import { calcularTotales, type EstadoPedido } from "./order.ts";
@@ -13,6 +14,10 @@ export const AYUDA_STAFF = `🛠️ *Comandos del local*
 • sale N — salió el delivery
 • entregado N — cerrar pedido
 • cancelar N motivo — cancelar y avisar al cliente
+• precio NOMBRE MONTO — cambiar un precio (ej: precio doble orbita 13500)
+• agotado NOMBRE — se terminó (el bot deja de ofrecerlo)
+• hay NOMBRE — volvió a haber
+• carta — precios y faltantes de hoy
 • demora M — sumar M minutos a todos los tiempos (demora 0 = normal)
 • cerrar / abrir / auto — forzar local cerrado, abierto o volver al horario
 • ayuda`;
@@ -31,6 +36,8 @@ const ETIQUETA: Record<EstadoPedido, string> = {
 /** Devuelve la respuesta para el staff, o null si el texto no es un comando. */
 export async function comandoStaff(bot: Bot, texto: string): Promise<string | null> {
   const t = texto.trim().toLowerCase().replace(/\s+/g, " ").replace(/^[#/]/, "");
+  const catalogo = await comandoCatalogo(bot, t);
+  if (catalogo) return catalogo;
   const m = t.match(/^(pedidos|ver|pago ok|pago no|listo|sale|salio|salió|entregado|cancelar|demora|cerrar|abrir|auto|ayuda)\b ?(\d+)? ?(.*)$/);
   if (!m) return null;
   const [, cmd, numStr, resto] = m;
@@ -141,6 +148,50 @@ export async function comandoStaff(bot: Bot, texto: string): Promise<string | nu
       case "auto":
         store.setAjuste("abierto_manual", null);
         return "🕒 Volvemos a usar el horario configurado.";
+    }
+  } catch (e) {
+    return `⚠️ ${(e as Error).message}`;
+  }
+  return null;
+}
+
+function unico(bot: Bot, nombre: string) {
+  const r = buscarItem(bot.menuBase, nombre);
+  if (!r.length) throw new Error(`No encuentro "${nombre}" en la carta. Escribí *carta* para ver los nombres.`);
+  if (r.length > 1) throw new Error(`"${nombre}" coincide con varios: ${r.map((i) => i.nombre).join(", ")}. Sé más específico.`);
+  return r[0];
+}
+
+/** Cambios de carta del día a día, sin tocar archivos: precio, agotado, hay, carta. */
+async function comandoCatalogo(bot: Bot, t: string): Promise<string | null> {
+  const { store } = bot;
+  try {
+    let m = t.match(/^precio (.+?) \$?\s?(\d[\d.,]*)$/);
+    if (m) {
+      const item = unico(bot, m[1]);
+      const monto = Number(m[2].replace(/[.,](?=\d{3}\b)/g, "").replace(",", "."));
+      if (!Number.isFinite(monto) || monto <= 0) throw new Error("El monto no es válido.");
+      const base = (item.tipo === "producto" ? bot.menuBase.productos : bot.menuBase.extras).find((x) => x.id === item.id)!.precio;
+      store.setAjuste(`precio:${item.id}`, monto === base ? null : String(monto));
+      return `💲 ${item.nombre}: ahora ${pesos(monto)}. Los pedidos ya cargados mantienen el precio anterior.`;
+    }
+    m = t.match(/^(agotado|agotada|no hay|se termino|sin stock) (.+)$/);
+    if (m) {
+      const item = unico(bot, m[2]);
+      store.setAjuste(`agotado:${item.id}`, "1");
+      return `🚫 ${item.nombre} marcado como agotado. Escribí *hay ${m[2]}* cuando vuelva.`;
+    }
+    m = t.match(/^(hay|volvio|volvió|repuesto) (.+)$/);
+    if (m) {
+      const item = unico(bot, m[2]);
+      store.setAjuste(`agotado:${item.id}`, null);
+      return `✅ ${item.nombre} disponible de nuevo.`;
+    }
+    if (t === "carta" || t === "precios") {
+      const menu = bot.menu;
+      const lineas = menu.productos.map((p) => `${p.disponible ? "•" : "🚫"} ${p.nombre} ${pesos(p.precio)}`);
+      const extras = menu.extras.map((e) => `${e.disponible ? "•" : "🚫"} ${e.nombre} +${pesos(e.precio)}`);
+      return `📋 *Carta de hoy*\n${lineas.join("\n")}\n\n*Extras*\n${extras.join("\n")}`;
     }
   } catch (e) {
     return `⚠️ ${(e as Error).message}`;
