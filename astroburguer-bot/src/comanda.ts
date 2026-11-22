@@ -27,6 +27,16 @@ export function comandaTexto(menu: Menu, negocio: Negocio, pedido: Pedido): stri
     out.push(`${cat.emoji} ${cat.nombre.toUpperCase()}`);
     for (const d of ls) {
       out.push(`${d.cantidad}x ${d.nombre.toUpperCase()}${d.opciones.length ? ` (${d.opciones.join(", ")})` : ""}`);
+      // promos y combos: qué hay que preparar, con las opciones elegidas
+      const linea = pedido.lineas.find((l) => l.linea === d.linea);
+      const prod = menu.productos.find((p) => p.id === linea?.productoId);
+      if (prod?.comanda && linea) {
+        const texto = prod.comanda.replace(/\{([^}]+)\}/g, (_, grupo: string) => {
+          const g = prod.opciones.find((o) => o.grupo === grupo);
+          return g?.valores.find((v) => v.id === linea.opciones[grupo])?.nombre ?? grupo;
+        });
+        out.push(`   ➜ ${texto.toUpperCase()}`);
+      }
       for (const e of d.extras) out.push(`   + ${e.nombre}`);
       if (d.sin.length) out.push(`   ❌ SIN: ${d.sin.join(", ").toUpperCase()}`);
       if (d.observacion) out.push(`   ⚠️ OBS: ${d.observacion}`);

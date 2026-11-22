@@ -316,7 +316,7 @@ export function ejecutarHerramienta(nombre: string, input: unknown, ctx: Context
       if (pedido.pago?.metodo === "transferencia") {
         pedido.estado = "esperando_pago";
         if (negocio.pago.comandaAntesDelPago) ctx.efectos.push({ tipo: "comanda", pedidoId: pedido.id! });
-        ctx.salida.push(`${resumenCliente(menu, negocio, pedido)}\n\n${tiempo}`);
+        ctx.salida.push(`✅ *Pedido #${pedido.id} confirmado* · Total *${pesos(t.total)}*\n${tiempo}`);
         ctx.salida.push(
           [
             `💸 Para pagar transferí *${pesos(t.total)}* a:`,
@@ -330,12 +330,12 @@ export function ejecutarHerramienta(nombre: string, input: unknown, ctx: Context
             .join("\n"),
         );
         ctx.efectos.push({ tipo: "verificar_comprobante_pendiente", pedidoId: pedido.id! });
-        return `Pedido #${pedido.id} confirmado, esperando comprobante de transferencia por ${pesos(t.total)}. El sistema YA envió el resumen, el tiempo estimado y el alias: no los repitas, solo cerrá con una frase corta.`;
+        return `Pedido #${pedido.id} confirmado, esperando comprobante de transferencia por ${pesos(t.total)}. El sistema YA envió la confirmación con el total, el tiempo estimado y el alias: no los repitas, solo cerrá con una frase corta.`;
       }
       pedido.estado = "en_cocina";
-      ctx.salida.push(`${resumenCliente(menu, negocio, pedido)}\n\n${tiempo}\n\n✅ ¡Pedido confirmado y enviado a cocina!`);
+      ctx.salida.push(`✅ *Pedido #${pedido.id} confirmado y en cocina* · Total *${pesos(t.total)}*${pedido.pago?.pagaCon ? ` (pagás con ${pesos(pedido.pago.pagaCon)}, te llevamos ${pesos(pedido.pago.pagaCon - t.total)} de vuelto)` : ""}\n${tiempo}`);
       ctx.efectos.push({ tipo: "comanda", pedidoId: pedido.id! });
-      return `Pedido #${pedido.id} confirmado en efectivo y enviado a cocina. El sistema YA envió el resumen y el tiempo estimado: no los repitas, solo agradecé en una frase.`;
+      return `Pedido #${pedido.id} confirmado en efectivo y enviado a cocina. El sistema YA envió la confirmación con el total y el tiempo estimado: no los repitas, solo agradecé en una frase.`;
     }
     case "estado_pedido": {
       if (pedido.estado === "armando") return "El pedido todavía no está confirmado.";

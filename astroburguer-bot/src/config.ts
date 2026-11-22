@@ -23,6 +23,8 @@ const Producto = z.object({
   disponible: z.boolean().default(true),
   /** palabras con que la gente lo pide: "napo", "muzza", "la de bacon" */
   apodos: z.array(z.string()).default([]),
+  /** detalle para la cocina (promos y combos): qué hay que preparar. {grupo} se reemplaza por la opción elegida */
+  comanda: z.string().default(""),
 });
 const Categoria = z.object({
   id: z.string(),

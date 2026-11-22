@@ -98,9 +98,9 @@ test("pedido completo por transferencia: agrega, confirma, verifica comprobante 
   await bot.recibir(CLIENTE, { tipo: "texto", texto: "sí confirmo" });
 
   const alCliente = enviados.filter((e) => e.tel === CLIENTE).map((e) => e.texto);
-  const ticket = alCliente.find((t) => t.includes("TOTAL"))!;
+  const ticket = alCliente.find((t) => t.includes("confirmado"))!;
   assert.ok(ticket, "se envió el ticket");
-  assert.match(ticket, new RegExp(`TOTAL: \\$${total.toLocaleString("es-AR")}`));
+  assert.match(ticket, new RegExp(`Pedido #1 confirmado\\* · Total \\*\\$${total.toLocaleString("es-AR")}\\*`));
   assert.match(ticket, /Tiempo estimado: \*\d+ a \d+ minutos\*/);
   assert.ok(alCliente.some((t) => t.includes(negocio.pago.alias)), "se envió el alias");
   assert.equal(store.pedido(1)!.estado, "esperando_pago");

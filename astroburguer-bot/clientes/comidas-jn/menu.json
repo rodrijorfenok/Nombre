@@ -81,7 +81,8 @@
             }
           ]
         }
-      ]
+      ],
+      "comanda": "1 pizza muzzarella + 1 pizza {pizza especial}"
     },
     {
       "id": "promo-2",
@@ -95,7 +96,8 @@
         "promo dos",
         "3 muzzas",
         "tres muzzas"
-      ]
+      ],
+      "comanda": "3 pizzas muzzarella"
     },
     {
       "id": "clasica",
@@ -414,7 +416,8 @@
         "napo para 2",
         "mila napo para dos",
         "napolitana para 2"
-      ]
+      ],
+      "comanda": "2 milanesas napolitanas + papas"
     },
     {
       "id": "napo-familiar",
@@ -432,7 +435,8 @@
         "napo familiar",
         "napolitana familiar",
         "3 milas"
-      ]
+      ],
+      "comanda": "3 milanesas napolitanas + bandeja de papas"
     },
     {
       "id": "milas-con-fritas",
@@ -467,7 +471,8 @@
             }
           ]
         }
-      ]
+      ],
+      "comanda": "2 milanesas {variedad} + papas p/2"
     },
     {
       "id": "papas-cono",
