@@ -1,0 +1,83 @@
+{
+  "nombre": "Comidas JN",
+  "rubro": "local de comida rápida (hamburguesas, pizzas, milanesas y papas)",
+  "zonaHoraria": "America/Argentina/Buenos_Aires",
+  "direccionLocal": "COMPLETAR dirección del local",
+  "horarios": [
+    {
+      "dias": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        0
+      ],
+      "abre": "19:30",
+      "cierra": "00:30"
+    }
+  ],
+  "asistente": {
+    "nombre": "",
+    "tono": "canchero",
+    "emojis": true,
+    "datosExtra": [
+      "La Super Americana y el Cuarto de Libra vienen con papas fritas y bebida incluidas.",
+      "Las promos de milanesas con fritas son para 2 personas.",
+      "Las pizzas especiales de la Promo N°1 se eligen entre: jamón y morrón, calabresa, jamón y tomate, fugazzeta, jamón y huevo, jamón y queso."
+    ],
+    "sugerencia": "unas papas fritas (hay cono, porción individual, grande o caja)"
+  },
+  "pago": {
+    "alias": "COMPLETAR.ALIAS",
+    "cvu": "",
+    "titular": "COMPLETAR titular de la cuenta",
+    "banco": "",
+    "aceptaEfectivo": true,
+    "comandaAntesDelPago": false,
+    "minutosValidezComprobante": 180
+  },
+  "delivery": {
+    "pedidoMinimo": 10000,
+    "zonas": [
+      {
+        "id": "z1",
+        "nombre": "Zona 1 (hasta 15 cuadras)",
+        "referencia": "Centro y barrios pegados al local",
+        "costo": 1500,
+        "minutos": 10
+      },
+      {
+        "id": "z2",
+        "nombre": "Zona 2 (15 a 30 cuadras)",
+        "referencia": "Barrios cercanos",
+        "costo": 2500,
+        "minutos": 18
+      },
+      {
+        "id": "z3",
+        "nombre": "Zona 3 (30 a 50 cuadras)",
+        "referencia": "Barrios alejados",
+        "costo": 3500,
+        "minutos": 25
+      }
+    ]
+  },
+  "cocina": {
+    "pedidosEnParalelo": 4,
+    "minutosPorTanda": 12,
+    "minutosPorUnidadExtra": 1.5,
+    "unidadesSinRecargo": 3
+  },
+  "equipo": {
+    "encargados": "env:COMIDAS_JN_ENCARGADOS",
+    "cocina": "env:COMIDAS_JN_COCINA"
+  },
+  "whatsapp": {
+    "phoneNumberId": "env:COMIDAS_JN_WA_PHONE_ID",
+    "token": "env:COMIDAS_JN_WA_TOKEN"
+  },
+  "panel": {
+    "token": "env:COMIDAS_JN_PANEL_TOKEN"
+  }
+}

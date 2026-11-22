@@ -141,11 +141,15 @@ export function textoMenu(menu: Menu, categoria?: string): string {
         .map((g) => g.valores.map((v) => `${v.nombre} ${pesos(p.precio + v.precio)}`).join(" · "));
       out.push(`• *${p.nombre}* — ${variantes.length ? variantes.join(" | ") : pesos(p.precio)}`);
       if (p.descripcion) out.push(`  _${p.descripcion}_`);
+      // opciones sin diferencia de precio (variedad, sabor…): se listan para que el cliente sepa qué elegir
+      for (const g of p.opciones.filter((g) => g.valores.every((v) => v.precio === 0) && g.valores.length <= 4)) {
+        out.push(`  ${g.grupo[0].toUpperCase()}${g.grupo.slice(1)}: ${g.valores.map((v) => v.nombre).join(" / ")}`);
+      }
     }
     out.push("");
   }
   if (!categoria) {
-    out.push("➕ *EXTRAS*");
+    out.push("➕ *AGREGADOS*");
     out.push(menu.extras.filter((e) => e.disponible).map((e) => `${e.nombre} ${pesos(e.precio)}`).join(" · "));
   }
   return out.join("\n").trim();
