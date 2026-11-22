@@ -87,7 +87,46 @@ export interface Pedido {
   agregados?: Agregado[];
   /** ISO: la cocina avisó al cliente que faltan ~5 minutos */
   avisoCasiListo?: string;
+  /** ISO: el cliente pidió que esté para esa hora (pedido programado) */
+  programadoPara?: string;
+  /** cuándo pasó cada cosa (para medir cuánto tarda la cocina de verdad) */
+  tiempos?: { listo?: string; enCamino?: string; entregado?: string };
+  /** avisos automáticos ya mandados (cada uno una sola vez) */
+  avisos?: { recordatorioPago?: string; sinPago?: string; atraso?: string; pedidoCalificacion?: string };
+  /** nota del cliente después de recibirlo (1 a 5) */
+  calificacion?: { nota: number; en: string };
+  /** lo cerró el sistema porque quedó abierto de un día anterior */
+  cerradoAutomatico?: boolean;
   proximaLinea: number;
+}
+
+/** Hora a la que la cocina tiene que tenerlo listo: la prometida, menos el viaje si es delivery. */
+export function horaObjetivoCocina(negocio: Negocio, pedido: Pedido): Date | null {
+  if (!pedido.horaEstimada) return null;
+  const viaje =
+    pedido.entrega?.modo === "delivery" ? (negocio.delivery.zonas.find((z) => z.id === pedido.entrega?.zonaId)?.minutos ?? 20) : 0;
+  return new Date(new Date(pedido.horaEstimada).getTime() - viaje * 60_000);
+}
+
+/** Unidades que hay que preparar (para la comanda y el panel). */
+export function unidades(pedido: Pedido, tanda?: number): number {
+  return pedido.lineas.filter((l) => tanda === undefined || (l.tanda ?? 0) === tanda).reduce((a, l) => a + l.cantidad, 0);
+}
+
+/** Datos de una línea para volver a cargarla tal cual (repetir un pedido anterior). */
+export function lineaComoInput(menu: Menu, l: LineaPedido): LineaInput {
+  const p = menu.productos.find((x) => x.id === l.productoId);
+  return {
+    producto_id: l.productoId,
+    cantidad: l.cantidad,
+    opciones: Object.entries(l.opciones)
+      .filter(([grupo]) => !p || p.opciones.some((g) => g.grupo === grupo))
+      .map(([grupo, valor]) => ({ grupo, valor })),
+    extras: l.extras,
+    sin_ingredientes: l.sinIngredientes,
+    observacion: l.observacion,
+    reemplazos: l.reemplazos,
+  };
 }
 
 export function pedidoNuevo(telefono: string, ahora = new Date()): Pedido {

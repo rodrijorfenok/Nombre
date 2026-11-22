@@ -78,8 +78,20 @@ export const NegocioSchema = z.object({
       minutosAtencionHumana: z.number().default(30),
       /** situaciones que ya pasaron en el local y cómo se resolvieron (salen del análisis de chats viejos) */
       casos: z.array(z.object({ situacion: z.string(), respuesta: z.string() })).default([]),
+      /** al marcar entregado, pedirle al cliente una nota del 1 al 5 (las bajas le llegan al encargado) */
+      pedirCalificacion: z.boolean().default(true),
     })
-    .default({ nombre: "", tono: "canchero", emojis: true, datosExtra: [], sugerencia: "una bebida o unas papas", derivarCuando: [], minutosAtencionHumana: 30, casos: [] }),
+    .default({
+      nombre: "",
+      tono: "canchero",
+      emojis: true,
+      datosExtra: [],
+      sugerencia: "una bebida o unas papas",
+      derivarCuando: [],
+      minutosAtencionHumana: 30,
+      casos: [],
+      pedirCalificacion: true,
+    }),
   /** coordenadas del local (para calcular la zona cuando el cliente comparte su ubicación) */
   ubicacion: z.object({ lat: z.number(), lng: z.number() }).nullable().default(null),
   pago: z.object({
@@ -90,9 +102,13 @@ export const NegocioSchema = z.object({
     aceptaEfectivo: z.boolean().default(true),
     comandaAntesDelPago: z.boolean().default(false),
     minutosValidezComprobante: z.number().default(180),
+    /** minutos sin comprobante después de confirmar para recordarle al cliente que transfiera (0 = no recordar) */
+    minutosRecordatorioPago: z.number().default(10),
   }),
   delivery: z.object({
     pedidoMinimo: z.number().default(0),
+    /** localidad que se agrega a la dirección en el link de Maps del repartidor, ej "José C. Paz, Buenos Aires" */
+    ciudad: z.string().default(""),
     zonas: z.array(
       z.object({
         id: z.string(),

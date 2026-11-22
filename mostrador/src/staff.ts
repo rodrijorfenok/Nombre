@@ -12,9 +12,10 @@ export const AYUDA_STAFF = `🛠️ *Comandos del local*
 • pago ok N — aprobar transferencia y mandar a cocina
 • pago no N motivo — rechazar comprobante
 • aviso N — faltan ~5 min: le avisa al cliente que ya puede venir a retirar (o que sale el delivery)
+• demorado N M — se atrasó: suma M minutos (10 si no ponés nada) y le pide disculpas al cliente
 • listo N — pedido listo (take away: avisa que retire)
 • sale N — salió el delivery
-• entregado N — cerrar pedido
+• entregado N — cerrar pedido (y pedirle una nota del 1 al 5)
 • cancelar N motivo — cancelar y avisar al cliente
 • precio NOMBRE MONTO — cambiar un precio (ej: precio doble orbita 13500)
 • agotado NOMBRE — se terminó (el bot deja de ofrecerlo)
@@ -93,12 +94,12 @@ export async function comandoStaff(bot: Bot, texto: string): Promise<string | nu
     return bot.apagado ? "⏸️ El bot está APAGADO (escribí *bot on*)." : "▶️ El bot está PRENDIDO (escribí *bot off* para apagarlo).";
   }
   // "5 min 12", "5min 12", "casi 12" = aviso 12
-  const t2 = t.replace(/^(5 ?min(utos)?|casi( listo)?|avisar)\b/, "aviso");
-  const m = t2.match(/^(pedidos|ver|pago ok|pago no|aviso|listo|sale|salio|salió|entregado|cancelar|demora|cerrar|abrir|auto|ayuda|responder|r|bot)\b ?(\d+)? ?(.*)$/);
+  const t2 = t.replace(/^(5 ?min(utos)?|casi( listo)?|avisar)\b/, "aviso").replace(/^(atrasado|retrasado|retraso|demorado)\b/, "demorado");
+  const m = t2.match(/^(pedidos|ver|pago ok|pago no|aviso|demorado|listo|sale|salio|salió|entregado|cancelar|demora|cerrar|abrir|auto|ayuda|responder|r|bot)\b ?(\d+)? ?(.*)$/);
   if (!m) return null;
   const [, cmd, numStr, resto] = m;
   // "listo", "ver", "sale"… sin número de pedido no son comandos: puede ser el encargado charlando o haciendo un pedido.
-  if (!numStr && ["ver", "pago ok", "pago no", "aviso", "listo", "sale", "salio", "salió", "entregado", "cancelar", "responder", "r", "bot"].includes(cmd)) return null;
+  if (!numStr && ["ver", "pago ok", "pago no", "aviso", "demorado", "listo", "sale", "salio", "salió", "entregado", "cancelar", "responder", "r", "bot"].includes(cmd)) return null;
   const n = numStr ? Number(numStr) : NaN;
   const { store, menu, negocio, mensajero } = bot;
 
@@ -131,13 +132,16 @@ export async function comandoStaff(bot: Bot, texto: string): Promise<string | nu
         return ps
           .map((p) => {
             const tot = calcularTotales(menu, negocio, p).total;
-            const hora = p.horaEstimada ? ` · ⏱️ ${horaLocal(new Date(p.horaEstimada), negocio.zonaHoraria)}` : "";
+            const hora = p.horaEstimada ? ` · ${p.programadoPara ? "🕘 para las" : "⏱️"} ${horaLocal(new Date(p.horaEstimada), negocio.zonaHoraria)}` : "";
             return `#${p.id} ${ETIQUETA[p.estado]} · ${p.cliente ?? p.telefono} · ${p.entrega?.modo === "delivery" ? "delivery" : "take away"} · ${pesos(tot)}${hora}`;
           })
           .join("\n");
       }
       case "ver":
-        return comandaTexto(menu, negocio, necesitaPedido());
+      {
+        const p = necesitaPedido();
+        return comandaTexto(menu, negocio, p, undefined, bot.infoComanda(p));
+      }
       case "pago ok": {
         const p = necesitaPedido();
         if (p.estado === "en_cocina" && cuentas(menu, negocio, p).agregadosPorTransferir.length) {
@@ -174,14 +178,33 @@ export async function comandoStaff(bot: Bot, texto: string): Promise<string | nu
         const p = necesitaPedido();
         if (!["en_cocina", "listo"].includes(p.estado)) return `El pedido #${p.id} está ${ETIQUETA[p.estado]}: el aviso es para pedidos en cocina.`;
         if (p.avisoCasiListo) return `Al cliente del pedido #${p.id} ya se le avisó a las ${horaLocal(new Date(p.avisoCasiListo), negocio.zonaHoraria)}.`;
-        p.avisoCasiListo = new Date().toISOString();
+        p.avisoCasiListo = bot.ahora().toISOString();
         store.guardarPedido(p);
         await avisar(p.telefono, textoCasiListo(bot, p), `[La cocina avisó que al pedido #${p.id} le faltan unos 5 minutos.]`);
         return `⏰ Avisado: al pedido #${p.id} le faltan ~5 min.`;
       }
+      case "demorado": {
+        const p = necesitaPedido();
+        if (!["en_cocina", "listo", "esperando_pago", "pago_en_revision"].includes(p.estado)) return `El pedido #${p.id} está ${ETIQUETA[p.estado]}: no hace falta avisar demora.`;
+        const min = Math.min(120, Math.max(1, Number(resto.match(/\d+/)?.[0] ?? 10)));
+        const base = Math.max(bot.ahora().getTime(), p.horaEstimada ? new Date(p.horaEstimada).getTime() : 0);
+        p.horaEstimada = new Date(base + min * 60_000).toISOString();
+        if (p.avisos) p.avisos.atraso = undefined;
+        store.guardarPedido(p);
+        const hora = horaLocal(new Date(p.horaEstimada), negocio.zonaHoraria);
+        await avisar(
+          p.telefono,
+          `🙏 Perdón, tu pedido #${p.id} se nos demoró un poquito. ${p.entrega?.modo === "delivery" ? "Llega" : "Va a estar listo"} aprox. a las *${hora}*. ¡Gracias por la paciencia!`,
+          `[El local avisó que el pedido #${p.id} se demora ${min} minutos más: nueva hora ${hora}.]`,
+        );
+        return `🕒 Pedido #${p.id}: nueva hora ${hora} (+${min} min). Cliente avisado.`;
+      }
       case "listo": {
         const p = necesitaPedido();
+        if (p.estado === "listo") return `El pedido #${p.id} ya estaba listo.`;
+        if (p.estado !== "en_cocina") return `El pedido #${p.id} está ${ETIQUETA[p.estado]}: solo se marca listo un pedido en cocina.`;
         p.estado = "listo";
+        (p.tiempos ??= {}).listo = bot.ahora().toISOString();
         store.guardarPedido(p);
         if (p.entrega?.modo === "take_away") {
           const ef = cuentas(menu, negocio, p).efectivo;
@@ -194,20 +217,38 @@ export async function comandoStaff(bot: Bot, texto: string): Promise<string | nu
       case "salio":
       case "salió": {
         const p = necesitaPedido();
+        if (p.entrega?.modo !== "delivery") return `El pedido #${p.id} es take away: cuando lo retiren, *entregado ${p.id}*.`;
+        if (!["en_cocina", "listo"].includes(p.estado)) return `El pedido #${p.id} está ${ETIQUETA[p.estado]}: no puede salir.`;
         p.estado = "en_camino";
+        (p.tiempos ??= {}).enCamino = bot.ahora().toISOString();
+        if (!p.tiempos.listo) p.tiempos.listo = p.tiempos.enCamino;
         store.guardarPedido(p);
         await avisar(p.telefono, `🛵 ¡Tu pedido #${p.id} salió! En unos minutos está en tu puerta.`, `[Pedido #${p.id} salió con el repartidor.]`);
         return `Pedido #${p.id} en camino.`;
       }
       case "entregado": {
         const p = necesitaPedido();
+        if (p.estado === "entregado") return `El pedido #${p.id} ya estaba entregado.`;
+        if (!["en_cocina", "listo", "en_camino"].includes(p.estado)) {
+          return `El pedido #${p.id} está ${ETIQUETA[p.estado]}: ${p.estado === "cancelado" ? "está cancelado" : "todavía no se pagó ni pasó a cocina"}. Si igual se entregó, primero *pago ok ${p.id}*.`;
+        }
         p.estado = "entregado";
+        (p.tiempos ??= {}).entregado = bot.ahora().toISOString();
+        if (!p.tiempos.listo) p.tiempos.listo = p.tiempos.entregado;
+        const pedirNota = negocio.asistente.pedirCalificacion;
+        if (pedirNota) (p.avisos ??= {}).pedidoCalificacion = bot.ahora().toISOString();
         store.guardarPedido(p);
-        await avisar(p.telefono, `🚀 ¡Gracias por elegir ${negocio.nombre}! Que lo disfrutes. Cuando quieras, pedinos de nuevo por acá.`, `[Pedido #${p.id} entregado.]`);
+        await avisar(
+          p.telefono,
+          `🚀 ¡Gracias por elegir ${negocio.nombre}! Que lo disfrutes.${pedirNota ? "\n⭐ Si tenés un segundo, contanos qué tal estuvo con un número del *1 al 5*." : " Cuando quieras, pedinos de nuevo por acá."}`,
+          `[Pedido #${p.id} entregado.${pedirNota ? " Se le pidió una nota del 1 al 5." : ""}]`,
+        );
         return `Pedido #${p.id} cerrado.`;
       }
       case "cancelar": {
         const p = necesitaPedido();
+        if (p.estado === "cancelado") return `El pedido #${p.id} ya estaba cancelado.`;
+        if (p.estado === "entregado") return `El pedido #${p.id} ya se entregó: no se puede cancelar.`;
         p.estado = "cancelado";
         store.guardarPedido(p);
         await avisar(
@@ -251,7 +292,7 @@ export function textoCasiListo(bot: Bot, p: Pedido): string {
 /** Lo que puede hacer un teléfono de cocina (no toca precios, pagos ni el bot). */
 export async function comandoCocina(bot: Bot, texto: string): Promise<string | null> {
   const t = texto.trim().toLowerCase().replace(/\s+/g, " ").replace(/^[#/]/, "");
-  if (!/^(pedidos|ver \d|aviso \d|5 ?min(utos)? \d|casi( listo)? \d|avisar \d|listo \d|sale \d|salio \d|salió \d)/.test(t)) return null;
+  if (!/^(pedidos|ver \d|aviso \d|5 ?min(utos)? \d|casi( listo)? \d|avisar \d|(demorado|atrasado|retrasado|retraso) \d|listo \d|sale \d|salio \d|salió \d)/.test(t)) return null;
   return comandoStaff(bot, texto);
 }
 

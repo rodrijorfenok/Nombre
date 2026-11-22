@@ -5,16 +5,18 @@ import { pesos } from "./money.ts";
 import {
   agregarLinea,
   calcularTotales,
+  lineaComoInput,
   cuentas,
   ErrorPedido,
   faltantes,
+  horaObjetivoCocina,
   modificarLinea,
   quitarLinea,
   resumenCliente,
   type LineaPedido,
   type Pedido,
 } from "./order.ts";
-import { estaAbierto, estimarEspera, horaLocal, textoHorarios } from "./tiempos.ts";
+import { estaAbierto, estimarEspera, horaLocal, proximaApertura, proximaHoraLocal, textoHorarios } from "./tiempos.ts";
 
 // ---------------- esquemas de entrada ----------------
 
@@ -84,6 +86,13 @@ export const Esquemas = {
   estado_pedido: z.strictObject({}),
   cancelar_pedido: z.strictObject({ motivo: z.string() }),
   nuevo_pedido: z.strictObject({}),
+  repetir_pedido_anterior: z.strictObject({
+    productos: z.boolean().optional().describe("cargar los mismos productos del último pedido (por defecto sí)"),
+    entrega: z.boolean().optional().describe("usar la misma forma de entrega y dirección de la última vez"),
+  }),
+  programar_pedido: z.strictObject({
+    hora: z.string().describe("hora a la que lo quiere, 'HH:MM' en hora del local (ej '21:30'); '' para que salga lo antes posible"),
+  }),
   sumar_a_pedido_en_cocina: z.strictObject({
     items: z.array(LineaIn).min(1),
     pago: z.enum(["efectivo", "transferencia"]).describe("cómo paga lo que se suma"),
@@ -114,6 +123,10 @@ const DESCRIPCIONES: Record<NombreHerramienta, string> = {
   estado_pedido: "Estado actual del pedido confirmado (en cocina, listo, en camino...) y hora estimada.",
   cancelar_pedido: "Cancela el pedido si todavía no entró a cocina.",
   nuevo_pedido: "Empieza un pedido nuevo cuando el anterior ya está confirmado y el cliente quiere hacer otro aparte.",
+  repetir_pedido_anterior:
+    "Carga lo mismo que el cliente pidió la última vez (\"lo de siempre\"), con los precios de hoy; con entrega=true copia también la dirección de delivery o el take away. Devuelve el pedido con lo que falta.",
+  programar_pedido:
+    "Programa el pedido para una hora (\"para las 22\", \"a las 21:30\"). El sistema controla que el local esté abierto a esa hora y que llegue a tiempo. También sirve para pedir antes de que abra. Con hora '' vuelve a 'lo antes posible'.",
   sumar_a_pedido_en_cocina:
     "Suma productos a un pedido que YA está en cocina, si entró hace poco (el plazo lo controla el sistema). Sale todo junto, un poco más tarde. Antes de llamarla decile al cliente cuánto suma (consultar_precios) y que se demora unos minutos más, y esperá que diga que sí. El sistema le avisa a cocina, recalcula la hora y, si paga por transferencia, le manda el alias por el monto agregado.",
   derivar_a_humano:
@@ -144,6 +157,8 @@ export interface ContextoHerramientas {
   demoraExtra: () => number;
   abiertoManual: () => boolean | null;
   crearPedido: () => Pedido;
+  /** último pedido concretado de este cliente (para "lo de siempre") */
+  pedidoAnterior?: () => Pedido | null;
   ahora: () => Date;
   /** mensajes deterministas que se mandan al cliente antes de la respuesta del modelo */
   salida: string[];
@@ -180,7 +195,10 @@ export function textoMenu(menu: Menu, categoria?: string): string {
 export function minutosParaSumar(negocio: Negocio, pedido: Pedido, ahora: Date): number {
   if (pedido.estado !== "en_cocina") return 0;
   const desde = new Date(pedido.enCocinaDesde ?? pedido.confirmadoEn ?? pedido.creadoEn).getTime();
-  const quedan = negocio.cocina.minutosParaAgregar - (ahora.getTime() - desde) / 60_000;
+  let quedan = negocio.cocina.minutosParaAgregar - (ahora.getTime() - desde) / 60_000;
+  // Programado para más tarde: se puede sumar hasta media hora antes de que la cocina lo tenga que tener listo.
+  const objetivo = pedido.programadoPara ? horaObjetivoCocina(negocio, pedido) : null;
+  if (objetivo) quedan = Math.max(quedan, (objetivo.getTime() - ahora.getTime()) / 60_000 - 30);
   return quedan > 0 ? Math.ceil(quedan) : 0;
 }
 
@@ -341,17 +359,28 @@ export function ejecutarHerramienta(nombre: string, input: unknown, ctx: Context
     }
     case "confirmar_pedido": {
       if (pedido.estado !== "armando") throw new ErrorPedido(`El pedido #${pedido.id} ya está confirmado (estado: ${pedido.estado}).`);
-      if (!abiertoAhora(ctx)) throw new ErrorPedido(`El local está cerrado ahora. Horarios: ${textoHorarios(negocio)}. No se puede confirmar.`);
+      const ahora = ctx.ahora();
+      const programado = pedido.programadoPara ? new Date(pedido.programadoPara) : null;
+      if (programado && programado.getTime() <= ahora.getTime()) pedido.programadoPara = undefined;
+      // Cerrado se puede confirmar solo un pedido programado para cuando esté abierto (pedido anticipado).
+      if (!abiertoAhora(ctx) && !(pedido.programadoPara && ctx.abiertoManual() !== false)) {
+        const abre = proximaApertura(negocio, ahora);
+        throw new ErrorPedido(
+          `El local está cerrado ahora. Horarios: ${textoHorarios(negocio)}. No se puede confirmar para ya${abre ? `; sí se puede dejar programado para cuando abra (${abre}) con programar_pedido` : ""}.`,
+        );
+      }
       const f = faltantes(menu, negocio, pedido);
       if (f.length) throw new ErrorPedido(`No se puede confirmar todavía. Falta: ${f.join("; ")}.`);
-      const ahora = ctx.ahora();
       const est = estimarEspera(menu, negocio, pedido, ctx.cargaCocina(), ctx.demoraExtra(), ahora);
       const t = calcularTotales(menu, negocio, pedido);
       pedido.confirmadoEn = ahora.toISOString();
       pedido.minutosEstimados = est.rango;
-      pedido.horaEstimada = est.horaEstimada.toISOString();
+      const hora = pedido.programadoPara && new Date(pedido.programadoPara) > est.horaEstimada ? new Date(pedido.programadoPara) : est.horaEstimada;
+      pedido.horaEstimada = hora.toISOString();
       const llega = pedido.entrega?.modo === "delivery" ? "llega" : "está listo para retirar";
-      const tiempo = `⏱️ Tiempo estimado: *${est.rango[0]} a ${est.rango[1]} minutos* (${llega} aprox. a las ${horaLocal(est.horaEstimada, negocio.zonaHoraria)}).`;
+      const tiempo = pedido.programadoPara
+        ? `🕘 *Programado para las ${horaLocal(hora, negocio.zonaHoraria)}* (${llega} a esa hora).`
+        : `⏱️ Tiempo estimado: *${est.rango[0]} a ${est.rango[1]} minutos* (${llega} aprox. a las ${horaLocal(est.horaEstimada, negocio.zonaHoraria)}).`;
 
       if (pedido.pago?.metodo === "transferencia" || pedido.pago?.metodo === "mixto") {
         const c = cuentas(menu, negocio, pedido);
@@ -407,6 +436,59 @@ export function ejecutarHerramienta(nombre: string, input: unknown, ctx: Context
       if (estabaConfirmado) ctx.efectos.push({ tipo: "avisar_staff", texto: `❌ El cliente canceló el pedido #${pedido.id}. Motivo: ${a.motivo}` });
       return `Pedido #${pedido.id} cancelado.`;
     }
+    case "repetir_pedido_anterior": {
+      const aviso = puedeEditar(ctx);
+      const anterior = ctx.pedidoAnterior?.() ?? null;
+      if (!anterior) throw new ErrorPedido("Este cliente no tiene pedidos anteriores guardados: tomale el pedido normalmente.");
+      const out: string[] = [];
+      if (a.productos !== false) {
+        const cargadas: string[] = [];
+        const errores: string[] = [];
+        for (const l of anterior.lineas) {
+          try {
+            agregarLinea(menu, pedido, lineaComoInput(menu, l));
+            cargadas.push(`${l.cantidad}x ${menu.productos.find((x) => x.id === l.productoId)?.nombre ?? l.productoId}`);
+          } catch (e) {
+            if (!(e instanceof ErrorPedido)) throw e;
+            errores.push(e.message);
+          }
+        }
+        out.push(cargadas.length ? `Cargado como la última vez: ${cargadas.join(", ")}.` : "No se pudo cargar nada del pedido anterior.");
+        if (errores.length) out.push(`NO SE PUDO REPETIR (avisale y ofrecé alternativa): ${errores.join(" | ")}`);
+      }
+      if (a.entrega && anterior.entrega) {
+        const e = anterior.entrega;
+        pedido.entrega = { ...e };
+        if (e.modo === "delivery" && e.zonaId && !negocio.delivery.zonas.some((z) => z.id === e.zonaId)) pedido.entrega.zonaId = undefined;
+        out.push(e.modo === "delivery" ? `Entrega: delivery a ${e.direccion ?? "(sin dirección)"} como la última vez.` : "Entrega: take away como la última vez.");
+      }
+      if (!pedido.cliente && anterior.cliente) pedido.cliente = anterior.cliente;
+      out.push(resumenConFaltantes(ctx, aviso));
+      return out.join("\n");
+    }
+    case "programar_pedido": {
+      const aviso = puedeEditar(ctx);
+      const ahora = ctx.ahora();
+      if (!a.hora.trim() || /antes posible|ya|ahora/i.test(a.hora)) {
+        pedido.programadoPara = undefined;
+        return `Sin programar: sale lo antes posible.\n${resumenConFaltantes(ctx, aviso)}`;
+      }
+      const cuando = proximaHoraLocal(a.hora, ahora, negocio.zonaHoraria);
+      if (!cuando) throw new ErrorPedido(`No entiendo la hora "${a.hora}". Pasala como HH:MM, por ejemplo 21:30.`);
+      if (cuando.getTime() - ahora.getTime() > 16 * 3_600_000) throw new ErrorPedido("Solo se programa para hoy (dentro de las próximas 16 horas).");
+      if (!estaAbierto(negocio, new Date(cuando.getTime() - 60_000))) {
+        throw new ErrorPedido(`A las ${horaLocal(cuando, negocio.zonaHoraria)} el local no está abierto (horarios: ${textoHorarios(negocio)}).`);
+      }
+      const est = estimarEspera(menu, negocio, pedido, ctx.cargaCocina(), ctx.demoraExtra(), ahora);
+      const antes = new Date(ahora.getTime() + est.rango[0] * 60_000);
+      if (cuando < antes) {
+        throw new ErrorPedido(
+          `Para las ${horaLocal(cuando, negocio.zonaHoraria)} no llegamos: lo antes posible es ${est.rango[0]}–${est.rango[1]} min (tipo ${horaLocal(est.horaEstimada, negocio.zonaHoraria)}). Ofrecé eso o una hora más tarde.`,
+        );
+      }
+      pedido.programadoPara = cuando.toISOString();
+      return `Programado para las ${horaLocal(cuando, negocio.zonaHoraria)}. Se confirma igual que siempre y la cocina lo tiene listo para esa hora.\n${resumenConFaltantes(ctx, aviso)}`;
+    }
     case "nuevo_pedido": {
       if (pedido.estado === "armando" && pedido.lineas.length) throw new ErrorPedido("Ya hay un pedido en armado: seguí con ese o cancelalo primero.");
       const nuevo = ctx.crearPedido();
@@ -453,7 +535,8 @@ export function ejecutarHerramienta(nombre: string, input: unknown, ctx: Context
       const soloLoNuevo: Pedido = { ...pedido, lineas: nuevas };
       const est = estimarEspera(menu, negocio, soloLoNuevo, 0, ctx.demoraExtra(), ahora);
       const anterior = pedido.horaEstimada ? new Date(pedido.horaEstimada).getTime() : 0;
-      const nueva = Math.max(anterior + 5 * 60_000, est.horaEstimada.getTime());
+      const holgado = Boolean(pedido.programadoPara) && est.horaEstimada.getTime() <= anterior;
+      const nueva = holgado ? anterior : Math.max(anterior + 5 * 60_000, est.horaEstimada.getTime());
       pedido.horaEstimada = new Date(nueva).toISOString();
       const hora = horaLocal(new Date(nueva), negocio.zonaHoraria);
       const llega = pedido.entrega?.modo === "delivery" ? "Llega" : "Está listo para retirar";

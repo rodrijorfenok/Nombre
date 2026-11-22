@@ -64,9 +64,15 @@ test("al cerrar, manda el resumen solo una vez", async () => {
   cargarPedidos(store);
   const enviados: string[] = [];
   let ahora = ar("2026-11-27T23:30"); // abierto: no manda
-  const bot = new Bot({ store, menu, negocio, client: {} as never, mensajero: { enviarTexto: async (_t, x) => void enviados.push(x) }, reloj: () => ahora, esperaRafagaMs: 0 });
+  const alCliente: string[] = [];
+  const mensajero = { enviarTexto: async (t: string, x: string) => void (t === negocio.equipo.encargados[0] ? enviados : alCliente).push(x) };
+  const bot = new Bot({ store, menu, negocio, client: {} as never, mensajero, reloj: () => ahora, esperaRafagaMs: 0 });
   await bot.tareaPeriodica();
   assert.equal(enviados.length, 0);
+  // la transferencia sin comprobante (confirmada 23:00) recibe un recordatorio, una sola vez
+  await bot.tareaPeriodica();
+  assert.equal(alCliente.length, 1);
+  assert.match(alCliente[0], /Pudiste hacer la transferencia/);
   ahora = ar("2026-11-28T00:20"); // cerró
   await bot.tareaPeriodica();
   await bot.tareaPeriodica();

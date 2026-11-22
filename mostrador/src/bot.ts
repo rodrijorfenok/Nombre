@@ -2,18 +2,20 @@ import fs from "node:fs";
 import path from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
 import { menuVigente } from "./catalogo.ts";
-import { comandaTexto } from "./comanda.ts";
+import { comandaTexto, type InfoComanda } from "./comanda.ts";
 import { evaluarComprobante, extraerDatosComprobante, type DatosComprobante } from "./comprobantes.ts";
 import { env, soportaFallbacks, type Menu, type Negocio } from "./config.ts";
 import { Store, type Conversacion, type Mensaje } from "./db.ts";
 import { definicionesHerramientas, ejecutarHerramienta, type ContextoHerramientas, type Efecto } from "./herramientas.ts";
 import { pesos } from "./money.ts";
-import { calcularTotales, cuentas, ErrorPedido, type Agregado, type Pedido } from "./order.ts";
+import { calcularTotales, cuentas, ErrorPedido, horaObjetivoCocina, type Agregado, type Pedido } from "./order.ts";
 import { systemPrompt } from "./prompt.ts";
 import { respuestaRapida } from "./rapidas.ts";
+import { normalizar } from "./money.ts";
 import { calcularResumen, inicioJornada, textoResumen } from "./reportes.ts";
 import { estaAbierto, estimarEspera, horaLocal } from "./tiempos.ts";
 import { avisarIntegracion } from "./integraciones.ts";
+import { fichaCliente, pedidoConcretado, textoFicha } from "./clientes.ts";
 import { Semaforo } from "./limites.ts";
 
 /** Compartido por todos los bots del proceso: limita las consultas simultáneas a la IA. */
@@ -97,6 +99,8 @@ export interface OpcionesBot {
 type PedidoConPendiente = Pedido & { comprobantePendiente?: string };
 
 const HORAS_REINICIO_CONVERSACION = 4;
+/** Un pedido que sigue abierto tantas horas después de su hora prometida se cierra solo. */
+const HORAS_CIERRE_AUTOMATICO = 10;
 const MAX_VUELTAS_HERRAMIENTAS = 10;
 
 export class Bot {
@@ -152,7 +156,12 @@ export class Bot {
     return menuVigente(this.menuBase, this.store);
   }
 
-  private abierto(): boolean {
+  /** Hora actual según el reloj del bot (en los tests se puede adelantar). */
+  ahora(): Date {
+    return this.reloj();
+  }
+
+  abierto(): boolean {
     const manual = this.store.ajuste("abierto_manual");
     return manual === null ? estaAbierto(this.negocio, this.reloj()) : manual === "1";
   }
@@ -208,6 +217,7 @@ export class Bot {
       await this.mensajero.enviarTexto(telefono, "Por ahora no puedo escuchar audios 🙏 ¿Me lo escribís así no se me escapa nada?");
       return;
     }
+    if (msg.tipo === "texto" && !this.enAtencionHumana(telefono) && (await this.calificacion(telefono, msg.texto))) return;
     const conv = this.conversacionVigente(telefono);
     const pedido = this.store.pedido(conv.pedidoId!)! as PedidoConPendiente;
 
@@ -296,22 +306,29 @@ export class Bot {
       }
     }
     // Conversación nueva: historial vacío y el system prompt vigente hoy, fijo para toda la charla.
+    // Si el cliente ya compró, la ficha (nombre, última dirección y último pedido) va aparte, también fija.
     const pedido = this.store.crearPedido(telefono, this.reloj());
+    const ficha = fichaCliente(this.store, telefono, pedido.id);
+    if (ficha.nombre) {
+      pedido.cliente = ficha.nombre;
+      this.store.guardarPedido(pedido);
+    }
     const nueva: Conversacion = {
       telefono,
       system: systemPrompt(this.menuBase, this.negocio),
       mensajes: [],
       pedidoId: pedido.id!,
       actualizadoEn: this.reloj().toISOString(),
+      ficha: textoFicha(this.menu, this.negocio, ficha),
     };
     this.store.guardarConversacion(nueva);
     return nueva;
   }
 
-  private async llamarModelo(system: string, mensajes: Mensaje[]) {
+  private async llamarModelo(system: string, mensajes: Mensaje[], ficha?: string) {
     if (disyuntor.abierto()) throw new ErrorModoSeguro("IA en pausa por errores seguidos");
     try {
-      const r = await this.llamarModeloSinFreno(system, mensajes);
+      const r = await this.llamarModeloSinFreno(system, mensajes, ficha);
       disyuntor.exito();
       return r;
     } catch (e) {
@@ -324,14 +341,15 @@ export class Bot {
     }
   }
 
-  private async llamarModeloSinFreno(system: string, mensajes: Mensaje[]) {
+  private async llamarModeloSinFreno(system: string, mensajes: Mensaje[], ficha?: string) {
     return semaforoIA.usar(() => this.client.beta.messages.create({
       model: env.model,
       max_tokens: 16000,
       ...(soportaFallbacks(env.model) ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const } : {}),
       output_config: { effort: env.effort },
       cache_control: { type: "ephemeral" },
-      system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
+      // El system prompt es igual para todos los clientes (queda en caché); la ficha va después.
+      system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }, ...(ficha ? [{ type: "text" as const, text: ficha }] : [])],
       tools: this.tools,
       messages: mensajes,
     }));
@@ -346,7 +364,7 @@ export class Bot {
       menu,
       negocio: this.negocio,
       pedido: structuredClone(pedidoInicial),
-      cargaCocina: () => this.store.cargaCocina(),
+      cargaCocina: () => this.store.cargaCocina(this.reloj()),
       demoraExtra: () => Number(this.store.ajuste("demora_extra") ?? 0),
       abiertoManual: () => {
         const v = this.store.ajuste("abierto_manual");
@@ -357,6 +375,7 @@ export class Bot {
         p.cliente = ctx.pedido.cliente;
         return p;
       },
+      pedidoAnterior: () => this.store.pedidosDeTelefono(conv.telefono, 30).find((p) => p.id !== ctx.pedido.id && pedidoConcretado(p)) ?? null,
       ahora: this.reloj,
       salida: [],
       efectos: [],
@@ -367,7 +386,7 @@ export class Bot {
     let erroresHerramientas = 0;
     let motivoDerivar: string | null = null;
     for (let vuelta = 0; vuelta < MAX_VUELTAS_HERRAMIENTAS; vuelta++) {
-      const res = await this.llamarModelo(system, mensajes);
+      const res = await this.llamarModelo(system, mensajes, conv.ficha);
       mensajes.push({ role: "assistant", content: res.content });
 
       if (res.stop_reason === "refusal") {
@@ -508,7 +527,9 @@ export class Bot {
     let texto = r.mensajeCliente;
     if (r.veredicto === "aprobado") {
       this.pasarACocina(pedido);
-      texto += `\n⏱️ ${pedido.entrega?.modo === "delivery" ? "Llega" : "Está listo"} aprox. a las *${horaLocal(new Date(pedido.horaEstimada!), this.negocio.zonaHoraria)}*.`;
+      texto += pedido.programadoPara
+        ? `\n🕘 Queda programado para las *${horaLocal(new Date(pedido.horaEstimada!), this.negocio.zonaHoraria)}*.`
+        : `\n⏱️ ${pedido.entrega?.modo === "delivery" ? "Llega" : "Está listo"} aprox. a las *${horaLocal(new Date(pedido.horaEstimada!), this.negocio.zonaHoraria)}*.`;
     } else if (r.veredicto === "revisar") {
       pedido.estado = "pago_en_revision";
       this.store.guardarPedido(pedido);
@@ -567,9 +588,10 @@ export class Bot {
     if (pedido.pago?.metodo === "transferencia" || pedido.pago?.metodo === "mixto") pedido.pagoVerificado = true;
     pedido.estado = "en_cocina";
     pedido.enCocinaDesde = this.reloj().toISOString();
-    const est = estimarEspera(this.menu, this.negocio, pedido, Math.max(0, this.store.cargaCocina() - 1), Number(this.store.ajuste("demora_extra") ?? 0), this.reloj());
+    const est = estimarEspera(this.menu, this.negocio, pedido, Math.max(0, this.store.cargaCocina(this.reloj()) - 1), Number(this.store.ajuste("demora_extra") ?? 0), this.reloj());
     pedido.minutosEstimados = est.rango;
-    pedido.horaEstimada = est.horaEstimada.toISOString();
+    const programado = pedido.programadoPara ? new Date(pedido.programadoPara) : null;
+    pedido.horaEstimada = (programado && programado > est.horaEstimada ? programado : est.horaEstimada).toISOString();
     this.store.guardarPedido(pedido);
   }
 
@@ -695,14 +717,102 @@ export class Bot {
     const hasta = new Date(inicioHoy.getTime() - (atras - 1) * 86_400_000);
     const fmt = (d: Date) => new Intl.DateTimeFormat("es-AR", { timeZone: tz, weekday: "long", day: "numeric", month: "numeric" }).format(d);
     const titulo = dias === 1 ? `${this.negocio.nombre} · ${fmt(desde)}` : `${this.negocio.nombre} · del ${fmt(desde)} al ${fmt(new Date(hasta.getTime() - 86_400_000))}`;
-    return textoResumen(titulo, calcularResumen(this.menu, this.negocio, this.store.pedidosEntre(desde.toISOString(), hasta.toISOString())));
+    const recurrente = (p: Pedido) => this.store.pedidosDeTelefono(p.telefono, 30).some((x) => x.id! < p.id! && pedidoConcretado(x));
+    return textoResumen(titulo, calcularResumen(this.menu, this.negocio, this.store.pedidosEntre(desde.toISOString(), hasta.toISOString()), recurrente));
   }
 
   /**
-   * Tareas automáticas (el servidor la llama cada 10 minutos): cuando el local ya cerró,
-   * le manda a los encargados el resumen de la jornada, una sola vez.
+   * Tareas automáticas (el servidor la llama cada minuto): recordatorios de pago, alertas de atraso,
+   * cierre de pedidos que quedaron abiertos de días anteriores y, cuando el local ya cerró,
+   * el resumen de la jornada a los encargados (una sola vez).
    */
   async tareaPeriodica() {
+    await this.tareasDelTurno().catch((e) => console.error(`[tareas ${this.negocio.nombre}]`, e));
+    await this.resumenAlCerrar();
+  }
+
+  private async tareasDelTurno() {
+    const ahora = this.reloj();
+    const { menu, negocio } = this;
+    const abierto = this.abierto();
+    const cerrados: string[] = [];
+    for (const p of this.store.pedidosActivos()) {
+      const confirmado = new Date(p.confirmadoEn ?? p.creadoEn).getTime();
+      const referencia = Math.max(confirmado, p.horaEstimada ? new Date(p.horaEstimada).getTime() : 0);
+      const minutos = (ahora.getTime() - confirmado) / 60_000;
+
+      // 1. Quedó abierto de un turno anterior (nadie lo marcó entregado o el pago nunca llegó): se cierra solo.
+      if (ahora.getTime() - referencia > HORAS_CIERRE_AUTOMATICO * 3_600_000) {
+        const sinPago = p.estado === "esperando_pago" || p.estado === "pago_en_revision";
+        p.estado = sinPago ? "cancelado" : "entregado";
+        p.cerradoAutomatico = true;
+        this.store.guardarPedido(p);
+        cerrados.push(`#${p.id} ${p.cliente ?? p.telefono} → ${sinPago ? "cancelado (nunca se pagó)" : "entregado"}`);
+        continue;
+      }
+      p.avisos ??= {};
+
+      // 2. Confirmó por transferencia y no mandó el comprobante: un recordatorio al cliente y, más tarde, aviso al local.
+      const rec = negocio.pago.minutosRecordatorioPago;
+      if (p.estado === "esperando_pago" && abierto && rec > 0 && !this.store.comprobantesDePedido(p.id!).length) {
+        if (!p.avisos.recordatorioPago && minutos >= rec && minutos < 90) {
+          p.avisos.recordatorioPago = ahora.toISOString();
+          this.store.guardarPedido(p);
+          const c = cuentas(menu, negocio, p);
+          const texto = `👋 ¿Pudiste hacer la transferencia de *${pesos(c.transferenciaBase)}*? Cuando la tengas, mandame la captura del comprobante y lo paso a cocina.\nAlias: *${negocio.pago.alias}* (${negocio.pago.titular})${negocio.pago.aceptaEfectivo && p.pago?.metodo === "transferencia" ? "\nSi preferís pagar en efectivo, avisame y lo cambio." : ""}`;
+          await this.mensajero.enviarTexto(p.telefono, texto);
+          this.registrarEvento(p.telefono, `[Recordatorio automático: el pedido #${p.id} sigue esperando el comprobante.]`, texto);
+        } else if (
+          p.avisos.recordatorioPago &&
+          !p.avisos.sinPago &&
+          minutos >= rec * 3 &&
+          minutos < 120 &&
+          ahora.getTime() - new Date(p.avisos.recordatorioPago).getTime() >= 15 * 60_000
+        ) {
+          p.avisos.sinPago = ahora.toISOString();
+          this.store.guardarPedido(p);
+          await this.avisarStaff(
+            `⏳ El pedido #${p.id} (${p.cliente ?? p.telefono}, ${pesos(cuentas(menu, negocio, p).transferenciaBase)}) lleva ${Math.round(minutos)} min confirmado sin comprobante. Si no aparece: *cancelar ${p.id}*. Para escribirle: *r ${p.id} mensaje*.`,
+          );
+        }
+      }
+
+      // 3. La cocina se pasó de la hora: aviso al encargado (una vez) para que le avise al cliente.
+      const objetivo = horaObjetivoCocina(negocio, p);
+      if (p.estado === "en_cocina" && objetivo && !p.avisos.atraso && ahora.getTime() > objetivo.getTime() + 5 * 60_000) {
+        p.avisos.atraso = ahora.toISOString();
+        this.store.guardarPedido(p);
+        await this.avisarStaff(
+          `⏰ El pedido #${p.id} (${p.cliente ?? p.telefono}) está atrasado: tenía que estar listo a las ${horaLocal(objetivo, negocio.zonaHoraria)}. Si va a tardar, avisale al cliente con *demorado ${p.id} 10* (suma 10 min y le pide disculpas).`,
+        );
+      }
+    }
+    if (cerrados.length) await this.avisarStaff(`🧹 Cerré ${cerrados.length === 1 ? "un pedido que quedó abierto" : `${cerrados.length} pedidos que quedaron abiertos`} de un turno anterior:\n${cerrados.join("\n")}`);
+  }
+
+  /** Nota del 1 al 5 que manda el cliente después de recibir el pedido. true = el mensaje era eso. */
+  private async calificacion(telefono: string, texto: string): Promise<boolean> {
+    const crudo = texto.trim();
+    const estrellas = /^(⭐|🌟|★){1,5}$/u.test(crudo) ? [...crudo].length : 0;
+    const m = normalizar(crudo).match(/^(?:(?:le |te )?(?:doy|pongo) )?(?:un |una )?([1-5])(?: (?:5|de 5|estrellas?|puntos?))?$/);
+    const nota = estrellas || (m ? Number(m[1]) : 0);
+    if (!nota) return false;
+    const p = this.store.pedidosDeTelefono(telefono, 1)[0];
+    const pedida = p?.avisos?.pedidoCalificacion;
+    if (!p || p.estado !== "entregado" || p.calificacion || !pedida) return false;
+    if (this.reloj().getTime() - new Date(pedida).getTime() > 24 * 3_600_000) return false;
+    p.calificacion = { nota, en: this.reloj().toISOString() };
+    this.store.guardarPedido(p);
+    if (nota >= 4) {
+      await this.mensajero.enviarTexto(telefono, nota === 5 ? "¡Gracias por el 5! 🙌 Nos alegra un montón. ¡Te esperamos la próxima!" : "¡Gracias por la nota! 🙌 ¡Te esperamos la próxima!");
+      return true;
+    }
+    await this.mensajero.enviarTexto(telefono, "Gracias por contarnos 🙏 Nos importa que salga bien. ¿Qué fue lo que no te gustó? Ya te lee alguien del local.");
+    await this.iniciarAtencionHumana(p.id!, `el cliente calificó el pedido con ${nota}/5`);
+    return true;
+  }
+
+  private async resumenAlCerrar() {
     const ahora = this.reloj();
     if (this.abierto()) return;
     const inicio = inicioJornada(ahora, this.negocio.zonaHoraria);
@@ -730,7 +840,7 @@ export class Bot {
       ag.comandaEnviada = true;
       this.store.guardarPedido(p);
     }
-    const texto = comandaTexto(this.menu, this.negocio, p, tanda);
+    const texto = comandaTexto(this.menu, this.negocio, p, tanda, this.infoComanda(p));
     const link =
       this.publicUrl && this.negocio.panel.token
         ? `\n🖨️ ${this.publicUrl}/comanda/${this.slug}/${p.id}?token=${this.negocio.panel.token}${tanda ? `&tanda=${tanda}` : ""}&print=1`
@@ -738,6 +848,11 @@ export class Bot {
     for (const n of this.negocio.equipo.cocina) await this.mensajero.enviarTexto(n, texto + link).catch((e) => console.error("[comanda]", e));
     if (tanda) await this.avisarStaff(`➕ El cliente del pedido #${p.id} sumó productos (agregado ${tanda}). Ya está en la comanda.`);
     console.log(`[${this.negocio.nombre}] comanda #${p.id}${tanda ? ` (agregado ${tanda})` : ""} enviada a cocina`);
+  }
+
+  /** Lo que la comanda cuenta del cliente: si es la primera vez o ya es habitual. */
+  infoComanda(p: Pedido): InfoComanda {
+    return { pedidosPrevios: fichaCliente(this.store, p.telefono, p.id).pedidos };
   }
 
   async avisarStaff(texto: string) {

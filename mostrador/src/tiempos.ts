@@ -147,3 +147,18 @@ export function proximaApertura(negocio: Negocio, ahora = new Date()): string | 
   }
   return null;
 }
+
+/** Próxima vez que el reloj del local marca HH:MM (dentro de las próximas 24 h). */
+export function proximaHoraLocal(hhmm: string, ahora: Date, tz: string): Date | null {
+  const m = hhmm.trim().match(/^(\d{1,2})[:.hs ]*(\d{2})?\s*(?:hs?)?$/i);
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = Number(m[2] ?? 0);
+  if (h > 24 || min > 59) return null;
+  const { minutos } = partesLocales(ahora, tz);
+  let diff = ((h % 24) * 60 + min) - minutos;
+  if (diff <= 0) diff += 1440;
+  const base = new Date(ahora);
+  base.setUTCSeconds(0, 0);
+  return new Date(base.getTime() + diff * 60_000);
+}

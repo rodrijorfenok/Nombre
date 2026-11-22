@@ -13,6 +13,8 @@ export interface Conversacion {
   mensajes: Mensaje[];
   pedidoId: number | null;
   actualizadoEn: string;
+  /** lo que el local ya sabe de este cliente (nombre, última dirección, último pedido); fijo toda la charla */
+  ficha?: string;
 }
 
 export interface Comprobante {
@@ -76,7 +78,19 @@ export class Store {
         creado_en TEXT NOT NULL
       );
       CREATE INDEX IF NOT EXISTS entrantes_estado ON entrantes(estado);
+      CREATE INDEX IF NOT EXISTS pedidos_telefono ON pedidos(telefono, id);
     `);
+    // columnas agregadas en versiones nuevas (las bases viejas no las tienen)
+    try {
+      this.db.exec("ALTER TABLE conversaciones ADD COLUMN ficha TEXT");
+    } catch {}
+  }
+
+  /** Últimos pedidos de un cliente, del más nuevo al más viejo. */
+  pedidosDeTelefono(telefono: string, limite = 20): Pedido[] {
+    return (this.db.prepare("SELECT datos FROM pedidos WHERE telefono = ? ORDER BY id DESC LIMIT ?").all(telefono, limite) as { datos: string }[]).map(
+      (r) => JSON.parse(r.datos) as Pedido,
+    );
   }
 
   // ---------- pedidos ----------
@@ -127,28 +141,40 @@ export class Store {
     return this.pedidosPorEstado(ESTADOS_ACTIVOS);
   }
 
-  /** Pedidos que ocupan la cocina (para la cola del tiempo de espera). */
-  cargaCocina(): number {
-    const r = this.db.prepare("SELECT COUNT(*) AS n FROM pedidos WHERE estado IN ('en_cocina','pago_en_revision','esperando_pago')").get() as { n: number };
-    return Number(r.n);
+  /**
+   * Pedidos que ocupan la cocina (para la cola del tiempo de espera). No cuentan los programados
+   * para dentro de más de 45 minutos: todavía no se empezaron.
+   */
+  cargaCocina(ahora = new Date()): number {
+    const limite = ahora.getTime() + 45 * 60_000;
+    return this.pedidosPorEstado(["en_cocina", "pago_en_revision", "esperando_pago"]).filter(
+      (p) => !p.programadoPara || new Date(p.programadoPara).getTime() <= limite,
+    ).length;
   }
 
   // ---------- conversaciones ----------
   conversacion(telefono: string): Conversacion | null {
     const r = this.db.prepare("SELECT * FROM conversaciones WHERE telefono = ?").get(telefono) as
-      | { telefono: string; mensajes: string; system: string | null; pedido_id: number | null; actualizado_en: string }
+      | { telefono: string; mensajes: string; system: string | null; pedido_id: number | null; actualizado_en: string; ficha: string | null }
       | undefined;
     if (!r) return null;
-    return { telefono: r.telefono, system: r.system ?? undefined, mensajes: JSON.parse(r.mensajes), pedidoId: r.pedido_id, actualizadoEn: r.actualizado_en };
+    return {
+      telefono: r.telefono,
+      system: r.system ?? undefined,
+      mensajes: JSON.parse(r.mensajes),
+      pedidoId: r.pedido_id,
+      actualizadoEn: r.actualizado_en,
+      ficha: r.ficha ?? undefined,
+    };
   }
 
   guardarConversacion(c: Conversacion) {
     this.db
       .prepare(
-        `INSERT INTO conversaciones (telefono, mensajes, system, pedido_id, actualizado_en) VALUES (?, ?, ?, ?, ?)
-         ON CONFLICT(telefono) DO UPDATE SET mensajes = excluded.mensajes, system = excluded.system, pedido_id = excluded.pedido_id, actualizado_en = excluded.actualizado_en`,
+        `INSERT INTO conversaciones (telefono, mensajes, system, pedido_id, actualizado_en, ficha) VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(telefono) DO UPDATE SET mensajes = excluded.mensajes, system = excluded.system, pedido_id = excluded.pedido_id, actualizado_en = excluded.actualizado_en, ficha = excluded.ficha`,
       )
-      .run(c.telefono, JSON.stringify(c.mensajes), c.system ?? null, c.pedidoId, c.actualizadoEn);
+      .run(c.telefono, JSON.stringify(c.mensajes), c.system ?? null, c.pedidoId, c.actualizadoEn, c.ficha ?? null);
   }
 
   // ---------- comprobantes ----------

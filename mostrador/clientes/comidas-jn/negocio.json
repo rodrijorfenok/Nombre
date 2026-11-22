@@ -41,6 +41,7 @@
   },
   "delivery": {
     "pedidoMinimo": 9500,
+    "ciudad": "José C. Paz, Buenos Aires",
     "zonas": [
       {
         "id": "z1",

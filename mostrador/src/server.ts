@@ -5,13 +5,11 @@ import Anthropic from "@anthropic-ai/sdk";
 import express from "express";
 import { Bot } from "./bot.ts";
 import { comandaHtml } from "./comanda.ts";
+import { estadoPanel, htmlPanel } from "./panel.ts";
 import { cargarClientes, env, type Cliente } from "./config.ts";
 import { Store } from "./db.ts";
-import { pesos } from "./money.ts";
-import { calcularTotales } from "./order.ts";
 import { comandoCocina, comandoStaff } from "./staff.ts";
 import { montarDemo } from "./demo.ts";
-import { horaLocal } from "./tiempos.ts";
 import { aEntrante, firmaValida, parsearWebhook, WhatsAppCloud, type MensajeWebhook } from "./whatsapp.ts";
 import { semaforoIA } from "./bot.ts";
 import { mismoNumero } from "./telefonos.ts";
@@ -150,10 +148,10 @@ function mantenimiento() {
 mantenimiento();
 setInterval(mantenimiento, 24 * 3_600_000).unref();
 
-// Resumen automático de la jornada al cerrar
+// Cada minuto: recordatorios de pago, alertas de atraso, cierre de pedidos viejos y resumen al cerrar.
 setInterval(() => {
-  for (const local of locales.values()) local.bot.tareaPeriodica().catch((e) => console.error(`[resumen ${local.cliente.slug}]`, e));
-}, 10 * 60_000).unref();
+  for (const local of locales.values()) local.bot.tareaPeriodica().catch((e) => console.error(`[tareas ${local.cliente.slug}]`, e));
+}, 60_000).unref();
 
 for (const local of locales.values()) {
   const pendientes = local.store.entrantesPendientes(10);
@@ -171,99 +169,50 @@ function localAutorizado(req: express.Request): Local | null {
 app.get("/panel/:slug", (req, res) => {
   const local = localAutorizado(req);
   if (!local) return void res.sendStatus(401);
-  const { store, cliente } = local;
-  const { menu: _m, negocio, slug } = cliente;
-  const menu = local.bot.menu;
-  const tk = encodeURIComponent(negocio.panel.token);
-  // Impresión automática (?auto=1): cada comanda que entra a cocina se imprime una sola vez en esta PC.
-  const auto = req.query.auto === "1";
-  const filas = store
-    .pedidosActivos()
-    .map((p) => {
-      const tot = calcularTotales(menu, negocio, p).total;
-      const comps = store
-        .comprobantesDePedido(p.id!)
-        .map((c) => `<a href="/comprobante/${slug}/${c.id}?token=${tk}" target="_blank">🧾 ${c.veredicto}</a>`)
-        .join(" ");
-      const boton = (cmd: string, label: string) =>
-        `<form method="post" action="/panel/${slug}/cmd?token=${tk}${auto ? "&auto=1" : ""}"><input type="hidden" name="cmd" value="${cmd} ${p.id}"><button>${label}</button></form>`;
-      return `<tr><td><b>#${p.id}</b></td><td>${p.estado.replace(/_/g, " ")}</td><td>${p.cliente ?? ""}<br><small>${p.telefono}</small></td>
-        <td>${p.entrega?.modo === "delivery" ? `🛵 ${p.entrega.direccion ?? ""}` : "🏃 take away"}</td><td>${pesos(tot)}<br><small>${p.pago?.metodo ?? ""}</small> ${comps}</td>
-        <td>${p.horaEstimada ? horaLocal(new Date(p.horaEstimada), negocio.zonaHoraria) : ""}</td>
-        <td class="acc"><a href="/comanda/${slug}/${p.id}?token=${tk}" target="_blank">🖨️ comanda</a>
-        ${["esperando_pago", "pago_en_revision"].includes(p.estado) ? boton("pago ok", "✅ pago ok") : ""}
-        ${(p.agregados ?? []).filter((a) => a.comandaEnviada).map((a) => `<a href="/comanda/${slug}/${p.id}?token=${tk}&tanda=${a.tanda}" target="_blank">➕ agregado ${a.tanda}</a>`).join(" ")}
-        ${p.estado === "en_cocina" ? (p.avisoCasiListo ? "<small>⏰ avisado</small>" : boton("aviso", "⏰ faltan 5 min")) : ""}
-        ${p.estado === "en_cocina" ? boton("listo", "🔔 listo") : ""}
-        ${p.entrega?.modo === "delivery" && ["en_cocina", "listo"].includes(p.estado) ? boton("sale", "🛵 salió") : ""}
-        ${boton("entregado", "📦 entregado")}</td></tr>`;
-    })
-    .join("");
-  // Trabajos de impresión: la comanda de cada pedido en cocina y la de cada agregado ya mandado a cocina.
-  const enCocina = store
-    .pedidosActivos()
-    .filter((p) => p.estado === "en_cocina")
-    .flatMap((p) => [
-      { clave: String(p.id), url: `/comanda/${slug}/${p.id}?token=${tk}` },
-      ...(p.agregados ?? []).filter((a) => a.comandaEnviada).map((a) => ({ clave: `${p.id}-${a.tanda}`, url: `/comanda/${slug}/${p.id}?token=${tk}&tanda=${a.tanda}` })),
-    ]);
-  const linkAuto = `/panel/${slug}?token=${tk}${auto ? "" : "&auto=1"}`;
-  const avisoAuto = auto
-    ? `🖨️ <b>Impresión automática activada</b> · <span id="impr"></span> · <a href="${linkAuto}">desactivar</a>`
-    : `🖨️ <a href="${linkAuto}">Activar impresión automática de comandas</a>`;
-  const scriptAuto = auto
-    ? `<script>
-(() => {
-  const KEY = "mostrador-impresas-${slug}";
-  const enCocina = ${JSON.stringify(enCocina)};
-  const estado = document.getElementById("impr");
-  let hechas = [];
-  try { hechas = JSON.parse(localStorage.getItem(KEY) || "[]"); } catch {}
-  const guardar = () => { try { localStorage.setItem(KEY, JSON.stringify(hechas.slice(-300))); } catch {} };
-  const pendientes = enCocina.filter((j) => !hechas.includes(j.clave) && !hechas.includes(Number(j.clave)));
-  const recargar = () => setTimeout(() => location.reload(), 10000);
-  const siguiente = () => {
-    const job = pendientes.shift();
-    if (job === undefined) { estado.textContent = "esperando pedidos (se revisa cada 10 s)"; return recargar(); }
-    const id = job.clave;
-    estado.textContent = "imprimiendo comanda #" + id + "…";
-    const f = document.createElement("iframe");
-    f.style.cssText = "position:absolute;width:0;height:0;border:0;visibility:hidden";
-    f.src = job.url;
-    f.onload = () => {
-      try {
-        f.contentWindow.focus();
-        f.contentWindow.print();
-        hechas.push(id); guardar();
-      } catch (e) {
-        console.error(e);
-        estado.textContent = "no se pudo imprimir la comanda #" + id + ", se reintenta";
-      }
-      setTimeout(() => { f.remove(); siguiente(); }, 1500);
-    };
-    document.body.appendChild(f);
-  };
-  siguiente();
-})();
-</script>`
-    : "";
-  res.type("html").send(`<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-${auto ? "" : '<meta http-equiv="refresh" content="20">'}<title>${negocio.nombre} · Pedidos</title>
-<style>body{font:15px system-ui,sans-serif;margin:16px;background:#111318;color:#f3f3f7}table{border-collapse:collapse;width:100%}
-td,th{border-bottom:1px solid #333;padding:8px;vertical-align:top;text-align:left}a{color:#ffb547}form{display:inline}
-button{margin:2px;padding:6px 10px;border-radius:6px;border:0;background:#ffb547;font-weight:600}.acc{white-space:nowrap}
-@media(max-width:700px){td,th{display:block;border:0;padding:2px 0}tr{display:block;border-bottom:1px solid #333;padding:8px 0}th{display:none}}</style></head>
-<body><h2>${negocio.nombre} — pedidos activos</h2><p><small>Se actualiza cada ${auto ? 10 : 20} s · demora extra: ${store.ajuste("demora_extra") ?? 0} min</small></p>
-<p><small>${avisoAuto}</small></p>
-<table><tr><th>#</th><th>Estado</th><th>Cliente</th><th>Entrega</th><th>Total</th><th>Hora</th><th></th></tr>${filas || '<tr><td colspan="7">Sin pedidos activos</td></tr>'}</table>${scriptAuto}</body></html>`);
+  res.setHeader("Cache-Control", "no-store");
+  res.type("html").send(htmlPanel(local.cliente.negocio.nombre, local.cliente.slug));
 });
 
-app.post("/panel/:slug/cmd", express.urlencoded({ extended: false }), async (req, res) => {
+// Datos del panel (los pide la página cada 5 segundos).
+app.get("/panel/:slug/estado", (req, res) => {
   const local = localAutorizado(req);
   if (!local) return void res.sendStatus(401);
-  await comandoStaff(local.bot, String(req.body?.cmd ?? ""));
-  const auto = req.query.auto === "1" ? "&auto=1" : "";
-  res.redirect(`/panel/${local.cliente.slug}?token=${encodeURIComponent(local.cliente.negocio.panel.token)}${auto}`);
+  res.setHeader("Cache-Control", "no-store");
+  res.json(estadoPanel(local.bot, local.cliente.slug, local.cliente.negocio.panel.token));
+});
+
+// Los botones del panel usan los mismos comandos que el encargado por WhatsApp.
+app.post("/panel/:slug/cmd", express.urlencoded({ extended: false }), express.json(), async (req, res) => {
+  const local = localAutorizado(req);
+  if (!local) return void res.sendStatus(401);
+  const respuesta = await comandoStaff(local.bot, String(req.body?.cmd ?? "").slice(0, 500));
+  if (req.accepts(["html", "json"]) === "json") return void res.json({ respuesta });
+  res.redirect(`/panel/${local.cliente.slug}?token=${encodeURIComponent(local.cliente.negocio.panel.token)}`);
+});
+
+// Escribirle al cliente desde el panel (como "r N mensaje").
+app.post("/panel/:slug/responder", express.json(), async (req, res) => {
+  const local = localAutorizado(req);
+  if (!local) return void res.sendStatus(401);
+  const texto = String(req.body?.texto ?? "").trim().slice(0, 1000);
+  if (!texto) return void res.status(400).json({ respuesta: "Escribí un mensaje." });
+  try {
+    res.json({ respuesta: (await local.bot.responderComoLocal(Number(req.body?.pedido), texto)).replace(/\*/g, "") });
+  } catch (e) {
+    res.status(400).json({ respuesta: (e as Error).message });
+  }
+});
+
+// Agotado / hay, tocando el producto en el panel.
+app.post("/panel/:slug/stock", express.json(), (req, res) => {
+  const local = localAutorizado(req);
+  if (!local) return void res.sendStatus(401);
+  const id = String(req.body?.id ?? "");
+  const menu = local.bot.menuBase;
+  const item = menu.productos.find((p) => p.id === id) ?? menu.extras.find((e) => e.id === id);
+  if (!item) return void res.status(404).json({ respuesta: "No existe ese producto." });
+  local.store.setAjuste(`agotado:${id}`, req.body?.disponible ? null : "1");
+  res.json({ respuesta: `${item.nombre}: ${req.body?.disponible ? "hay de nuevo" : "agotado"}` });
 });
 
 app.get("/comanda/:slug/:id", (req, res) => {
@@ -273,7 +222,7 @@ app.get("/comanda/:slug/:id", (req, res) => {
   if (!p) return void res.sendStatus(404);
   const tanda = Number(req.query.tanda) || undefined;
   if (tanda && !p.agregados?.some((a) => a.tanda === tanda)) return void res.sendStatus(404);
-  res.type("html").send(comandaHtml(local.bot.menu, local.cliente.negocio, p, tanda));
+  res.type("html").send(comandaHtml(local.bot.menu, local.bot.negocio, p, tanda, local.bot.infoComanda(p)));
 });
 
 app.get("/comprobante/:slug/:id", (req, res) => {
@@ -293,9 +242,9 @@ app.get("/privacidad", (_req, res) => {
 <h1>Política de privacidad</h1>
 <p>Este servicio es el asistente de pedidos por WhatsApp de ${nombres} ("el local"). Explica qué datos usamos cuando nos escribís por WhatsApp y para qué.</p>
 <h2>Qué datos recibimos</h2>
-<ul><li>Tu número de WhatsApp y el nombre de tu perfil.</li><li>Los mensajes que nos mandás: lo que pedís, tu nombre, la dirección de entrega y la forma de pago.</li><li>Las imágenes que envíes, por ejemplo el comprobante de una transferencia.</li></ul>
+<ul><li>Tu número de WhatsApp y el nombre de tu perfil.</li><li>Los mensajes que nos mandás: lo que pedís, tu nombre, la dirección de entrega y la forma de pago.</li><li>Las imágenes que envíes, por ejemplo el comprobante de una transferencia.</li><li>La nota del 1 al 5 que nos dejes después de recibir el pedido.</li></ul>
 <h2>Para qué los usamos</h2>
-<p>Solo para tomar, preparar, cobrar y entregar tu pedido, y para responder tus consultas. No los vendemos ni los usamos para publicidad.</p>
+<p>Solo para tomar, preparar, cobrar y entregar tu pedido, y para responder tus consultas. Cuando volvés a escribir, usamos tus pedidos anteriores (tu nombre, la última dirección y lo que pediste) para atenderte más rápido. No los vendemos ni los usamos para publicidad.</p>
 <h2>Con quién se comparten</h2>
 <p>Con el personal del local que prepara y entrega el pedido. Los mensajes se procesan con WhatsApp (Meta) y con un servicio de inteligencia artificial (Anthropic) que ayuda a interpretar el pedido; ambos actúan como proveedores y no usan tus datos para otros fines.</p>
 <h2>Cuánto tiempo se guardan</h2>

@@ -100,9 +100,21 @@ La PC de la cocina tiene el panel abierto con la impresión automática prendida
    ```
 
    El `--user-data-dir` abre un Chrome aparte, así la impresión sin diálogo funciona aunque tengas otro Chrome abierto. En Mac: `open -na "Google Chrome" --args --kiosk-printing --user-data-dir=/tmp/mostrador-cocina --app="https://…&auto=1"`.
-3. Abrí ese acceso directo y dejalo abierto durante el turno. Arriba tiene que decir **Impresión automática activada**. La PC no se tiene que suspender.
+3. Abrí ese acceso directo y dejalo abierto durante el turno. Arriba a la derecha tiene que decir **🖨️ Auto: sí**. La PC no se tiene que suspender.
 
-Desde el panel también se puede activar con el link *Activar impresión automática de comandas*; sin `--kiosk-printing`, Chrome muestra el cuadro de imprimir en cada comanda. Los celulares y tablets no imprimen solos: hace falta una PC (o notebook) con Chrome.
+Desde el panel también se puede prender o apagar con el botón **🖨️ Auto** (queda guardado en esa compu; al prenderlo, imprime solo lo que entra desde ese momento). Sin `--kiosk-printing`, Chrome muestra el cuadro de imprimir en cada comanda. Los celulares y tablets no imprimen solos: hace falta una PC (o notebook) con Chrome.
+
+### El panel de cocina
+
+`/panel/comidas-jn?token=…` es una pantalla de cocina que se actualiza sola cada 5 segundos, sin recargar. Sirve en la PC, en una tablet o en el celular.
+
+- **Cuatro columnas**: 💸 por cobrar, 🔥 en cocina, ✅ listos y 🛵 en camino. Cada tarjeta muestra lo que hay que preparar, con los "sin" y los cambios resaltados.
+- **Reloj por pedido**: verde con tiempo de sobra, amarillo cuando faltan 5 minutos o menos, rojo cuando ya se pasó de la hora. La hora que se mira es la que la cocina tiene que cumplir (en delivery, la prometida menos el viaje).
+- **Botones**: ✅ pago ok, ❌ rechazar comprobante, ⏰ faltan 5 min, 🔔 listo, 🕒 +10 min (le pide disculpas al cliente y corre la hora), 🛵 salió, 📦 entregado, ✖ cancelar. Cancelar y rechazar piden un segundo toque para no equivocarse.
+- **💬 Responder**: le escribís al cliente desde el panel. El bot se pausa con ese cliente hasta que toques **🤖 Devolver al bot**.
+- **Arriba**: abrir, cerrar o volver al horario; demora extra con −5 / +5; bot prendido o apagado; lo vendido en el día, cuánto tarda la cocina y la nota de los clientes.
+- **🔔 Sonido**: tocalo una vez y cada pedido nuevo suena (y vibra en el celular). La pantalla no se apaga mientras el panel está abierto.
+- **📦 Stock de hoy**: tocá un producto para marcarlo agotado (queda tachado y el bot deja de ofrecerlo); tocalo de nuevo cuando vuelva.
 
 **Con un solo celular:** dejá `COMIDAS_JN_COCINA` vacío (la comanda sale por la impresora) y poné tu celular en `COMIDAS_JN_ENCARGADOS` para recibir los avisos de "te necesitan" y el resumen. Así podés hacer de cliente con el mismo celular: lo que coincide con un comando (`pedidos`, `listo 3`…) se toma como comando y el resto como pedido.
 
@@ -114,6 +126,13 @@ Desde el panel también se puede activar con el link *Activar impresión automá
 - **Pago mixto** (parte efectivo, parte transferencia): el bot pide el comprobante por la parte transferida y la comanda dice cuánto cobrar en efectivo.
 - **Sumar algo a un pedido que ya está en cocina**: se puede durante los primeros 10 minutos (se cambia en `negocio.json` → `cocina.minutosParaAgregar`). Cocina recibe una comanda aparte que dice "sale junto con el pedido #N" y el cliente recibe la nueva hora y cuánto paga.
 - **Aviso de 5 minutos**: cuando a un pedido le falten unos 5 minutos, tocá **⏰ faltan 5 min** en el panel (o escribí `aviso N`). Al cliente le llega "ya podés venir a retirarlo" (o "sale en 5 minutos" si es delivery). Después, **🔔 listo** como siempre.
+- **Clientes que vuelven**: el bot recuerda el nombre, la última dirección y el último pedido. Los saluda por el nombre, les ofrece "lo de siempre" y les pregunta si va a la misma dirección. En la comanda sale si es la primera vez o el número de pedido del cliente.
+- **Pedidos programados** ("para las 22"): el bot controla que el local esté abierto a esa hora y que se llegue. La comanda dice `PROGRAMADO PARA LAS 22:00 — NO ADELANTAR`. Con el local cerrado, el cliente puede dejar el pedido programado para cuando abra.
+- **Recordatorio de pago**: si alguien confirma por transferencia y a los 10 minutos no mandó el comprobante, el bot le recuerda una vez (`pago.minutosRecordatorioPago`, 0 para no recordar). Si 15 minutos después sigue sin pagar, te avisa a vos.
+- **Pedido atrasado**: si un pedido se pasa 5 minutos de la hora, te llega un aviso. Con `demorado N 10` (o **🕒 +10 min** en el panel) se le pide disculpas al cliente y se le da la nueva hora.
+- **Nota del cliente**: al marcar **entregado**, el bot le pide una nota del 1 al 5. Si pone 3 o menos, le pregunta qué pasó y te pasa la charla. Las notas salen en el resumen (`asistente.pedirCalificacion: false` para no pedirlas).
+- **Pedidos olvidados**: si un pedido queda abierto 10 horas después de su hora (nadie tocó *entregado* o el pago nunca llegó), se cierra solo y te llega un aviso con la lista. Al cliente no le llega nada.
+- **Resumen**: además de las ventas, dice cuántos minutos tarda la cocina en promedio, qué porcentaje salió a tiempo, la nota de los clientes y cuántos volvieron a pedir.
 
 ## Aprender de los chats viejos del local
 

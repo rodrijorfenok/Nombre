@@ -1,5 +1,18 @@
 # Cambios
 
+## 1.3.0
+
+- Panel de cocina nuevo: se actualiza solo cada 5 segundos sin recargar, columnas por estado, reloj con colores contra la hora que la cocina tiene que cumplir, ítems con los "sin" y cambios resaltados, sonido y vibración con cada pedido nuevo, pantalla siempre prendida, responder al cliente y devolverlo al bot, stock del día con un toque, abrir/cerrar, demora ±5, bot on/off y números del día. La impresión automática sigue igual (botón 🖨️ Auto).
+- Comanda nueva: arriba el número, el modo y la hora objetivo (en delivery "SALE 21:30 · LLEGA 21:40"); unidades totales; primera vez o número de pedido del cliente; "NO COBRAR: ya está pago" o "PAGO SIN CONFIRMAR"; link a Maps y, en el ticket impreso, un QR con la dirección para el repartidor; "sin" y cambios en recuadro.
+- Clientes que vuelven: el bot recuerda nombre, última dirección y último pedido; los saluda por el nombre y entiende "lo de siempre" (`repetir_pedido_anterior`).
+- Pedidos programados ("para las 22") y anticipados con el local cerrado (`programar_pedido`).
+- Recordatorio automático de pago a los 10 minutos y aviso al encargado si sigue sin pagar.
+- Aviso de pedido atrasado y comando `demorado N M` (le pide disculpas al cliente con la nueva hora).
+- Nota del 1 al 5 al entregar; las bajas pasan a una persona. El resumen suma la nota, el tiempo real de cocina, el % a tiempo y los clientes que volvieron.
+- Los pedidos que quedan abiertos de un turno anterior se cierran solos (ya no inflan la demora ni frenan el resumen).
+- Comandos más seguros: `listo`, `sale`, `entregado` y `cancelar` controlan el estado (por ejemplo, no se avisa "salió" de un pedido take away ni "gracias" de uno cancelado).
+- `delivery.ciudad` en `negocio.json` para que el mapa del repartidor no busque la calle en otra ciudad.
+
 ## 1.2.0
 
 - Cambio de ingredientes: "la super americana con cebolla brunoise en vez de caramelizada" queda como cambio sin costo, en el resumen y en la comanda (🔁 CAMBIAR). Solo se puede poner un ingrediente que el local ya usa.

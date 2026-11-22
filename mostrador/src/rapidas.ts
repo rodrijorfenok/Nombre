@@ -67,19 +67,39 @@ export function respuestaRapida(texto: string, ctx: ContextoRapido): string[] | 
   switch (intencion) {
     case "saludo": {
       if (!ctx.primerMensaje) return null; // a mitad de un pedido, que conteste la IA con contexto
+      // Abre hoy: ya puede dejar el pedido programado para la apertura.
+      const anticipado = apertura?.startsWith("hoy")
+        ? usted
+          ? " Si quiere, ya puede dejarme el pedido y se lo programo para cuando abramos."
+          : " Si querés, ya me podés dejar el pedido y te lo programo para cuando abramos."
+        : "";
       if (!ctx.abierto) {
         return [
           elegir(
             usted
-              ? [`¡Hola! ${yo}${negocio.nombre}. ${cerrado} Cuando quiera nos escribe y le tomamos el pedido.`]
+              ? [`¡Hola! ${yo}${negocio.nombre}. ${cerrado}${anticipado || " Cuando quiera nos escribe y le tomamos el pedido."}`]
               : [
-                  `¡Hola! ${cerrado} Cuando abramos escribinos y te lo preparamos${e("🙌")}`,
-                  `¡Buenas! ${yo}${negocio.nombre}. ${cerrado} ¡Te esperamos!${e("🍔")}`,
+                  `¡Hola! ${cerrado}${anticipado || ` Cuando abramos escribinos y te lo preparamos${e("🙌")}`}`,
+                  `¡Buenas! ${yo}${negocio.nombre}. ${cerrado}${anticipado || ` ¡Te esperamos!${e("🍔")}`}`,
                 ],
             azar,
           ),
         ];
       }
+      // Cliente que ya compró (el nombre viene de su último pedido): saludo de conocido.
+      const nombre = pedido.cliente?.split(" ")[0];
+      if (nombre && !usted) {
+        return [
+          elegir(
+            [
+              `¡Hola, ${nombre}! Qué bueno tenerte de vuelta${e("🙌")} ¿Te armo lo de siempre o te paso la carta?`,
+              `¡Buenas, ${nombre}!${e("👋")} ¿Repetimos lo de la otra vez o te paso la carta?`,
+            ],
+            azar,
+          ),
+        ];
+      }
+      if (nombre) return [`¡Hola, ${nombre}! Qué gusto que nos escriba de nuevo. ¿Le preparo lo mismo que la vez pasada o le paso la carta?`];
       return [
         elegir(
           usted
