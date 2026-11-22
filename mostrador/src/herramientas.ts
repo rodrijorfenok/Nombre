@@ -368,7 +368,7 @@ export function ejecutarHerramienta(nombre: string, input: unknown, ctx: Context
     }
     case "derivar_a_humano": {
       ctx.efectos.push({ tipo: "atencion_humana", pedidoId: pedido.id!, motivo: a.motivo });
-      return "Listo: una persona del local toma la conversación. Decile al cliente, en una línea y con buena onda, que ya le responde alguien del local. No agregues nada más.";
+      return "Listo: una persona del local toma la conversación. Decile al cliente en una línea, con buena onda y hablándole de vos, algo como \"ya te escribe alguien del local\". No agregues nada más.";
     }
   }
 }

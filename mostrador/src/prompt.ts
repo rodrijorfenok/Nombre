@@ -25,8 +25,8 @@ function catalogo(menu: Menu): string {
 
 const TONOS: Record<Negocio["asistente"]["tono"], string> = {
   canchero:
-    'Hablás como alguien joven y con onda que atiende el mostrador de un local de barrio en Argentina: voseo, "dale", "joya", "de una", "buenísimo". Cercano pero sin pasarte de confianza ni usar lunfardo pesado.',
-  cordial: "Hablás con voseo argentino, amable y prolijo, como un buen encargado de local: cálido, claro, sin modismos fuertes.",
+    'Hablás como alguien joven y con onda que atiende el mostrador de un local de barrio en Argentina: voseo siempre ("te respondo", "querés", nunca "le responde" ni "usted"), "dale", "joya", "de una", "buenísimo". Cercano pero sin pasarte de confianza ni usar lunfardo pesado. Nada de modismos de otros países ("te tinca", "vale", "chévere", "ahorita").',
+  cordial: "Hablás con voseo argentino siempre (nunca \"usted\"), amable y prolijo, como un buen encargado de local: cálido, claro, sin modismos fuertes ni de otros países.",
   formal: "Tratás al cliente de usted, con amabilidad y precisión, como en un restaurante de categoría. Nada de modismos.",
 };
 
@@ -94,7 +94,7 @@ ${a.emojis ? "Usá emojis con moderación: uno por mensaje como mucho, y no en t
 # Derivar a una persona (derivar_a_humano)
 Usalo, en lugar de responder vos, cuando:
 ${derivar.map((d) => `- ${d}`).join("\n")}
-Al derivar, decile al cliente en una línea que ya le responde alguien del local. Desde ese momento lo atiende una persona.
+Al derivar, decile al cliente en una línea, hablándole de vos, algo como "ya te escribe alguien del local". Desde ese momento lo atiende una persona.
 
 # Ejemplos de tono (no los copies literal)
 Cliente: "hola tenes hamburguesas?"

@@ -78,6 +78,53 @@ const CASOS: Record<string, Caso[]> = {
         ['Napolitana "Comen 2"', tiene(p, "napo-comen-2")],
       ],
     },
+    {
+      nombre: "Pedido ambiguo: tiene que preguntar tamaño y bebida",
+      mensajes: ["quiero una hamburguesa clásica"],
+      verificar: (p, c) => [
+        ["no inventó tamaño ni bebida", !tiene(p, "clasica")],
+        ["preguntó por el tamaño", c.respuestas.some((r) => /simple|doble|triple|tama/i.test(r))],
+        ["preguntó por la bebida", c.respuestas.some((r) => /coca|sprite|bebida/i.test(r))],
+      ],
+    },
+    {
+      nombre: "Cambia de idea a mitad del pedido",
+      mensajes: ["una super americana triple con coca y una pizza jamón y queso", "no, mejor la americana con sprite y sacá la pizza"],
+      verificar: (p) => [
+        ["Americana triple con Sprite", tiene(p, "super-americana", (l) => l.opciones.bebida === "sprite" && l.opciones["tamaño"] === "triple")],
+        ["ya no hay Americana con Coca", !tiene(p, "super-americana", (l) => l.opciones.bebida === "coca")],
+        ["sacó la pizza", !tiene(p, "pizza-jamon-y-queso")],
+      ],
+    },
+    {
+      nombre: "Bebida suelta (no se vende sola)",
+      mensajes: ["tenés coca de litro y medio?"],
+      verificar: (p, c) => [
+        ["no cargó nada", p.lineas.length === 0],
+        ["no ofrece una bebida que no existe", !c.respuestas.some((r) => /1[,.]5|litro y medio/i.test(r) && /\$\s?\d/.test(r))],
+      ],
+    },
+    {
+      nombre: "Reclamo: debe derivar",
+      mensajes: ["el pedido de anoche llegó frío y faltaba una pizza, quiero que me lo solucionen"],
+      verificar: (_p, c) => [["derivó a una persona", c.derivado]],
+    },
+    {
+      nombre: "Alergia: debe derivar sin garantizar nada",
+      mensajes: ["soy celíaca, ¿la pizza muzzarella es apta?"],
+      verificar: (_p, c) => [
+        ["derivó a una persona", c.derivado],
+        ["no garantizó que es apta", !c.respuestas.some((r) => /\b(s[ií],? es apta|es apta para cel[ií]acos|sin tacc)\b/i.test(r) && !/no (te )?(puedo|podemos) garantizar/i.test(r))],
+      ],
+    },
+    {
+      nombre: "Muy lejos: fuera del área de delivery",
+      mensajes: ["una promo 2 con delivery, estoy a como 80 cuadras del local"],
+      verificar: (p, c) => [
+        ["no asignó zona de delivery", !(p.entrega?.modo === "delivery" && p.entrega.zonaId)],
+        ["ofreció retirar o derivó", c.derivado || c.respuestas.some((r) => /retir|buscar|take away|local/i.test(r))],
+      ],
+    },
   ],
 };
 
@@ -91,6 +138,35 @@ async function main() {
     process.exit(1);
   }
   const client = new Anthropic({ maxRetries: 3 });
+  // Medición de consumo: se suman los tokens de cada llamada para estimar el costo por conversación.
+  const uso = { llamadas: 0, entrada: 0, cacheLeida: 0, cacheEscrita: 0, salida: 0 };
+  const sumar = (u: Anthropic.Beta.BetaUsage | undefined) => {
+    if (!u) return;
+    uso.llamadas++;
+    uso.entrada += u.input_tokens ?? 0;
+    uso.cacheLeida += u.cache_read_input_tokens ?? 0;
+    uso.cacheEscrita += u.cache_creation_input_tokens ?? 0;
+    uso.salida += u.output_tokens ?? 0;
+  };
+  const m = client.beta.messages as unknown as Record<"create" | "parse", (...a: unknown[]) => Promise<{ usage?: Anthropic.Beta.BetaUsage }>>;
+  for (const k of ["create", "parse"] as const) {
+    const original = m[k].bind(client.beta.messages);
+    m[k] = async (...a: unknown[]) => {
+      const r = await original(...a);
+      sumar(r.usage);
+      return r;
+    };
+  }
+  // Precios por millón de tokens (Haiku 5.5, prompts de hasta 100K): entrada, salida, lectura y escritura de caché.
+  const PRECIOS: Record<string, [number, number, number, number]> = {
+    "claude-haiku-5-5": [0.1, 0.5, 0.01, 0.125],
+    "claude-sonnet-5-5": [2, 10, 0.1, 2.5],
+    "claude-opus-5-5": [4, 20, 0.2, 5],
+  };
+  const costo = () => {
+    const [e, s, cl, ce] = PRECIOS[env.model] ?? PRECIOS["claude-haiku-5-5"];
+    return (uso.entrada * e + uso.salida * s + uso.cacheLeida * cl + uso.cacheEscrita * ce) / 1e6;
+  };
   const casos = [...(CASOS[slug] ?? []), ...genericos];
   let ok = 0;
   let totalChecks = 0;
@@ -116,6 +192,7 @@ async function main() {
     });
     console.log(`\n━━━ ${caso.nombre} ━━━`);
     const t0 = Date.now();
+    const costoAntes = costo();
     for (const m of caso.mensajes) {
       console.log(`\n👤 ${m}`);
       const antes = respuestas.length;
@@ -124,7 +201,7 @@ async function main() {
     }
     const conv = store.conversacion(CLIENTE)!;
     const pedido = store.pedido(conv.pedidoId!)!;
-    console.log(`\n   (${((Date.now() - t0) / 1000).toFixed(1)} s)`);
+    console.log(`\n   (${((Date.now() - t0) / 1000).toFixed(1)} s · USD ${(costo() - costoAntes).toFixed(4)})`);
     for (const [nombre, paso] of caso.verificar(pedido, { derivado, respuestas })) {
       totalChecks++;
       if (paso) ok++;
@@ -132,6 +209,9 @@ async function main() {
     }
   }
   console.log(`\nResultado: ${ok}/${totalChecks} verificaciones bien.`);
+  console.log(
+    `Consumo (${env.model}, esfuerzo ${env.effort}): ${uso.llamadas} llamadas · entrada ${uso.entrada} · caché leída ${uso.cacheLeida} · caché escrita ${uso.cacheEscrita} · salida ${uso.salida} tokens · total USD ${costo().toFixed(4)}`,
+  );
   process.exit(ok === totalChecks ? 0 : 1);
 }
 

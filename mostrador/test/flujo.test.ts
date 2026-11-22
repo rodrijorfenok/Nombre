@@ -202,3 +202,49 @@ test("fuera de horario no se puede confirmar", async () => {
   assert.match(res.content, /cerrado/);
   assert.equal(store.pedido(1)!.estado, "armando");
 });
+
+test("pago en dos transferencias: la primera es parcial y la segunda completa el saldo", async () => {
+  const guion: Paso[] = [
+    {
+      tools: [
+        { name: "agregar_productos", input: { items: [{ producto_id: "doble-orbita", cantidad: 2 }] } },
+        { name: "configurar_entrega", input: { modo: "take_away" } },
+        { name: "datos_cliente", input: { nombre: "Sol" } },
+        { name: "elegir_pago", input: { metodo: "transferencia" } },
+        { name: "confirmar_pedido", input: {} },
+      ],
+    },
+    { text: "¡Gracias Sol!" },
+  ];
+  const lecturas = [
+    { monto: 20000, numero_operacion: "111" },
+    { monto: 5600, numero_operacion: "222" },
+  ];
+  const base = {
+    es_comprobante: true,
+    legible: true,
+    fecha_hora: "2026-11-21T21:03",
+    destinatario_nombre: negocio.pago.titular,
+    destinatario_alias_cvu: negocio.pago.alias,
+    origen_nombre: "Sol",
+    entidad: "Mercado Pago",
+    estado: "aprobada",
+    signos_de_edicion: false,
+    observaciones: "",
+  };
+  const { client } = clienteFalso(guion, null);
+  (client as any).beta.messages.parse = async () => ({ stop_reason: "end_turn", parsed_output: { ...base, ...lecturas.shift() } });
+  const store = new Store(":memory:");
+  const { m, enviados } = bandeja();
+  const bot = new Bot({ store, menu, negocio, client, mensajero: m, reloj, dataDir, esperaRafagaMs: 0 });
+
+  await bot.recibir(CLIENTE, { tipo: "texto", texto: "2 doble orbita, retiro, soy Sol, transfiero" });
+  await bot.recibir(CLIENTE, { tipo: "imagen", datos: Buffer.from("a"), mime: "image/jpeg" });
+  assert.equal(store.pedido(1)!.estado, "esperando_pago");
+  assert.match(enviados.at(-1)!.texto, /Te faltan \*\$5\.600\*/);
+
+  await bot.recibir(CLIENTE, { tipo: "imagen", datos: Buffer.from("b"), mime: "image/jpeg" });
+  assert.equal(store.pedido(1)!.estado, "en_cocina");
+  assert.ok(enviados.some((e) => e.tel === COCINA && /COMANDA #0001/.test(e.texto)));
+  assert.deepEqual(store.comprobantesDePedido(1).map((c) => c.veredicto), ["parcial", "aprobado"]);
+});

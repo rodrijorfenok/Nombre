@@ -157,7 +157,7 @@ La base de datos se limpia sola: borra los chats de más de 14 días y los compr
 
 | | **Haiku 5.5 (por defecto)** | Sonnet 5.5 | Opus 5.5 |
 |---|---|---|---|
-| IA (Claude) | **USD 15 a 40** | USD 250 a 450 | USD 500 a 900 |
+| IA (Claude) | **≈ USD 16 (medido)** | USD 250 a 450 | USD 500 a 900 |
 | Servidor (Railway) | USD 5 a 10 | USD 5 a 10 | USD 5 a 10 |
 | WhatsApp (Meta) | USD 0* | USD 0* | USD 0* |
 

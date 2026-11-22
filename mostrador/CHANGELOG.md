@@ -1,5 +1,13 @@
 # Cambios
 
+## 1.1.0
+
+- Haiku 5.5 como modelo por defecto, con esfuerzo `medium`.
+- Ensayo con IA real ampliado a 12 situaciones (pedido ambiguo, cambio de idea, bebida suelta, reclamo, alergia, fuera de zona) con medición de costo. Resultado con Haiku 5.5: 29/29.
+- Pagos en varias transferencias: un comprobante válido pero corto queda como pago parcial y se suma con los siguientes.
+- `npm run probar-comprobante` para probar comprobantes reales con la IA.
+- Tono: siempre de vos y sin modismos de otros países.
+
 ## 1.0.0
 
 Primera versión completa.

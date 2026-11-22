@@ -24,7 +24,8 @@ export const DatosComprobanteSchema = z.object({
 
 export type DatosComprobante = z.infer<typeof DatosComprobanteSchema>;
 
-export type Veredicto = "aprobado" | "revisar" | "rechazado";
+/** parcial = comprobante válido pero por menos del total: se suma a los siguientes */
+export type Veredicto = "aprobado" | "revisar" | "rechazado" | "parcial";
 
 export interface ResultadoComprobante {
   veredicto: Veredicto;
@@ -95,7 +96,16 @@ function coincideDestinatario(d: DatosComprobante, negocio: Negocio): boolean | 
  */
 export function evaluarComprobante(
   d: DatosComprobante | null,
-  opts: { total: number; negocio: Negocio; pedidoCreadoEn: Date; ahora?: Date; operacionDuplicada?: boolean },
+  opts: {
+    /** lo que falta pagar (el total del pedido, o el saldo si ya hubo pagos parciales) */
+    total: number;
+    negocio: Negocio;
+    pedidoCreadoEn: Date;
+    ahora?: Date;
+    operacionDuplicada?: boolean;
+    /** suma de pagos parciales anteriores del mismo pedido */
+    pagadoAntes?: number;
+  },
 ): ResultadoComprobante {
   const { total, negocio } = opts;
   const ahora = opts.ahora ?? new Date();
@@ -127,8 +137,9 @@ export function evaluarComprobante(
   const motivosRevisar: string[] = [];
   const motivosRechazo: string[] = [];
 
+  const saldo = opts.pagadoAntes ? "saldo pendiente" : "total";
   if (d.monto === null) motivosRevisar.push("no se lee el monto");
-  else if (d.monto + 1 < total) motivosRechazo.push(`monto ${pesos(d.monto)} menor al total ${pesos(total)} (faltan ${pesos(total - d.monto)})`);
+  else if (d.monto + 1 < total) motivosRechazo.push(`monto ${pesos(d.monto)} menor al ${saldo} ${pesos(total)} (faltan ${pesos(total - d.monto)})`);
 
   const dest = coincideDestinatario(d, negocio);
   if (dest === false) motivosRechazo.push(`el destinatario (${d.destinatario_nombre ?? d.destinatario_alias_cvu}) no coincide con la cuenta del local`);
@@ -146,8 +157,16 @@ export function evaluarComprobante(
   if (d.signos_de_edicion) motivosRevisar.push("posibles signos de edición");
   if (!d.numero_operacion) motivosRevisar.push("sin número de operación");
 
+  const faltaPlata = d.monto !== null && d.monto + 1 < total;
+  // Comprobante correcto pero corto: se acepta como pago parcial y se espera el resto.
+  if (faltaPlata && motivosRechazo.length === 1 && !motivosRevisar.length) {
+    return {
+      veredicto: "parcial",
+      motivos: [`pago parcial de ${pesos(d.monto!)}`, `operación ${d.numero_operacion}`, `faltan ${pesos(total - d.monto!)}`],
+      mensajeCliente: `Recibí tu transferencia de ${pesos(d.monto!)} 👍 Te faltan *${pesos(total - d.monto!)}* para completar el pedido: transferí la diferencia al alias *${negocio.pago.alias}* y mandame ese comprobante.`,
+    };
+  }
   if (motivosRechazo.length) {
-    const faltaPlata = d.monto !== null && d.monto + 1 < total;
     return {
       veredicto: "rechazado",
       motivos: [...motivosRechazo, ...motivosRevisar],

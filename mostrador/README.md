@@ -106,7 +106,8 @@ Requiere Node 22.13 o superior. Con Docker: `docker build -t mostrador . && dock
 | `npm run validar [-- <local>]` | Revisa la configuración: datos sin completar, apodos ambiguos, variables faltantes |
 | `npm run nuevo-local -- <slug> "Nombre"` | Crea un local desde la plantilla |
 | `npm run demo-guiada -- <local>` | Genera la página de demo gratis a partir de `demo.json` |
-| `npm run ensayo [-- <local>]` | Simula clientes contra la IA real y verifica los pedidos (gasta centavos) |
+| `npm run ensayo [-- <local>]` | Simula 12 clientes contra la IA real y verifica los pedidos (menos de 1 centavo de dólar) |
+| `npm run probar-comprobante -- <local> <total> <archivos>` | Prueba la lectura de comprobantes reales con la IA |
 | `npm run carga -- 300 1500` | Prueba de carga con IA simulada: 300 clientes a la vez |
 | `npm run check` | Revisión de tipos + pruebas (lo mismo que corre GitHub en cada cambio) |
 
@@ -141,15 +142,15 @@ Los secretos nunca van en estos archivos. Se escriben como `"env:NOMBRE_VARIABLE
 
 | | **Haiku 5.5 (por defecto)** | Sonnet 5.5 | Opus 5.5 |
 |---|---|---|---|
-| IA por mes | **USD 15 a 40** | USD 250 a 450 | USD 500 a 900 |
+| IA por mes | **≈ USD 16 (medido)** | USD 250 a 450 | USD 500 a 900 |
 | Servidor | USD 5 a 10 | USD 5 a 10 | USD 5 a 10 |
 | WhatsApp | USD 0 | USD 0 | USD 0 |
 
-Son estimaciones. Medí el consumo real con los primeros pedidos. Antes de cambiar de modelo, corré `npm run ensayo` con el modelo nuevo y revisá los resultados.
+Con Haiku 5.5 se midió con `npm run ensayo`: un pedido completo de 3 mensajes cuesta unos USD 0,003 y tarda entre 2 y 3 segundos por respuesta. Las otras columnas son estimaciones. Antes de cambiar de modelo, corré el ensayo con el modelo nuevo y revisá los resultados.
 
 ## Límites conocidos
 
-- **Comprobantes:** el control es un filtro, no una prueba bancaria; una captura se puede falsificar. Lo infalible es confirmar el ingreso en la cuenta (conexión con Mercado Pago, pendiente).
+- **Comprobantes:** el control es un filtro, no una prueba bancaria; una captura se puede falsificar. Acepta pagos en varias transferencias y los suma. Lo infalible es confirmar el ingreso en la cuenta (conexión con Mercado Pago, pendiente).
 - **Zonas:** sin la ubicación del local en `negocio.json`, la zona se elige por cuadras que dice el cliente.
 - **Audios:** no los procesa; le pide al cliente que escriba.
 - **Una sola instancia:** el servidor guarda en SQLite y debe correr con una réplica. Aguanta cientos de clientes simultáneos.

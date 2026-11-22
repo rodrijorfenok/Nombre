@@ -22,7 +22,7 @@ export interface Comprobante {
   archivo: string | null;
   numeroOperacion: string | null;
   monto: number | null;
-  veredicto: "aprobado" | "revisar" | "rechazado";
+  veredicto: "aprobado" | "revisar" | "rechazado" | "parcial";
   motivos: string[];
   datos: unknown;
   creadoEn: string;

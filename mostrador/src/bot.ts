@@ -467,8 +467,14 @@ export class Bot {
       console.error("[comprobante] error leyendo imagen", e);
     }
     const duplicado = extraidos?.numero_operacion ? this.store.operacionYaUsada(extraidos.numero_operacion, pedido.id) : null;
+    // Pagos parciales anteriores del mismo pedido: este comprobante tiene que cubrir el saldo.
+    const pagadoAntes = this.store
+      .comprobantesDePedido(pedido.id!)
+      .filter((c) => c.veredicto === "parcial")
+      .reduce((a, c) => a + (c.monto ?? 0), 0);
     const r = evaluarComprobante(extraidos, {
-      total,
+      total: Math.max(0, total - pagadoAntes),
+      pagadoAntes,
       negocio: this.negocio,
       pedidoCreadoEn: new Date(pedido.creadoEn),
       ahora: this.reloj(),

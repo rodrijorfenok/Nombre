@@ -146,9 +146,12 @@ test("comprobante válido se aprueba", () => {
 });
 
 test("comprobante con monto menor, otra cuenta, viejo o duplicado se rechaza", () => {
+  // monto corto pero comprobante válido: pago parcial, se espera el resto
   const menor = evaluarComprobante({ ...base, monto: 20000 }, opts);
-  assert.equal(menor.veredicto, "rechazado");
-  assert.match(menor.mensajeCliente, /faltan \$5\.000/i);
+  assert.equal(menor.veredicto, "parcial");
+  assert.match(menor.mensajeCliente, /faltan \*\$5\.000\*/i);
+  // monto corto Y a otra cuenta: rechazado
+  assert.equal(evaluarComprobante({ ...base, monto: 20000, destinatario_nombre: "Pedro Gómez" }, opts).veredicto, "rechazado");
   assert.equal(evaluarComprobante({ ...base, destinatario_nombre: "Pedro Gómez" }, opts).veredicto, "rechazado");
   assert.equal(evaluarComprobante({ ...base, fecha_hora: "2026-11-10T21:10" }, opts).veredicto, "rechazado");
   assert.equal(evaluarComprobante(base, { ...opts, operacionDuplicada: true }).veredicto, "rechazado");
