@@ -269,7 +269,7 @@ app.get("/comprobante/:slug/:id", (req, res) => {
 // Política de privacidad pública (Meta la pide para publicar la app de WhatsApp).
 app.get("/privacidad", (_req, res) => {
   const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
-  const nombres = todos.map((c) => esc(c.negocio.nombre)).join(", ") || "el local";
+  const nombres = [...locales.values()].map((l) => esc(l.cliente.negocio.nombre)).join(", ") || "el local";
   res.type("html").send(`<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Política de privacidad · Mostrador</title><style>body{font:16px/1.55 system-ui,sans-serif;max-width:720px;margin:32px auto;padding:0 16px;color:#222}h1{font-size:24px}h2{font-size:18px;margin-top:28px}</style></head><body>
 <h1>Política de privacidad</h1>
