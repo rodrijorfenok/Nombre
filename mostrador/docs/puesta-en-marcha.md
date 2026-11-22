@@ -55,8 +55,8 @@ Se tarda unos 40 minutos la primera vez. Para la demo usamos el **número de pru
 | Variable | Valor |
 |---|---|
 | `ANTHROPIC_API_KEY` | tu clave de console.anthropic.com |
-| `CLAUDE_MODEL` | `claude-opus-5-5` (o `claude-haiku-5-5` para más velocidad y menos costo) |
-| `CLAUDE_EFFORT` | `low` |
+| `CLAUDE_MODEL` | `claude-haiku-5-5` (el que viene por defecto: rápido y barato) |
+| `CLAUDE_EFFORT` | `medium` |
 | `WHATSAPP_APP_SECRET` | la clave secreta del paso 1.6 |
 | `WHATSAPP_VERIFY_TOKEN` | una palabra que inventes, ej. `astro-demo-2026` |
 | `ASTROBURGUER_WA_PHONE_ID` | el Phone number ID del paso 1.3 |
@@ -155,12 +155,12 @@ La base de datos se limpia sola: borra los chats de más de 14 días y los compr
 
 **Costo mensual estimado (unos 6.000 pedidos):**
 
-| | Opus 5.5 | Sonnet 5.5 | Haiku 5.5 |
+| | **Haiku 5.5 (por defecto)** | Sonnet 5.5 | Opus 5.5 |
 |---|---|---|---|
-| IA (Claude) | USD 500 a 900 | USD 250 a 450 | USD 15 a 30 |
+| IA (Claude) | **USD 15 a 40** | USD 250 a 450 | USD 500 a 900 |
 | Servidor (Railway) | USD 5 a 10 | USD 5 a 10 | USD 5 a 10 |
 | WhatsApp (Meta) | USD 0* | USD 0* | USD 0* |
 
 \* Con la tarifa actual de Meta, responder a un cliente que escribió primero no tiene costo. Solo se pagan los mensajes que inicia el local, como campañas o promociones.
 
-Para que un local pague poco y tengas buen margen, **Haiku 5.5 es la opción lógica**. La parte delicada (precios, totales, tiempos, validación de pagos) la hace el programa, no la IA. Antes de ofrecerlo, probá unos 30 pedidos reales con Haiku y mirá cómo responde. Se cambia con una sola variable: `CLAUDE_MODEL=claude-haiku-5-5`.
+Mostrador viene con **Haiku 5.5**: es el más barato y rápido, y alcanza porque la parte delicada (precios, totales, tiempos, validación de pagos) la hace el programa, no la IA. Antes de lanzar un local, corré `npm run ensayo` y hacé unos 30 pedidos de prueba. Si algún caso sale mal, probá primero con `CLAUDE_EFFORT=high`, y si sigue fallando, con `CLAUDE_MODEL=claude-sonnet-5-5`.

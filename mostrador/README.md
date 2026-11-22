@@ -128,7 +128,7 @@ Los secretos nunca van en estos archivos. Se escriben como `"env:NOMBRE_VARIABLE
 | Variable | Para qué |
 |---|---|
 | `ANTHROPIC_API_KEY` | Clave de Claude |
-| `CLAUDE_MODEL` / `CLAUDE_EFFORT` | Modelo (`claude-opus-5-5` por defecto; `claude-sonnet-5-5` o `claude-haiku-5-5` para gastar menos) y esfuerzo (`low`) |
+| `CLAUDE_MODEL` / `CLAUDE_EFFORT` | Modelo (`claude-haiku-5-5` por defecto; `claude-sonnet-5-5` o `claude-opus-5-5` si hace falta más capacidad) y esfuerzo (`medium` por defecto) |
 | `WHATSAPP_APP_SECRET` / `WHATSAPP_VERIFY_TOKEN` | Firma y verificación del webhook de Meta (obligatorio en producción) |
 | `<LOCAL>_WA_PHONE_ID`, `<LOCAL>_WA_TOKEN` | Número de WhatsApp de cada local |
 | `<LOCAL>_PANEL_TOKEN` | Clave del panel de cocina |
@@ -139,9 +139,9 @@ Los secretos nunca van en estos archivos. Se escriben como `"env:NOMBRE_VARIABLE
 
 ## Costos estimados (200 pedidos por día)
 
-| | Opus 5.5 | Sonnet 5.5 | Haiku 5.5 |
+| | **Haiku 5.5 (por defecto)** | Sonnet 5.5 | Opus 5.5 |
 |---|---|---|---|
-| IA por mes | USD 500 a 900 | USD 250 a 450 | USD 15 a 30 |
+| IA por mes | **USD 15 a 40** | USD 250 a 450 | USD 500 a 900 |
 | Servidor | USD 5 a 10 | USD 5 a 10 | USD 5 a 10 |
 | WhatsApp | USD 0 | USD 0 | USD 0 |
 

@@ -180,8 +180,8 @@ function validarReferencias(menu: Menu) {
 }
 
 export const env = {
-  model: process.env.CLAUDE_MODEL ?? "claude-opus-5-5",
-  effort: (process.env.CLAUDE_EFFORT ?? "low") as "low" | "medium" | "high" | "xhigh" | "max",
+  model: process.env.CLAUDE_MODEL ?? "claude-haiku-5-5",
+  effort: (process.env.CLAUDE_EFFORT ?? "medium") as "low" | "medium" | "high" | "xhigh" | "max",
   clientesDir: process.env.CLIENTES_DIR ?? "clientes",
   dataDir: process.env.DATA_DIR ?? "data",
   publicUrl: process.env.PUBLIC_URL ?? "",

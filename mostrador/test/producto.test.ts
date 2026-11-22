@@ -251,3 +251,15 @@ test("firma del webhook de Meta: acepta la válida, rechaza la falsa y sin secre
     process.env.NODE_ENV = antes;
   }
 });
+
+test("con Haiku 5.5 (por defecto) el pedido a la IA no lleva fallbacks ni parámetros que ese modelo rechaza", async () => {
+  const { bot, llamadas } = armar({ respuestas: ["¡Dale!"] });
+  await bot.recibir("9", { tipo: "texto", texto: "quiero algo rico" });
+  const p = llamadas[0];
+  assert.equal(p.model, "claude-haiku-5-5");
+  assert.equal(p.output_config.effort, "medium");
+  assert.equal(p.fallbacks, undefined);
+  assert.equal(p.betas, undefined);
+  for (const k of ["temperature", "top_p", "top_k", "thinking"]) assert.equal(p[k], undefined, k);
+  assert.equal(p.messages.at(-1).role, "user", "sin prefill");
+});
