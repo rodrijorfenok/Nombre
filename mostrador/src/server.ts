@@ -49,10 +49,11 @@ if (!locales.size) console.warn("⚠️  No hay ningún local configurado con Wh
 const app = express();
 app.disable("x-powered-by");
 app.set("trust proxy", true);
-app.use((_req, res, next) => {
+app.use((req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("Referrer-Policy", "no-referrer");
-  res.setHeader("X-Frame-Options", "DENY");
+  // La comanda se imprime desde el panel dentro de un iframe del mismo sitio; el resto no se puede embeber.
+  res.setHeader("X-Frame-Options", req.path.startsWith("/comanda/") ? "SAMEORIGIN" : "DENY");
   next();
 });
 
@@ -165,6 +166,8 @@ app.get("/panel/:slug", (req, res) => {
   const { menu: _m, negocio, slug } = cliente;
   const menu = local.bot.menu;
   const tk = encodeURIComponent(negocio.panel.token);
+  // Impresión automática (?auto=1): cada comanda que entra a cocina se imprime una sola vez en esta PC.
+  const auto = req.query.auto === "1";
   const filas = store
     .pedidosActivos()
     .map((p) => {
@@ -174,7 +177,7 @@ app.get("/panel/:slug", (req, res) => {
         .map((c) => `<a href="/comprobante/${slug}/${c.id}?token=${tk}" target="_blank">🧾 ${c.veredicto}</a>`)
         .join(" ");
       const boton = (cmd: string, label: string) =>
-        `<form method="post" action="/panel/${slug}/cmd?token=${tk}"><input type="hidden" name="cmd" value="${cmd} ${p.id}"><button>${label}</button></form>`;
+        `<form method="post" action="/panel/${slug}/cmd?token=${tk}${auto ? "&auto=1" : ""}"><input type="hidden" name="cmd" value="${cmd} ${p.id}"><button>${label}</button></form>`;
       return `<tr><td><b>#${p.id}</b></td><td>${p.estado.replace(/_/g, " ")}</td><td>${p.cliente ?? ""}<br><small>${p.telefono}</small></td>
         <td>${p.entrega?.modo === "delivery" ? `🛵 ${p.entrega.direccion ?? ""}` : "🏃 take away"}</td><td>${pesos(tot)}<br><small>${p.pago?.metodo ?? ""}</small> ${comps}</td>
         <td>${p.horaEstimada ? horaLocal(new Date(p.horaEstimada), negocio.zonaHoraria) : ""}</td>
@@ -185,21 +188,66 @@ app.get("/panel/:slug", (req, res) => {
         ${boton("entregado", "📦 entregado")}</td></tr>`;
     })
     .join("");
+  const enCocina = store
+    .pedidosActivos()
+    .filter((p) => p.estado === "en_cocina")
+    .map((p) => p.id);
+  const linkAuto = `/panel/${slug}?token=${tk}${auto ? "" : "&auto=1"}`;
+  const avisoAuto = auto
+    ? `🖨️ <b>Impresión automática activada</b> · <span id="impr"></span> · <a href="${linkAuto}">desactivar</a>`
+    : `🖨️ <a href="${linkAuto}">Activar impresión automática de comandas</a>`;
+  const scriptAuto = auto
+    ? `<script>
+(() => {
+  const KEY = "mostrador-impresas-${slug}";
+  const enCocina = ${JSON.stringify(enCocina)};
+  const estado = document.getElementById("impr");
+  let hechas = [];
+  try { hechas = JSON.parse(localStorage.getItem(KEY) || "[]"); } catch {}
+  const guardar = () => { try { localStorage.setItem(KEY, JSON.stringify(hechas.slice(-300))); } catch {} };
+  const pendientes = enCocina.filter((id) => !hechas.includes(id));
+  const recargar = () => setTimeout(() => location.reload(), 10000);
+  const siguiente = () => {
+    const id = pendientes.shift();
+    if (id === undefined) { estado.textContent = "esperando pedidos (se revisa cada 10 s)"; return recargar(); }
+    estado.textContent = "imprimiendo comanda #" + id + "…";
+    const f = document.createElement("iframe");
+    f.style.cssText = "position:absolute;width:0;height:0;border:0;visibility:hidden";
+    f.src = "/comanda/${slug}/" + id + "?token=${tk}";
+    f.onload = () => {
+      try {
+        f.contentWindow.focus();
+        f.contentWindow.print();
+        hechas.push(id); guardar();
+      } catch (e) {
+        console.error(e);
+        estado.textContent = "no se pudo imprimir la comanda #" + id + ", se reintenta";
+      }
+      setTimeout(() => { f.remove(); siguiente(); }, 1500);
+    };
+    document.body.appendChild(f);
+  };
+  siguiente();
+})();
+</script>`
+    : "";
   res.type("html").send(`<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="refresh" content="20"><title>${negocio.nombre} · Pedidos</title>
+${auto ? "" : '<meta http-equiv="refresh" content="20">'}<title>${negocio.nombre} · Pedidos</title>
 <style>body{font:15px system-ui,sans-serif;margin:16px;background:#111318;color:#f3f3f7}table{border-collapse:collapse;width:100%}
 td,th{border-bottom:1px solid #333;padding:8px;vertical-align:top;text-align:left}a{color:#ffb547}form{display:inline}
 button{margin:2px;padding:6px 10px;border-radius:6px;border:0;background:#ffb547;font-weight:600}.acc{white-space:nowrap}
 @media(max-width:700px){td,th{display:block;border:0;padding:2px 0}tr{display:block;border-bottom:1px solid #333;padding:8px 0}th{display:none}}</style></head>
-<body><h2>${negocio.nombre} — pedidos activos</h2><p><small>Se actualiza cada 20 s · demora extra: ${store.ajuste("demora_extra") ?? 0} min</small></p>
-<table><tr><th>#</th><th>Estado</th><th>Cliente</th><th>Entrega</th><th>Total</th><th>Hora</th><th></th></tr>${filas || '<tr><td colspan="7">Sin pedidos activos</td></tr>'}</table></body></html>`);
+<body><h2>${negocio.nombre} — pedidos activos</h2><p><small>Se actualiza cada ${auto ? 10 : 20} s · demora extra: ${store.ajuste("demora_extra") ?? 0} min</small></p>
+<p><small>${avisoAuto}</small></p>
+<table><tr><th>#</th><th>Estado</th><th>Cliente</th><th>Entrega</th><th>Total</th><th>Hora</th><th></th></tr>${filas || '<tr><td colspan="7">Sin pedidos activos</td></tr>'}</table>${scriptAuto}</body></html>`);
 });
 
 app.post("/panel/:slug/cmd", express.urlencoded({ extended: false }), async (req, res) => {
   const local = localAutorizado(req);
   if (!local) return void res.sendStatus(401);
   await comandoStaff(local.bot, String(req.body?.cmd ?? ""));
-  res.redirect(`/panel/${local.cliente.slug}?token=${encodeURIComponent(local.cliente.negocio.panel.token)}`);
+  const auto = req.query.auto === "1" ? "&auto=1" : "";
+  res.redirect(`/panel/${local.cliente.slug}?token=${encodeURIComponent(local.cliente.negocio.panel.token)}${auto}`);
 });
 
 app.get("/comanda/:slug/:id", (req, res) => {

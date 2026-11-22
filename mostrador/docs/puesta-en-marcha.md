@@ -88,6 +88,24 @@ Desde tu celular, escribile al número de prueba: "hola", "me pasás la carta?",
 - **Celulares argentinos y el número de prueba:** Meta a veces guarda tu celular sin el 9 y rechaza los envíos con el error 131030. El bot lo detecta y reintenta solo con la otra forma, así que no tenés que hacer nada.
 - **Un mismo celular no puede ser cliente y encargado a la vez:** si tu número está como encargado, el bot interpreta tus mensajes que coincidan con un comando (`pedidos`, `listo 3`…) como comandos, y el resto como pedido normal. Para que la demo sea limpia, hacé de cliente con tu celular y poné como encargado otro número.
 
+### Comandas impresas solas (impresora térmica de 80 mm)
+
+La PC de la cocina tiene el panel abierto con la impresión automática prendida: cada pedido que pasa a cocina (efectivo confirmado o transferencia aprobada) se imprime **una sola vez**, sin tocar nada.
+
+1. Conectá la impresora térmica a la PC, instalá su driver y ponela como **impresora predeterminada** con papel de 80 mm.
+2. Creá un acceso directo de Chrome que imprima sin preguntar (`--kiosk-printing`). En Windows, clic derecho en el escritorio → *Nuevo → Acceso directo* y pegá (todo en una línea):
+
+   ```
+   "C:\Program Files\Google\Chrome\Application\chrome.exe" --kiosk-printing --user-data-dir=C:\mostrador-cocina --app="https://TU-DOMINIO/panel/comidas-jn?token=TU_PANEL_TOKEN&auto=1"
+   ```
+
+   El `--user-data-dir` abre un Chrome aparte, así la impresión sin diálogo funciona aunque tengas otro Chrome abierto. En Mac: `open -na "Google Chrome" --args --kiosk-printing --user-data-dir=/tmp/mostrador-cocina --app="https://…&auto=1"`.
+3. Abrí ese acceso directo y dejalo abierto durante el turno. Arriba tiene que decir **Impresión automática activada**. La PC no se tiene que suspender.
+
+Desde el panel también se puede activar con el link *Activar impresión automática de comandas*; sin `--kiosk-printing`, Chrome muestra el cuadro de imprimir en cada comanda. Los celulares y tablets no imprimen solos: hace falta una PC (o notebook) con Chrome.
+
+**Con un solo celular:** dejá `COMIDAS_JN_COCINA` vacío (la comanda sale por la impresora) y poné tu celular en `COMIDAS_JN_ENCARGADOS` para recibir los avisos de "te necesitan" y el resumen. Así podés hacer de cliente con el mismo celular: lo que coincide con un comando (`pedidos`, `listo 3`…) se toma como comando y el resto como pedido.
+
 **Demo de Comidas JN:** la carta ya está cargada en `clientes/comidas-jn/`. Usá las variables `COMIDAS_JN_WA_PHONE_ID`, `COMIDAS_JN_WA_TOKEN`, `COMIDAS_JN_PANEL_TOKEN`, `COMIDAS_JN_ENCARGADOS` y `COMIDAS_JN_COCINA` en lugar de las de `ASTROBURGUER_` (el panel queda en `/panel/comidas-jn?token=...`). Para probarla en la terminal: `npm run chat -- comidas-jn`.
 
 ## 5. n8n o Make (opcional, para sumar cosas)
