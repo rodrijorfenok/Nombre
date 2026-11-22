@@ -167,28 +167,32 @@ test("teléfonos argentinos en cualquier formato", async () => {
   for (const f of ["11 3639 7582", "1136397582", "011 3639-7582", "+54 9 11 3639 7582", "541136397582", "5491136397582", "+54 9 11 15 3639 7582"]) {
     assert.equal(normalizarTelefono(f), "5491136397582", f);
   }
-  assert.equal(variantesAR("5491136397582"), "541136397582");
+  assert.deepEqual(variantesAR("5491136397582"), ["541136397582", "54111536397582", "54113156397582", "54113615397582"]);
+  assert.deepEqual(variantesAR("123"), []);
   assert.ok(mismoNumero("11 3639 7582", "5491136397582"));
   const { NegocioSchema } = await import("../src/config.ts");
   const n = NegocioSchema.parse({ ...negocio, equipo: { encargados: "11 3639 7582, 11 4444 5555", cocina: [] } });
   assert.deepEqual(n.equipo.encargados, ["5491136397582", "5491144445555"]);
 });
 
-test("si Meta rechaza el celular con 9 (error 131030), reintenta sin el 9 y lo recuerda", async () => {
+test("si Meta rechaza el celular con 9 (error 131030), prueba las otras formas y recuerda la que anduvo", async () => {
   const { WhatsAppCloud } = await import("../src/whatsapp.ts");
   const destinos: string[] = [];
   const original = globalThis.fetch;
   globalThis.fetch = (async (_url: string, init: any) => {
     const to = JSON.parse(init.body).to;
     destinos.push(to);
-    if (to === "5491136397582") return new Response('{"error":{"code":131030,"message":"Recipient phone number not in allowed list"}}', { status: 400 });
+    // como el número de prueba de Meta: solo acepta 54 + área + 15 + número
+    if (to !== "54111536397582") return new Response('{"error":{"code":131030,"message":"Recipient phone number not in allowed list"}}', { status: 400 });
     return new Response("{}", { status: 200 });
   }) as typeof fetch;
   try {
     const wa = new WhatsAppCloud("token", "123");
     await wa.enviarTexto("5491136397582", "hola");
     await wa.enviarTexto("5491136397582", "segundo");
-    assert.deepEqual(destinos, ["5491136397582", "541136397582", "541136397582"]);
+    assert.deepEqual(destinos, ["5491136397582", "541136397582", "54111536397582", "54111536397582"]);
+    // si ninguna forma anda, se informa el error
+    await assert.rejects(new WhatsAppCloud("token", "123").enviarTexto("5491144445555", "x"), /131030/);
   } finally {
     globalThis.fetch = original;
   }

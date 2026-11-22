@@ -22,11 +22,20 @@ export function normalizarTelefono(entrada: string, paisPorDefecto = "54"): stri
   return d;
 }
 
-/** La otra forma del mismo celular argentino (con o sin el 9), o null si no aplica. */
-export function variantesAR(tel: string): string | null {
-  if (tel.startsWith("549") && tel.length === 13) return `54${tel.slice(3)}`;
-  if (tel.startsWith("54") && !tel.startsWith("549") && tel.length === 12) return `549${tel.slice(2)}`;
-  return null;
+/**
+ * Otras formas en que Meta puede tener registrado el mismo celular argentino, en orden de prueba.
+ * La lista de destinatarios del número de prueba suele aceptar solo 54 + área + 15 + número
+ * (ej. 54111536397582), aunque el mensaje entrante llegue como 5491136397582.
+ */
+export function variantesAR(tel: string): string[] {
+  let local: string | null = null; // área + número, 10 dígitos
+  if (tel.startsWith("549") && tel.length === 13) local = tel.slice(3);
+  else if (tel.startsWith("54") && tel.length === 12) local = tel.slice(2);
+  if (!local) return [];
+  const formas = [`549${local}`, `54${local}`];
+  // con el 15 después del código de área (2, 3 o 4 dígitos: 11, 351, 2994…)
+  for (const largoArea of [2, 3, 4]) formas.push(`54${local.slice(0, largoArea)}15${local.slice(largoArea)}`);
+  return formas.filter((f) => f !== tel);
 }
 
 export function mismoNumero(a: string, b: string): boolean {

@@ -42,10 +42,20 @@ export class WhatsAppCloud implements Mensajero {
     try {
       await this.enviarA(destino, texto);
     } catch (e) {
-      const otra = variantesAR(destino);
-      if (!otra || !esDestinatarioNoPermitido(e)) throw e;
-      await this.enviarA(otra, texto);
-      this.formaAceptada.set(telefono, otra);
+      if (!esDestinatarioNoPermitido(e)) throw e;
+      // Meta no reconoce esta forma del número: probar las otras formas del mismo celular argentino.
+      let ultimo = e;
+      for (const otra of variantesAR(destino)) {
+        try {
+          await this.enviarA(otra, texto);
+          this.formaAceptada.set(telefono, otra);
+          return;
+        } catch (e2) {
+          if (!esDestinatarioNoPermitido(e2)) throw e2;
+          ultimo = e2;
+        }
+      }
+      throw ultimo;
     }
   }
 
