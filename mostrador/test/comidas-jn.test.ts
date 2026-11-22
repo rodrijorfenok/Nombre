@@ -61,7 +61,9 @@ test("zona según la ubicación compartida por el cliente", async () => {
   assert.match(zonaPorUbicacion(n, -34.527, -58.7), /zona z4/);
   // ~6 km → fuera
   assert.match(zonaPorUbicacion(n, -34.554, -58.7), /FUERA/);
-  assert.equal(zonaPorUbicacion(negocio, -34.5, -58.7), "", "sin ubicación del local no calcula");
+  assert.equal(zonaPorUbicacion({ ...negocio, ubicacion: null }, -34.5, -58.7), "", "sin ubicación del local no calcula");
+  // el local real (Pinta 3351): una esquina cercana cae en la zona 1
+  assert.match(zonaPorUbicacion(negocio, -34.5590, -58.7700), /zona z1/);
 });
 
 test("Comidas JN: abre viernes a domingo y feriados de 20 a 00", async () => {
