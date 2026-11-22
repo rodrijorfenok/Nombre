@@ -1,0 +1,30 @@
+name: Mostrador
+
+on:
+  push:
+    paths: ["mostrador/**", ".github/workflows/mostrador.yml"]
+  pull_request:
+    paths: ["mostrador/**", ".github/workflows/mostrador.yml"]
+
+jobs:
+  pruebas:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mostrador
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: mostrador/.nvmrc
+          cache: npm
+          cache-dependency-path: mostrador/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - name: Validar la configuración de los locales
+        run: npm run validar -- --solo-estructura
+      - name: Generar la demo guiada (verifica que el guion coincida con la carta)
+        run: npm run demo-guiada -- comidas-jn
+      - name: Prueba de carga corta (IA simulada)
+        run: npm run carga -- 60 300

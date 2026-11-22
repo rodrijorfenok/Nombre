@@ -1,0 +1,554 @@
+{
+  "moneda": "ARS",
+  "categorias": [
+    {
+      "id": "promos",
+      "nombre": "Promociones",
+      "emoji": "⭐",
+      "prepMin": 18
+    },
+    {
+      "id": "hamburguesas",
+      "nombre": "Hamburguesas",
+      "emoji": "🍔",
+      "prepMin": 15
+    },
+    {
+      "id": "pizzas",
+      "nombre": "Pizzas",
+      "emoji": "🍕",
+      "prepMin": 18
+    },
+    {
+      "id": "milanesas",
+      "nombre": "Milanesas",
+      "emoji": "🥩",
+      "prepMin": 20
+    },
+    {
+      "id": "papas",
+      "nombre": "Papas fritas",
+      "emoji": "🍟",
+      "prepMin": 10
+    }
+  ],
+  "productos": [
+    {
+      "id": "promo-1",
+      "categoria": "promos",
+      "nombre": "Promo N°1",
+      "descripcion": "1 pizza muzzarella + 1 pizza especial a elección.",
+      "precio": 22000,
+      "ingredientes": [],
+      "apodos": [
+        "promo 1",
+        "promo uno",
+        "la promo de 2 pizzas"
+      ],
+      "opciones": [
+        {
+          "grupo": "pizza especial",
+          "valores": [
+            {
+              "id": "jamon-y-morron",
+              "nombre": "Jamón y Morrón",
+              "precio": 0
+            },
+            {
+              "id": "calabresa",
+              "nombre": "Calabresa",
+              "precio": 0
+            },
+            {
+              "id": "jamon-y-tomate",
+              "nombre": "Jamón y Tomate",
+              "precio": 0
+            },
+            {
+              "id": "fugazzeta",
+              "nombre": "Fugazzeta",
+              "precio": 0
+            },
+            {
+              "id": "jamon-y-huevo",
+              "nombre": "Jamón y Huevo",
+              "precio": 0
+            },
+            {
+              "id": "jamon-y-queso",
+              "nombre": "Jamón y Queso",
+              "precio": 0
+            }
+          ]
+        }
+      ],
+      "comanda": "1 pizza muzzarella + 1 pizza {pizza especial}"
+    },
+    {
+      "id": "promo-2",
+      "categoria": "promos",
+      "nombre": "Promo N°2",
+      "descripcion": "3 pizzas muzzarella.",
+      "precio": 27000,
+      "ingredientes": [],
+      "apodos": [
+        "promo 2",
+        "promo dos",
+        "3 muzzas",
+        "tres muzzas"
+      ],
+      "comanda": "3 pizzas muzzarella"
+    },
+    {
+      "id": "clasica",
+      "categoria": "hamburguesas",
+      "nombre": "Hamburguesa Clásica",
+      "descripcion": "Medallón de carne, queso tybo, lechuga y tomate. Viene con papas fritas y lata de Coca-Cola o Sprite.",
+      "precio": 11500,
+      "ingredientes": [
+        "queso tybo",
+        "lechuga",
+        "tomate"
+      ],
+      "apodos": [
+        "clasica",
+        "la clasica",
+        "hamburguesa comun",
+        "comun"
+      ],
+      "opciones": [
+        {
+          "grupo": "tamaño",
+          "valores": [
+            {
+              "id": "simple",
+              "nombre": "Simple",
+              "precio": 0
+            },
+            {
+              "id": "doble",
+              "nombre": "Doble",
+              "precio": 2000
+            },
+            {
+              "id": "triple",
+              "nombre": "Triple",
+              "precio": 3000
+            }
+          ]
+        },
+        {
+          "grupo": "bebida",
+          "valores": [
+            {
+              "id": "coca",
+              "nombre": "Lata de Coca-Cola",
+              "precio": 0
+            },
+            {
+              "id": "sprite",
+              "nombre": "Lata de Sprite",
+              "precio": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "super-americana",
+      "categoria": "hamburguesas",
+      "nombre": "Super Americana",
+      "descripcion": "Medallón de carne, cheddar, bacon, cebolla caramelizada y barbacoa. Viene con papas fritas y lata de Coca-Cola o Sprite.",
+      "precio": 11500,
+      "ingredientes": [
+        "cheddar",
+        "bacon",
+        "cebolla caramelizada",
+        "barbacoa"
+      ],
+      "apodos": [
+        "americana",
+        "super americana",
+        "la de bacon"
+      ],
+      "opciones": [
+        {
+          "grupo": "tamaño",
+          "valores": [
+            {
+              "id": "simple",
+              "nombre": "Simple",
+              "precio": 0
+            },
+            {
+              "id": "doble",
+              "nombre": "Doble",
+              "precio": 2000
+            },
+            {
+              "id": "triple",
+              "nombre": "Triple",
+              "precio": 3000
+            }
+          ]
+        },
+        {
+          "grupo": "bebida",
+          "valores": [
+            {
+              "id": "coca",
+              "nombre": "Lata de Coca-Cola",
+              "precio": 0
+            },
+            {
+              "id": "sprite",
+              "nombre": "Lata de Sprite",
+              "precio": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cuarto-de-libra",
+      "categoria": "hamburguesas",
+      "nombre": "Cuarto de Libra",
+      "descripcion": "Medallón de carne, cheddar, cebolla brunoise, ketchup y mostaza. Viene con papas fritas y lata de Coca-Cola o Sprite.",
+      "precio": 11500,
+      "ingredientes": [
+        "cheddar",
+        "cebolla brunoise",
+        "ketchup",
+        "mostaza"
+      ],
+      "apodos": [
+        "cuarto",
+        "cuarto de libra",
+        "la cuarto"
+      ],
+      "opciones": [
+        {
+          "grupo": "tamaño",
+          "valores": [
+            {
+              "id": "simple",
+              "nombre": "Simple",
+              "precio": 0
+            },
+            {
+              "id": "doble",
+              "nombre": "Doble",
+              "precio": 2000
+            },
+            {
+              "id": "triple",
+              "nombre": "Triple",
+              "precio": 3000
+            }
+          ]
+        },
+        {
+          "grupo": "bebida",
+          "valores": [
+            {
+              "id": "coca",
+              "nombre": "Lata de Coca-Cola",
+              "precio": 0
+            },
+            {
+              "id": "sprite",
+              "nombre": "Lata de Sprite",
+              "precio": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pizza-muzzarella",
+      "categoria": "pizzas",
+      "nombre": "Pizza Mozzarella",
+      "descripcion": "Salsa de tomate y muzzarella.",
+      "precio": 9500,
+      "ingredientes": [
+        "salsa de tomate",
+        "muzzarella"
+      ],
+      "apodos": [
+        "muzza",
+        "muzzarella",
+        "mozzarella",
+        "musa"
+      ]
+    },
+    {
+      "id": "pizza-jamon-y-morron",
+      "categoria": "pizzas",
+      "nombre": "Pizza Jamón y Morrón",
+      "descripcion": "Salsa de tomate, muzzarella, jamón y morrón.",
+      "precio": 14000,
+      "ingredientes": [
+        "salsa de tomate",
+        "muzzarella",
+        "jamón",
+        "morrón"
+      ],
+      "apodos": [
+        "jym",
+        "jamon y morron",
+        "jamón y morrón",
+        "jamón y morrón"
+      ]
+    },
+    {
+      "id": "pizza-calabresa",
+      "categoria": "pizzas",
+      "nombre": "Pizza Calabresa",
+      "descripcion": "Salsa de tomate, muzzarella y calabresa.",
+      "precio": 14000,
+      "ingredientes": [
+        "salsa de tomate",
+        "muzzarella",
+        "calabresa"
+      ],
+      "apodos": [
+        "calabresa"
+      ]
+    },
+    {
+      "id": "pizza-jamon-y-tomate",
+      "categoria": "pizzas",
+      "nombre": "Pizza Jamón y Tomate",
+      "descripcion": "Salsa de tomate, muzzarella, jamón y tomate.",
+      "precio": 14000,
+      "ingredientes": [
+        "salsa de tomate",
+        "muzzarella",
+        "jamón",
+        "tomate"
+      ],
+      "apodos": [
+        "jamón y tomate"
+      ]
+    },
+    {
+      "id": "pizza-fugazzeta",
+      "categoria": "pizzas",
+      "nombre": "Pizza Fugazzeta",
+      "descripcion": "Salsa de tomate, muzzarella, jamón y cebolla caramelizada.",
+      "precio": 14000,
+      "ingredientes": [
+        "salsa de tomate",
+        "muzzarella",
+        "jamón",
+        "cebolla caramelizada"
+      ],
+      "apodos": [
+        "fugazzeta"
+      ]
+    },
+    {
+      "id": "pizza-jamon-y-huevo",
+      "categoria": "pizzas",
+      "nombre": "Pizza Jamón y Huevo",
+      "descripcion": "Salsa de tomate, muzzarella, jamón y huevo.",
+      "precio": 14000,
+      "ingredientes": [
+        "salsa de tomate",
+        "muzzarella",
+        "jamón",
+        "huevo"
+      ],
+      "apodos": [
+        "jamón y huevo"
+      ]
+    },
+    {
+      "id": "pizza-jamon-y-queso",
+      "categoria": "pizzas",
+      "nombre": "Pizza Jamón y Queso",
+      "descripcion": "Salsa de tomate, jamón y muzzarella.",
+      "precio": 14000,
+      "ingredientes": [
+        "salsa de tomate",
+        "jamón",
+        "muzzarella"
+      ],
+      "apodos": [
+        "jyq",
+        "jamón y queso"
+      ]
+    },
+    {
+      "id": "pizza-casa",
+      "categoria": "pizzas",
+      "nombre": "Pizza de la Casa",
+      "descripcion": "Salsa de tomate, muzzarella, jamón, papas fritas y huevos fritos.",
+      "precio": 15000,
+      "ingredientes": [
+        "salsa de tomate",
+        "muzzarella",
+        "jamón",
+        "papas fritas",
+        "huevos fritos"
+      ],
+      "apodos": [
+        "la de la casa",
+        "pizza especial de la casa"
+      ]
+    },
+    {
+      "id": "napo-comen-2",
+      "categoria": "milanesas",
+      "nombre": "Napolitana \"Comen 2\"",
+      "descripcion": "2 milanesas de ternera a la napolitana con papas fritas.",
+      "precio": 20000,
+      "ingredientes": [
+        "salsa de tomate",
+        "jamón",
+        "muzzarella"
+      ],
+      "apodos": [
+        "comen 2",
+        "comen dos",
+        "napo para 2",
+        "mila napo para dos",
+        "napolitana para 2"
+      ],
+      "comanda": "2 milanesas napolitanas + papas"
+    },
+    {
+      "id": "napo-familiar",
+      "categoria": "milanesas",
+      "nombre": "Napolitana \"Familiar\"",
+      "descripcion": "3 milanesas de ternera a la napolitana con bandeja de papas.",
+      "precio": 28000,
+      "ingredientes": [
+        "salsa de tomate",
+        "jamón",
+        "muzzarella"
+      ],
+      "apodos": [
+        "familiar",
+        "napo familiar",
+        "napolitana familiar",
+        "3 milas"
+      ],
+      "comanda": "3 milanesas napolitanas + bandeja de papas"
+    },
+    {
+      "id": "milas-con-fritas",
+      "categoria": "milanesas",
+      "nombre": "Milanesas con fritas p/2",
+      "descripcion": "Dos milanesas + papas fritas para 2 personas.",
+      "precio": 24000,
+      "ingredientes": [],
+      "apodos": [
+        "hoy sale con fritas",
+        "milas con fritas",
+        "milanesas con papas para dos"
+      ],
+      "opciones": [
+        {
+          "grupo": "variedad",
+          "valores": [
+            {
+              "id": "fugazzeta",
+              "nombre": "Fugazzeta",
+              "precio": 0
+            },
+            {
+              "id": "morron",
+              "nombre": "De morrón",
+              "precio": 0
+            },
+            {
+              "id": "jamon-y-morron",
+              "nombre": "Jamón y morrón",
+              "precio": 0
+            }
+          ]
+        }
+      ],
+      "comanda": "2 milanesas {variedad} + papas p/2"
+    },
+    {
+      "id": "papas-cono",
+      "categoria": "papas",
+      "nombre": "Cono de papas",
+      "descripcion": "",
+      "precio": 5000,
+      "ingredientes": [],
+      "apodos": [
+        "cono",
+        "conito de papas"
+      ],
+      "extras": [
+        "cheddar",
+        "bacon"
+      ]
+    },
+    {
+      "id": "papas-chica",
+      "categoria": "papas",
+      "nombre": "Papas porción individual",
+      "descripcion": "",
+      "precio": 7000,
+      "ingredientes": [],
+      "apodos": [
+        "porcion chica",
+        "porcion individual",
+        "papas chicas"
+      ],
+      "extras": [
+        "cheddar",
+        "bacon"
+      ]
+    },
+    {
+      "id": "papas-grande",
+      "categoria": "papas",
+      "nombre": "Papas porción grande",
+      "descripcion": "",
+      "precio": 10000,
+      "ingredientes": [],
+      "apodos": [
+        "porcion grande",
+        "papas grandes"
+      ],
+      "extras": [
+        "cheddar",
+        "bacon"
+      ]
+    },
+    {
+      "id": "papas-caja",
+      "categoria": "papas",
+      "nombre": "Papas caja de pizza",
+      "descripcion": "Una caja de pizza llena de papas fritas.",
+      "precio": 16000,
+      "ingredientes": [],
+      "apodos": [
+        "caja de papas",
+        "caja de pizza de papas",
+        "papas en caja"
+      ],
+      "extras": [
+        "cheddar",
+        "bacon"
+      ]
+    }
+  ],
+  "extras": [
+    {
+      "id": "cheddar",
+      "nombre": "Cheddar",
+      "precio": 2500
+    },
+    {
+      "id": "bacon",
+      "nombre": "Bacon",
+      "precio": 2500
+    }
+  ]
+}

@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>__NOMBRE__ · Demo del bot</title>
+<style>
+:root{--wa:#008069;--wa-osc:#075e54;--fondo:#efeae2;--burb:#fff;--mia:#d9fdd3;--txt:#111b21;--gris:#667781;--coc:#1c2128;--coc2:#2d333b;--coctx:#e6edf3;--amb:#ffb547;--pagina:#e9edef}
+*{box-sizing:border-box}html,body{margin:0;height:100%}
+body{font:15px/1.42 -apple-system,system-ui,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--txt);background:var(--pagina);display:flex;flex-direction:column}
+.top{background:var(--wa-osc);color:#fff;padding:12px max(16px,env(safe-area-inset-left)) 12px max(16px,env(safe-area-inset-right))}
+.top h1{font-size:17px;margin:0 0 2px}.top p{margin:0;font-size:13px;opacity:.85;max-width:70ch}
+.esc{display:flex;gap:8px;overflow-x:auto;padding:10px max(16px,env(safe-area-inset-left));background:#fff;border-bottom:1px solid #d1d7db;scrollbar-width:none}
+.esc button{flex:none;border:1px solid #c9d1d6;background:#fff;color:var(--txt);border-radius:18px;padding:7px 12px;font:inherit;font-size:13.5px;cursor:pointer}
+.esc button.on{background:var(--wa);border-color:var(--wa);color:#fff}
+.desc{padding:8px max(16px,env(safe-area-inset-left));font-size:13.5px;color:var(--gris);background:#fff;border-bottom:1px solid #d1d7db}
+.main{flex:1;display:flex;min-height:0;gap:0}
+.panel{flex:1;display:flex;flex-direction:column;min-height:0;min-width:0}
+.cab{display:flex;align-items:center;gap:10px;padding:9px 14px;background:var(--wa);color:#fff}
+.av{width:34px;height:34px;border-radius:50%;background:#ffffff30;display:grid;place-items:center}
+.cab b{display:block;font-size:15px}.cab small{font-size:12px;opacity:.85}
+.msgs{flex:1;overflow-y:auto;padding:12px 10px 16px;display:flex;flex-direction:column;gap:6px;background:var(--fondo)}
+.m{max-width:85%;padding:7px 10px 6px;border-radius:8px;white-space:pre-wrap;word-wrap:break-word;box-shadow:0 1px .5px #0b141a26;animation:in .18s ease-out}
+.m.bot{background:var(--burb);align-self:flex-start;border-top-left-radius:2px}
+.m.cliente{background:var(--mia);align-self:flex-end;border-top-right-radius:2px}
+.m .nota{display:block;font-size:12px;color:var(--gris);margin-top:4px;font-style:italic}
+.foto{display:block;width:180px;height:110px;border-radius:6px;margin-bottom:4px;background:linear-gradient(135deg,#009ee3,#00bcff);color:#fff;font-weight:700;display:grid;place-items:center;text-align:center;font-size:13px}
+.escr{align-self:flex-start;color:var(--gris);font-style:italic;font-size:13px;padding:2px 8px}
+.coc .cab{background:#2b3138}.coc .msgs{background:var(--coc)}
+.coc .m{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;line-height:1.45}
+.coc .m.cocina{background:var(--coc2);color:var(--coctx);align-self:flex-start}
+.coc .m.encargado{background:var(--amb);color:#1d1300;align-self:flex-end}
+.vacio{color:#8b949e;font-size:13px;text-align:center;margin:auto;padding:20px;max-width:32ch}
+.ctrl{display:flex;gap:8px;align-items:center;padding:8px max(12px,env(safe-area-inset-left));background:#f0f2f5;border-top:1px solid #d1d7db}
+.ctrl button{white-space:nowrap;border:0;border-radius:20px;padding:9px 14px;font:inherit;font-size:14px;font-weight:600;cursor:pointer;background:var(--wa);color:#fff}
+.ctrl button.sec{background:#fff;color:var(--txt);border:1px solid #c9d1d6}
+.ctrl .paso{margin-left:auto;font-size:12.5px;color:var(--gris);font-variant-numeric:tabular-nums}
+.tabs{display:none}
+.aviso{font-size:12px;color:var(--gris);padding:6px max(16px,env(safe-area-inset-left)) 10px;background:var(--pagina)}
+@keyframes in{from{opacity:.2;transform:translateY(4px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.m{animation:none}}
+@media (max-width:799px){
+ .tabs{display:flex;background:var(--wa)}.tabs button{flex:1;border:0;background:none;color:#ffffffb3;padding:10px;font:inherit;font-weight:600;border-bottom:3px solid transparent}
+ .tabs button.on{color:#fff;border-color:#fff}
+ .panel{display:none}.panel.on{display:flex}
+ .cab{display:none}
+ .top{padding-top:8px;padding-bottom:8px}.top h1{font-size:15px}.top p{font-size:12.5px}
+ .desc{font-size:12.5px;padding-top:6px;padding-bottom:6px}.esc{padding-top:8px;padding-bottom:8px}
+ .ctrl{gap:6px}.ctrl button{padding:8px 11px;font-size:13px}
+ .aviso{font-size:11px;padding-top:4px;padding-bottom:6px}
+}
+@media (min-width:800px){.main{max-width:1150px;width:100%;margin:12px auto;border-radius:10px;overflow:hidden;box-shadow:0 2px 12px #0002}.coc{max-width:460px;border-left:1px solid #0003}}
+</style></head>
+<body>
+<div class="top"><h1>__NOMBRE__ · Bot de pedidos por WhatsApp</h1>
+<p>Demostración guiada. Elegí una situación y mirá cómo responde el bot al cliente y qué le llega al local.</p></div>
+<nav class="esc" id="esc"></nav>
+<div class="desc" id="desc"></div>
+<div class="tabs"><button class="on" data-p="chat" type="button">💬 Cliente</button><button data-p="coc" type="button">👨‍🍳 Local <span id="badge"></span></button></div>
+<div class="main">
+ <section class="panel on" id="chat"><div class="cab"><div class="av">🍔</div><div><b>__NOMBRE__</b><small id="est">en línea</small></div></div><div class="msgs" id="m1"></div></section>
+ <section class="panel coc" id="coc"><div class="cab"><div class="av">👨‍🍳</div><div><b>WhatsApp del local</b><small>comandas, avisos y comandos</small></div></div><div class="msgs" id="m2"></div></section>
+</div>
+<div class="ctrl"><button id="play" type="button">⏸ Pausa</button><button class="sec" id="next" type="button">Siguiente ⏭</button><button class="sec" id="again" type="button">↺ Repetir</button><span class="paso" id="paso"></span></div>
+<div class="aviso">Conversaciones de ejemplo. Precios, totales, tiempos, carta, comandas y avisos los generó el sistema real del bot con la carta y los horarios de __NOMBRE__. Las frases libres del asistente son ejemplos del estilo con que responde.</div>
+<script>
+const ESC = __DATOS__;
+const $ = s => document.querySelector(s);
+const fmt = x => x.replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])).replace(/\*([^*\n]+)\*/g,"<b>$1</b>").replace(/(^|\s)_([^_\n]+)_/g,"$1<i>$2</i>");
+let actual = Object.keys(ESC)[0], i = 0, auto = true, timer = null, sinVer = 0;
+const reducido = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+function pintarBotones(){
+  $("#esc").innerHTML = Object.entries(ESC).map(([k,v]) => `<button type="button" data-k="${k}" class="${k===actual?"on":""}">${v.titulo}</button>`).join("");
+}
+function reiniciar(k){
+  clearTimeout(timer); actual = k; i = 0; sinVer = 0; $("#badge").textContent = "";
+  pintarBotones(); $("#desc").textContent = ESC[k].desc;
+  $("#m1").innerHTML = ""; $("#m2").innerHTML = '<div class="vacio">Acá aparece lo que recibe el encargado en su WhatsApp: comandas, derivaciones y respuestas a sus comandos.</div>';
+  auto = true; $("#play").textContent = "⏸ Pausa"; actualizarPaso(); programar(400);
+}
+function actualizarPaso(){ $("#paso").textContent = `${i} / ${ESC[actual].evs.length}`; }
+function burbuja(e){
+  const enCocina = e.de === "cocina" || e.de === "encargado";
+  const cont = enCocina ? $("#m2") : $("#m1");
+  if (enCocina) { cont.querySelector(".vacio")?.remove(); if (!$("#coc").classList.contains("on") && innerWidth < 800) { sinVer++; $("#badge").textContent = `(${sinVer})`; } }
+  const d = document.createElement("div");
+  d.className = "m " + e.de;
+  let html = fmt(e.texto);
+  if (e.texto.startsWith("📷")) html = `<span class="foto">Comprobante<br>Transferencia enviada<br>${e.monto ?? ""}</span>` + html;
+  if (e.nota) html += `<span class="nota">${fmt(e.nota)}</span>`;
+  d.innerHTML = html; cont.appendChild(d); cont.scrollTop = cont.scrollHeight;
+}
+function escribiendo(on){
+  $("#m1 .escr")?.remove();
+  $("#est").textContent = on ? "escribiendo…" : "en línea";
+  if (on) { const d = document.createElement("div"); d.className = "escr"; d.textContent = "escribiendo…"; $("#m1").appendChild(d); $("#m1").scrollTop = 1e9; }
+}
+function paso(){
+  const evs = ESC[actual].evs;
+  if (i >= evs.length) { auto = false; $("#play").textContent = "▶ Reproducir"; escribiendo(false); return; }
+  const e = evs[i++]; escribiendo(false); burbuja(e); actualizarPaso();
+  const sig = evs[i];
+  if (sig && sig.de === "bot") escribiendo(true);
+  if (auto) programar(espera(sig));
+}
+function espera(sig){
+  if (!sig || reducido) return 600;
+  if (sig.de === "bot") return Math.min(2600, 900 + sig.texto.length * 4);
+  if (sig.de === "cliente" || sig.de === "encargado") return 1900;
+  return 1100;
+}
+function programar(ms){ clearTimeout(timer); timer = setTimeout(paso, ms); }
+$("#esc").onclick = e => { const k = e.target.closest("button")?.dataset.k; if (k) reiniciar(k); };
+$("#play").onclick = () => { auto = !auto; $("#play").textContent = auto ? "⏸ Pausa" : "▶ Reproducir"; if (auto) { if (i >= ESC[actual].evs.length) reiniciar(actual); else programar(300); } else clearTimeout(timer); };
+$("#next").onclick = () => { auto = false; $("#play").textContent = "▶ Reproducir"; clearTimeout(timer); paso(); };
+$("#again").onclick = () => reiniciar(actual);
+document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => {
+  document.querySelectorAll(".tabs button,.panel").forEach(x => x.classList.remove("on"));
+  b.classList.add("on"); $("#" + b.dataset.p).classList.add("on");
+  if (b.dataset.p === "coc") { sinVer = 0; $("#badge").textContent = ""; }
+});
+reiniciar(actual);
+</script>
+</body></html>
