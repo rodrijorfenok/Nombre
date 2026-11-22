@@ -41,6 +41,8 @@ export async function comandoStaff(bot: Bot, texto: string): Promise<string | nu
   const m = t.match(/^(pedidos|ver|pago ok|pago no|listo|sale|salio|salió|entregado|cancelar|demora|cerrar|abrir|auto|ayuda)\b ?(\d+)? ?(.*)$/);
   if (!m) return null;
   const [, cmd, numStr, resto] = m;
+  // "listo", "ver", "sale"… sin número de pedido no son comandos: puede ser el encargado charlando o haciendo un pedido.
+  if (!numStr && ["ver", "pago ok", "pago no", "listo", "sale", "salio", "salió", "entregado", "cancelar"].includes(cmd)) return null;
   const n = numStr ? Number(numStr) : NaN;
   const { store, menu, negocio, mensajero } = bot;
 

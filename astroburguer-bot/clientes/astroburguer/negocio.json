@@ -68,8 +68,8 @@
     "unidadesSinRecargo": 3
   },
   "equipo": {
-    "encargados": [],
-    "cocina": []
+    "encargados": "env:ASTROBURGUER_ENCARGADOS",
+    "cocina": "env:ASTROBURGUER_COCINA"
   },
   "whatsapp": {
     "phoneNumberId": "env:ASTROBURGUER_WA_PHONE_ID",

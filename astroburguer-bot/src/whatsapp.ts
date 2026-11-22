@@ -1,15 +1,19 @@
 import crypto from "node:crypto";
 import type { Entrante, Mensajero, MediaType } from "./bot.ts";
 import { conReintentos } from "./limites.ts";
+import { variantesAR } from "./telefonos.ts";
 
 class ErrorWhatsApp extends Error {
   constructor(
     readonly status: number,
-    cuerpo: string,
+    readonly cuerpo: string,
   ) {
     super(`WhatsApp ${status}: ${cuerpo}`);
   }
 }
+
+/** 131030 = el destinatario no está en la lista permitida (típico del número de prueba con celulares argentinos). */
+const esDestinatarioNoPermitido = (e: unknown) => e instanceof ErrorWhatsApp && e.cuerpo.includes("131030");
 
 /** 429 (demasiados mensajes) y errores 5xx o de red se reintentan; 4xx de datos inválidos no. */
 const reintentable = (e: unknown) => !(e instanceof ErrorWhatsApp) || e.status === 429 || e.status >= 500;
@@ -30,7 +34,22 @@ export class WhatsAppCloud implements Mensajero {
     this.base = `https://graph.facebook.com/${version}`;
   }
 
+  /** Números argentinos que Meta solo acepta en su otra forma (con o sin 9): se recuerda para no fallar dos veces. */
+  private formaAceptada = new Map<string, string>();
+
   async enviarTexto(telefono: string, texto: string) {
+    const destino = this.formaAceptada.get(telefono) ?? telefono;
+    try {
+      await this.enviarA(destino, texto);
+    } catch (e) {
+      const otra = variantesAR(destino);
+      if (!otra || !esDestinatarioNoPermitido(e)) throw e;
+      await this.enviarA(otra, texto);
+      this.formaAceptada.set(telefono, otra);
+    }
+  }
+
+  private async enviarA(telefono: string, texto: string) {
     // WhatsApp corta en 4096 caracteres.
     for (let i = 0; i < texto.length; i += 4000) {
       const body = JSON.stringify({ messaging_product: "whatsapp", to: telefono, type: "text", text: { body: texto.slice(i, i + 4000), preview_url: false } });

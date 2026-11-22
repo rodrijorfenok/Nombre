@@ -66,8 +66,8 @@
     "unidadesSinRecargo": 3
   },
   "equipo": {
-    "encargados": [],
-    "cocina": []
+    "encargados": "env:SLUG_ENCARGADOS",
+    "cocina": "env:SLUG_COCINA"
   },
   "whatsapp": {
     "phoneNumberId": "env:SLUG_WA_PHONE_ID",

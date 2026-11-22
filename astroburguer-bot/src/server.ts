@@ -12,6 +12,7 @@ import { comandoStaff } from "./staff.ts";
 import { horaLocal } from "./tiempos.ts";
 import { aEntrante, firmaValida, parsearWebhook, WhatsAppCloud, type MensajeWebhook } from "./whatsapp.ts";
 import { semaforoIA } from "./bot.ts";
+import { mismoNumero } from "./telefonos.ts";
 
 interface Local {
   cliente: Cliente;
@@ -79,7 +80,7 @@ const metricas = { mensajes: 0, errores: 0, msTotal: 0, msMax: 0 };
 async function procesarEntrante(local: Local, m: MensajeWebhook) {
   const inicio = Date.now();
   try {
-    if (local.cliente.negocio.equipo.encargados.includes(m.from) && m.tipo === "text") {
+    if (local.cliente.negocio.equipo.encargados.some((n) => mismoNumero(n, m.from)) && m.tipo === "text") {
       const r = await comandoStaff(local.bot, m.texto ?? "");
       if (r) {
         await local.wa.enviarTexto(m.from, r);
@@ -102,8 +103,16 @@ async function procesarEntrante(local: Local, m: MensajeWebhook) {
 }
 
 // Al arrancar: retomar lo que quedó a medias (mensajes de los últimos 10 minutos) y limpiar lo viejo.
+function mantenimiento() {
+  for (const local of locales.values()) {
+    const r = local.store.limpiarViejo();
+    if (r.chats || r.archivos) console.log(`🧹 ${local.cliente.slug}: ${r.chats} chats viejos y ${r.archivos} comprobantes borrados`);
+  }
+}
+mantenimiento();
+setInterval(mantenimiento, 24 * 3_600_000).unref();
+
 for (const local of locales.values()) {
-  local.store.limpiarEntrantes();
   const pendientes = local.store.entrantesPendientes(10);
   if (pendientes.length) console.log(`↻ ${local.cliente.slug}: retomando ${pendientes.length} mensajes pendientes`);
   for (const p of pendientes) void procesarEntrante(local, p.payload as MensajeWebhook);

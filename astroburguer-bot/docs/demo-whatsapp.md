@@ -35,6 +35,8 @@ Se tarda unos 40 minutos la primera vez. Para la demo usamos el **número de pru
 | `ASTROBURGUER_WA_TOKEN` | el token permanente del paso 1.5 |
 | `ASTROBURGUER_PANEL_TOKEN` | otra palabra secreta para el panel |
 | `PUBLIC_URL` | el dominio del paso 2.4 |
+| `ASTROBURGUER_ENCARGADOS` | tu celular, ej. `11 3639 7582` (recibís avisos y podés mandar comandos). Varios, separados por coma |
+| `ASTROBURGUER_COCINA` | el celular que recibe las comandas (puede ser el mismo) |
 
 6. Esperá el deploy y abrí `https://TU-DOMINIO/salud`: tiene que decir `"ok": true` y `"locales": ["astroburguer"]`.
 
@@ -54,7 +56,9 @@ Se tarda unos 40 minutos la primera vez. Para la demo usamos el **número de pru
 Desde tu celular, escribile al número de prueba: "hola", "me pasás la carta?", "quiero 2 doble órbita sin cebolla y una coca zero"… Seguí hasta confirmar.
 
 - **Panel de cocina:** `https://TU-DOMINIO/panel/astroburguer?token=TU_PANEL_TOKEN`
-- **Comandos del local:** agregá tu número en `clientes/astroburguer/negocio.json` → `equipo.encargados` y `equipo.cocina`, sin `+` (ej. `5491155554444`). Así recibís las comandas y podés escribir `pedidos`, `precio doble 13900`, `agotado napo`…
+- **Comandos del local:** con tu número en `ASTROBURGUER_ENCARGADOS` y `ASTROBURGUER_COCINA` recibís las comandas y podés escribir `pedidos`, `precio doble 13900`, `agotado napo`… Los números se aceptan en cualquier formato (`11 3639 7582`, `+54 9 11 3639-7582`, con o sin 15).
+- **Celulares argentinos y el número de prueba:** Meta a veces guarda tu celular sin el 9 y rechaza los envíos con el error 131030. El bot lo detecta y reintenta solo con la otra forma, así que no tenés que hacer nada.
+- **Un mismo celular no puede ser cliente y encargado a la vez:** si tu número está como encargado, el bot interpreta tus mensajes que coincidan con un comando (`pedidos`, `listo 3`…) como comandos, y el resto como pedido normal. Para que la demo sea limpia, hacé de cliente con tu celular y poné como encargado otro número.
 
 Para la demo con el cliente, poné su nombre, su carta y su alias en `clientes/astroburguer/` (o creá su carpeta con `npm run nuevo-local`), así ve **su** local funcionando.
 
@@ -98,3 +102,21 @@ Resultados medidos:
 - 300 clientes a la vez con `IA_EN_PARALELO=200`: los 300 correctos, espera mediana de 4,7 s.
 
 El único límite es cuántas consultas a la IA en paralelo admite tu cuenta de Anthropic (`IA_EN_PARALELO`). Si se llena, los mensajes esperan en fila, no se pierden. Con 40, que es el valor por defecto, 300 clientes simultáneos también salen todos bien, pero esperan unos 20 s.
+
+## Para 200 pedidos por día
+
+Para el servidor es poco tráfico: aun si 50 clientes escriben en el mismo minuto, todos reciben respuesta en pocos segundos y ningún pedido se pierde. Con más de 300 clientes simultáneos esperarían en fila unos 20 segundos, pero tampoco se perdería nada. No hace falta tocar `IA_EN_PARALELO`.
+
+La base de datos se limpia sola: borra los chats de más de 14 días y los comprobantes de más de 90. Los pedidos se guardan siempre.
+
+**Costo mensual estimado (unos 6.000 pedidos):**
+
+| | Opus 5.5 | Sonnet 5.5 | Haiku 5.5 |
+|---|---|---|---|
+| IA (Claude) | USD 500 a 900 | USD 250 a 450 | USD 15 a 30 |
+| Servidor (Railway) | USD 5 a 10 | USD 5 a 10 | USD 5 a 10 |
+| WhatsApp (Meta) | USD 0* | USD 0* | USD 0* |
+
+\* Con la tarifa actual de Meta, responder a un cliente que escribió primero no tiene costo. Solo se pagan los mensajes que inicia el local, como campañas o promociones.
+
+Para que un local pague poco y tengas buen margen, **Haiku 5.5 es la opción lógica**. La parte delicada (precios, totales, tiempos, validación de pagos) la hace el programa, no la IA. Antes de ofrecerlo, probá unos 30 pedidos reales con Haiku y mirá cómo responde. Se cambia con una sola variable: `CLAUDE_MODEL=claude-haiku-5-5`.

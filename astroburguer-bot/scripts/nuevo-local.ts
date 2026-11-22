@@ -25,5 +25,6 @@ console.log(`✅ Creado ${destino}
 Próximos pasos:
   1. Editá ${destino}/negocio.json (dirección, horarios, alias, titular, zonas, números del equipo).
   2. Editá ${destino}/menu.json (productos, precios, combos, apodos).
-  3. Agregá al .env: ${PREFIJO}_WA_PHONE_ID, ${PREFIJO}_WA_TOKEN y ${PREFIJO}_PANEL_TOKEN.
+  3. Agregá al .env: ${PREFIJO}_WA_PHONE_ID, ${PREFIJO}_WA_TOKEN, ${PREFIJO}_PANEL_TOKEN,
+     ${PREFIJO}_ENCARGADOS y ${PREFIJO}_COCINA (números separados por coma, ej: 11 3639 7582).
   4. Probalo: npm run chat -- ${slug}`);

@@ -1,6 +1,13 @@
 import fs from "node:fs";
 import path from "node:path";
 import { z } from "zod";
+import { normalizarTelefono } from "./telefonos.ts";
+
+/** Lista de teléfonos: acepta un array o un texto separado por comas (útil con "env:VARIABLE"). */
+const Telefonos = z.preprocess(
+  (v) => (typeof v === "string" ? v.split(",") : v),
+  z.array(z.string()).transform((xs) => xs.map((x) => x.trim()).filter(Boolean).map((x) => normalizarTelefono(x))),
+);
 
 const ValorOpcion = z.object({ id: z.string(), nombre: z.string(), precio: z.number() });
 const GrupoOpcion = z.object({ grupo: z.string(), valores: z.array(ValorOpcion).min(1) });
@@ -86,9 +93,9 @@ export const NegocioSchema = z.object({
   equipo: z
     .object({
       /** reciben avisos y pueden mandar comandos (pago ok, precio, agotado…) */
-      encargados: z.array(z.string()).default([]),
+      encargados: Telefonos.default([]),
       /** reciben las comandas */
-      cocina: z.array(z.string()).default([]),
+      cocina: Telefonos.default([]),
     })
     .default({ encargados: [], cocina: [] }),
   whatsapp: z

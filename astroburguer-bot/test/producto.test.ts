@@ -161,3 +161,42 @@ test("integraciones: avisa solo cuando el pedido cambia de estado", () => {
   store.guardarPedido(p);
   assert.deepEqual(avisos, ["armando->en_cocina", "en_cocina->entregado"]);
 });
+
+test("teléfonos argentinos en cualquier formato", async () => {
+  const { normalizarTelefono, variantesAR, mismoNumero } = await import("../src/telefonos.ts");
+  for (const f of ["11 3639 7582", "1136397582", "011 3639-7582", "+54 9 11 3639 7582", "541136397582", "5491136397582", "+54 9 11 15 3639 7582"]) {
+    assert.equal(normalizarTelefono(f), "5491136397582", f);
+  }
+  assert.equal(variantesAR("5491136397582"), "541136397582");
+  assert.ok(mismoNumero("11 3639 7582", "5491136397582"));
+  const { NegocioSchema } = await import("../src/config.ts");
+  const n = NegocioSchema.parse({ ...negocio, equipo: { encargados: "11 3639 7582, 11 4444 5555", cocina: [] } });
+  assert.deepEqual(n.equipo.encargados, ["5491136397582", "5491144445555"]);
+});
+
+test("si Meta rechaza el celular con 9 (error 131030), reintenta sin el 9 y lo recuerda", async () => {
+  const { WhatsAppCloud } = await import("../src/whatsapp.ts");
+  const destinos: string[] = [];
+  const original = globalThis.fetch;
+  globalThis.fetch = (async (_url: string, init: any) => {
+    const to = JSON.parse(init.body).to;
+    destinos.push(to);
+    if (to === "5491136397582") return new Response('{"error":{"code":131030,"message":"Recipient phone number not in allowed list"}}', { status: 400 });
+    return new Response("{}", { status: 200 });
+  }) as typeof fetch;
+  try {
+    const wa = new WhatsAppCloud("token", "123");
+    await wa.enviarTexto("5491136397582", "hola");
+    await wa.enviarTexto("5491136397582", "segundo");
+    assert.deepEqual(destinos, ["5491136397582", "541136397582", "541136397582"]);
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+test("palabras sueltas como 'listo' o 'sale' sin número no se toman como comando", async () => {
+  const { bot } = armar();
+  assert.equal(await comandoStaff(bot, "listo"), null);
+  assert.equal(await comandoStaff(bot, "dale sale"), null);
+  assert.match((await comandoStaff(bot, "pedidos"))!, /No hay pedidos activos/);
+});

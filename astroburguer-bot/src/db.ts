@@ -238,6 +238,26 @@ export class Store {
     this.db.prepare("DELETE FROM entrantes WHERE estado != 'pendiente' AND creado_en < ?").run(new Date(Date.now() - dias * 86_400_000).toISOString());
   }
 
+  /**
+   * Mantenimiento: borra historiales de chat viejos (lo pesado, con imágenes) y archivos de comprobantes.
+   * Los pedidos se conservan siempre (sirven para reportes y "lo de siempre").
+   */
+  limpiarViejo(diasChats = 14, diasComprobantes = 90): { chats: number; archivos: number } {
+    const corteChats = new Date(Date.now() - diasChats * 86_400_000).toISOString();
+    const chats = Number(this.db.prepare("DELETE FROM conversaciones WHERE actualizado_en < ?").run(corteChats).changes);
+    const corteComp = new Date(Date.now() - diasComprobantes * 86_400_000).toISOString();
+    const viejos = this.db.prepare("SELECT id, archivo FROM comprobantes WHERE creado_en < ? AND archivo IS NOT NULL").all(corteComp) as { id: number; archivo: string }[];
+    for (const c of viejos) {
+      try {
+        fs.rmSync(c.archivo, { force: true });
+      } catch {}
+      this.db.prepare("UPDATE comprobantes SET archivo = NULL WHERE id = ?").run(c.id);
+    }
+    this.db.prepare("DELETE FROM mensajes_procesados WHERE creado_en < ?").run(corteChats);
+    this.limpiarEntrantes();
+    return { chats, archivos: viejos.length };
+  }
+
   marcarProcesado(idMensaje: string): boolean {
     try {
       this.db.prepare("INSERT INTO mensajes_procesados (id, creado_en) VALUES (?, ?)").run(idMensaje, new Date().toISOString());
