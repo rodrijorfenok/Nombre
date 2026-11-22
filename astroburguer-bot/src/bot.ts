@@ -18,6 +18,50 @@ import { Semaforo } from "./limites.ts";
 /** Compartido por todos los bots del proceso: limita las consultas simultáneas a la IA. */
 export const semaforoIA = new Semaforo(env.iaEnParalelo);
 
+/**
+ * Freno automático: si la IA falla varias veces seguidas (caída del servicio, clave vencida, sin saldo),
+ * el bot deja de intentarlo un rato y pasa todas las charlas a una persona, en vez de responder mal.
+ */
+export const disyuntor = {
+  erroresSeguidos: 0,
+  abiertoHasta: 0,
+  limite: 3,
+  pausaMs: 5 * 60_000,
+  abierto(ahora = Date.now()) {
+    return this.abiertoHasta > ahora;
+  },
+  exito() {
+    this.erroresSeguidos = 0;
+  },
+  /** devuelve true si este error es el que lo abre */
+  falla(ahora = Date.now()) {
+    this.erroresSeguidos++;
+    if (this.erroresSeguidos >= this.limite && !this.abierto(ahora)) {
+      this.abiertoHasta = ahora + this.pausaMs;
+      this.erroresSeguidos = 0;
+      return true;
+    }
+    return false;
+  },
+};
+
+export class ErrorModoSeguro extends Error {}
+
+/** El cliente pide hablar con una persona o se está frustrando: no lo dejamos con el bot. */
+export function pideHumano(texto: string): boolean {
+  const t = texto
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  return (
+    /(hablar|comunicar(me)?|comunicas|atender(me)?|pasar(me)?|pasas|pasan|pasame) con (una persona|alguien|un humano|una persona real|el encargado|la encargada|el dueno|la duena)/.test(t) ||
+    /\b(quiero|necesito|pasame( con)?) (un|una) (humano|persona)/.test(t) ||
+    /^(humano|persona|operador|encargado)\W*$/.test(t) ||
+    /no (me )?(entendes|entendiste|entienden) (nada|un carajo|lo que)/.test(t) ||
+    /(dejame|basta) de (bot|robot)/.test(t)
+  );
+}
+
 export interface Mensajero {
   enviarTexto(telefono: string, texto: string): Promise<void>;
 }
@@ -137,8 +181,8 @@ export class Bot {
       .catch(() => {})
       .then(() => this.procesar(telefono, msg))
       .catch(async (e) => {
-        console.error(`[bot ${this.negocio.nombre}] error con ${telefono}:`, e);
-        await this.mensajero.enviarTexto(telefono, "Uy, se me trabó algo de mi lado 😅 ¿Me lo repetís?").catch(() => {});
+        if (!(e instanceof ErrorModoSeguro)) console.error(`[bot ${this.negocio.nombre}] error con ${telefono}:`, e);
+        await this.pasarAPersonaPorError(telefono, msg).catch((e2) => console.error("[bot] no se pudo derivar:", e2));
       })
       .finally(() => {
         // limpiar la cola si nadie más se encoló detrás (evita que el mapa crezca sin fin)
@@ -165,6 +209,13 @@ export class Bot {
 
     if (this.enAtencionHumana(telefono)) {
       await this.reenviarAlLocal(conv, pedido, msg);
+      return;
+    }
+
+    if (msg.tipo === "texto" && pideHumano(msg.texto)) {
+      await this.mensajero.enviarTexto(telefono, "¡Dale! Ya te escribe alguien del local 🙌");
+      this.agregarAlHistorial(conv, msg.texto, "¡Dale! Ya te escribe alguien del local 🙌");
+      await this.iniciarAtencionHumana(pedido.id!, `el cliente pidió hablar con una persona: "${msg.texto}"`);
       return;
     }
 
@@ -248,6 +299,22 @@ export class Bot {
   }
 
   private async llamarModelo(system: string, mensajes: Mensaje[]) {
+    if (disyuntor.abierto()) throw new ErrorModoSeguro("IA en pausa por errores seguidos");
+    try {
+      const r = await this.llamarModeloSinFreno(system, mensajes);
+      disyuntor.exito();
+      return r;
+    } catch (e) {
+      if (disyuntor.falla()) {
+        await this.avisarStaff(
+          `⚠️ *El bot entró en modo seguro*: la IA falló ${disyuntor.limite} veces seguidas (${(e as Error).message?.slice(0, 120)}).\nDurante 5 minutos los mensajes de los clientes te llegan a vos para que respondas con *r N mensaje*. Después reintenta solo.`,
+        );
+      }
+      throw e;
+    }
+  }
+
+  private async llamarModeloSinFreno(system: string, mensajes: Mensaje[]) {
     return semaforoIA.usar(() => this.client.beta.messages.create({
       model: env.model,
       max_tokens: 16000,
@@ -287,12 +354,14 @@ export class Bot {
     const pedidosTocados = new Map<number, Pedido>();
 
     let respuesta = "";
+    let erroresHerramientas = 0;
+    let motivoDerivar: string | null = null;
     for (let vuelta = 0; vuelta < MAX_VUELTAS_HERRAMIENTAS; vuelta++) {
       const res = await this.llamarModelo(system, mensajes);
       mensajes.push({ role: "assistant", content: res.content });
 
       if (res.stop_reason === "refusal") {
-        respuesta = "Perdón, con eso no te puedo ayudar por acá. Si querés, te comunico con alguien del local.";
+        motivoDerivar = "la IA no quiso responder ese mensaje";
         break;
       }
       if (res.stop_reason === "pause_turn") continue;
@@ -305,11 +374,18 @@ export class Bot {
             resultados.push({ type: "tool_result", tool_use_id: u.id, content: ejecutarHerramienta(u.name, u.input, ctx) });
           } catch (e) {
             if (!(e instanceof ErrorPedido)) throw e;
+            erroresHerramientas++;
             resultados.push({ type: "tool_result", tool_use_id: u.id, content: e.message, is_error: true });
           }
           pedidosTocados.set(ctx.pedido.id!, ctx.pedido);
         }
         mensajes.push({ role: "user", content: resultados });
+        if (erroresHerramientas >= 4) {
+          motivoDerivar = `el bot no logró cargar el pedido (${erroresHerramientas} intentos fallidos)`;
+          // cerrar el turno de forma válida: el último mensaje del historial tiene que ser del asistente
+          mensajes.push({ role: "assistant", content: "[Derivado a una persona del local por errores al cargar el pedido.]" });
+          break;
+        }
         continue;
       }
       respuesta = res.content
@@ -319,7 +395,13 @@ export class Bot {
         .trim();
       break;
     }
-    if (!respuesta && !ctx.salida.length) respuesta = "¿Me lo repetís? No llegué a entenderte bien 🙏";
+    if (!respuesta && !ctx.salida.length && !motivoDerivar) motivoDerivar = "el bot no supo qué responder";
+    if (mensajes.at(-1)?.role === "user") mensajes.push({ role: "assistant", content: "[Sin respuesta del bot.]" });
+    if (motivoDerivar) {
+      // Freno automático: antes que responder mal, pasa la charla a una persona.
+      respuesta = "Para no equivocarme, ya te responde una persona del local 🙌";
+      ctx.efectos.push({ tipo: "atencion_humana", pedidoId: ctx.pedido.id!, motivo: `🛑 freno automático: ${motivoDerivar}` });
+    }
 
     // ---- commit ----
     pedidosTocados.set(ctx.pedido.id!, ctx.pedido);
@@ -441,7 +523,29 @@ export class Bot {
 
   // ------------------------- atención humana -------------------------
 
+  /** Apagado general (comando "bot off"): nadie habla con la IA, todo va al local. */
+  get apagado(): boolean {
+    return this.store.ajuste("bot_apagado") === "1";
+  }
+
+  private async pasarAPersonaPorError(telefono: string, msg: Entrante) {
+    const conv = this.store.conversacion(telefono);
+    const pedidoId = conv?.pedidoId;
+    if (!conv || !pedidoId) {
+      await this.mensajero.enviarTexto(telefono, "En un momento te responde alguien del local 🙌");
+      return;
+    }
+    const ya = this.enAtencionHumana(telefono);
+    if (!ya) {
+      await this.mensajero.enviarTexto(telefono, "En un momento te responde alguien del local 🙌");
+      await this.iniciarAtencionHumana(pedidoId, disyuntor.abierto() ? "🛑 el bot está en modo seguro (la IA no responde)" : "🛑 el bot tuvo un error técnico");
+    }
+    const p = this.store.pedido(pedidoId)! as PedidoConPendiente;
+    await this.reenviarAlLocal(conv, p, msg);
+  }
+
   enAtencionHumana(telefono: string): boolean {
+    if (this.apagado || disyuntor.abierto()) return true;
     const hasta = this.store.ajuste(`humano:${telefono}`);
     return Boolean(hasta && new Date(hasta).getTime() > this.reloj().getTime());
   }

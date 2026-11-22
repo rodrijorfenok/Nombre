@@ -20,6 +20,8 @@ export const AYUDA_STAFF = `🛠️ *Comandos del local*
 • carta — precios y faltantes de hoy
 • demora M — sumar M minutos a todos los tiempos (demora 0 = normal)
 • cerrar / abrir / auto — forzar local cerrado, abierto o volver al horario
+• bot off / bot on — apagar o prender el bot para TODOS (apagado, los mensajes te llegan a vos)
+• atender N — tomar vos la charla del pedido N
 • r N mensaje — responderle vos al cliente del pedido N
 • bot N — que el bot vuelva a atender a ese cliente
 • ayuda`;
@@ -40,6 +42,26 @@ export async function comandoStaff(bot: Bot, texto: string): Promise<string | nu
   const t = texto.trim().toLowerCase().replace(/\s+/g, " ").replace(/^[#/]/, "");
   const catalogo = await comandoCatalogo(bot, t);
   if (catalogo) return catalogo;
+
+  // Botón de apagado general
+  if (/^(bot off|apagar bot|apaga(r)? el bot|bot apagado)$/.test(t)) {
+    bot.store.setAjuste("bot_apagado", "1");
+    return "⏸️ *Bot apagado.* Desde ahora todos los mensajes de los clientes te llegan a vos; respondé con *r N mensaje*. Para prenderlo: *bot on*";
+  }
+  if (/^(bot on|prender bot|prende(r)? el bot|bot prendido)$/.test(t)) {
+    bot.store.setAjuste("bot_apagado", null);
+    return "▶️ *Bot prendido.* Vuelve a atender a los clientes (los que estás atendiendo vos siguen con vos hasta que escribas *bot N*).";
+  }
+  let mt = t.match(/^atender (\d+)$/);
+  if (mt) {
+    const p = bot.store.pedido(Number(mt[1]));
+    if (!p) return `⚠️ No encuentro el pedido ${mt[1]}.`;
+    bot.store.setAjuste(`humano:${p.telefono}`, new Date(Date.now() + 12 * 3_600_000).toISOString());
+    return `🙋 Ahora atendés vos a ${p.cliente ?? p.telefono} (pedido #${p.id}). Respondé con *r ${p.id} mensaje*; para devolvérselo al bot: *bot ${p.id}*`;
+  }
+  if (t === "estado bot" || t === "estado") {
+    return bot.apagado ? "⏸️ El bot está APAGADO (escribí *bot on*)." : "▶️ El bot está PRENDIDO (escribí *bot off* para apagarlo).";
+  }
   const m = t.match(/^(pedidos|ver|pago ok|pago no|listo|sale|salio|salió|entregado|cancelar|demora|cerrar|abrir|auto|ayuda|responder|r|bot)\b ?(\d+)? ?(.*)$/);
   if (!m) return null;
   const [, cmd, numStr, resto] = m;

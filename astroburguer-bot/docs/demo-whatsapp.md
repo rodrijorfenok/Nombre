@@ -1,4 +1,22 @@
-# Conectar WhatsApp para la demo
+# Mostrarle el bot a un local
+
+Hay dos formas. Conviene empezar por la primera.
+
+## A. Demo web: un link, sin Meta (5 minutos)
+
+Una página igual a WhatsApp donde el dueño chatea con **su** bot desde el celular, como si fuera un cliente. En la pestaña **Cocina** ve en vivo cómo llegan la comanda y los avisos, y puede probar los comandos (`listo 1`, `r 1 hola`, `bot off`…). Solo necesita la clave de Claude.
+
+1. Subí el bot a Railway (paso 2 de abajo). Para la demo alcanza con `ANTHROPIC_API_KEY`, `CLAUDE_MODEL` y `DEMO_TOKEN`; no hacen falta las variables de WhatsApp.
+2. Mandale al dueño el link: `https://TU-DOMINIO/demo/comidas-jn?t=TU_DEMO_TOKEN`.
+3. Cada persona que abre el link tiene su propia prueba, aislada de las demás. El local figura abierto a cualquier hora. El límite es de 120 mensajes por persona, para que nadie gaste tus créditos.
+
+Lo que vale la pena mostrarle en la demo:
+- Pedir como se habla: "2 cuartos dobles sin cebolla, uno con coca y otro con sprite".
+- Pedir algo que no se puede, como "agregale bacon a la hamburguesa", y ver cómo pasa a una persona y llega el aviso a la cocina.
+- Escribir "quiero hablar con una persona".
+- Cerrar un pedido con transferencia y mandar una captura con 📎 para que vea el control del comprobante.
+
+## B. WhatsApp real
 
 Se tarda unos 40 minutos la primera vez. Para la demo usamos el **número de prueba gratis que da Meta**: tu WhatsApp personal sigue igual y hace de "cliente".
 
@@ -102,6 +120,22 @@ Resultados medidos:
 - 300 clientes a la vez con `IA_EN_PARALELO=200`: los 300 correctos, espera mediana de 4,7 s.
 
 El único límite es cuántas consultas a la IA en paralelo admite tu cuenta de Anthropic (`IA_EN_PARALELO`). Si se llena, los mensajes esperan en fila, no se pierden. Con 40, que es el valor por defecto, 300 clientes simultáneos también salen todos bien, pero esperan unos 20 s.
+
+## Parar el bot
+
+| Qué querés | Cómo |
+|---|---|
+| Que no responda a **nadie** (por ejemplo, si algo anda raro) | Escribile `bot off` al bot desde el celular del encargado. Los mensajes de los clientes te llegan a vos y contestás con `r N mensaje`. Para volver: `bot on` |
+| Tomar vos **una** charla | `atender N` (N es el número de pedido). Para devolverla: `bot N` |
+| Apagar todo del todo | En Railway, *Settings → Pause service* (o borrar el webhook en Meta) |
+
+## Frenos automáticos: el bot se detiene solo
+
+- **Si la IA se cae** (servicio caído, clave vencida, sin saldo): el cliente recibe "en un momento te responde alguien del local", su mensaje te llega a vos y nadie queda colgado. Si falla 3 veces seguidas, el bot entra en **modo seguro**: durante 5 minutos todo va directo al local, te avisa por WhatsApp y después reintenta solo.
+- **Si no logra cargar un pedido** (4 intentos fallidos en un mismo mensaje), **si no sabe qué responder** o **si la IA se niega a contestar**: deriva a una persona en lugar de inventar.
+- **Si el cliente pide una persona o se frustra** ("quiero hablar con alguien", "no entendés nada"): pasa a una persona al instante, sin consultar a la IA.
+- **Lo que no puede salir mal:** precios, totales, envío, tiempos y validación de comprobantes los calcula el programa, no la IA. Además, antes de confirmar, el cliente ve el resumen y tiene que decir que sí.
+- **Lo que el bot no detecta solo:** que entienda mal un producto y el cliente no se dé cuenta al ver el resumen. Para eso están el resumen obligatorio y la comanda que revisa la cocina.
 
 ## Para 200 pedidos por día
 

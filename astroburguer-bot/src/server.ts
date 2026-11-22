@@ -9,6 +9,7 @@ import { Store } from "./db.ts";
 import { pesos } from "./money.ts";
 import { calcularTotales } from "./order.ts";
 import { comandoStaff } from "./staff.ts";
+import { montarDemo } from "./demo.ts";
 import { horaLocal } from "./tiempos.ts";
 import { aEntrante, firmaValida, parsearWebhook, WhatsAppCloud, type MensajeWebhook } from "./whatsapp.ts";
 import { semaforoIA } from "./bot.ts";
@@ -27,10 +28,11 @@ const anthropic = new Anthropic({ maxRetries: 4, timeout: 90_000 });
 const locales = new Map<string, Local>(); // slug -> local
 const porNumero = new Map<string, Local>(); // phoneNumberId -> local
 
-for (const cliente of cargarClientes()) {
+const todos = cargarClientes();
+for (const cliente of todos) {
   const { slug, negocio, menu } = cliente;
   if (!negocio.whatsapp.phoneNumberId || !negocio.whatsapp.token) {
-    console.warn(`⚠️  ${slug}: falta whatsapp.phoneNumberId o whatsapp.token en negocio.json, lo salteo`);
+    console.warn(`ℹ️  ${slug}: sin WhatsApp configurado (solo demo web)`);
     continue;
   }
   const store = new Store(path.join(env.dataDir, slug, "pedidos.db"));
@@ -44,6 +46,10 @@ for (const cliente of cargarClientes()) {
 if (!locales.size) console.warn("⚠️  No hay ningún local configurado con WhatsApp en clientes/");
 
 const app = express();
+
+// Demo web para mostrarle el bot a cada local: /demo/<local> (si DEMO_TOKEN está definido: /demo/<local>?t=DEMO_TOKEN)
+montarDemo(app, todos, anthropic);
+for (const c of todos) console.log(`🧪 Demo de ${c.negocio.nombre}: /demo/${c.slug}${process.env.DEMO_TOKEN ? "?t=…" : ""}`);
 
 // Verificación del webhook (Meta hace un GET al configurarlo). Un solo webhook para todos los locales.
 app.get("/webhook", (req, res) => {
