@@ -10,7 +10,8 @@ import { pesos } from "./money.ts";
 import { calcularTotales } from "./order.ts";
 import { comandoStaff } from "./staff.ts";
 import { horaLocal } from "./tiempos.ts";
-import { aEntrante, firmaValida, parsearWebhook, WhatsAppCloud } from "./whatsapp.ts";
+import { aEntrante, firmaValida, parsearWebhook, WhatsAppCloud, type MensajeWebhook } from "./whatsapp.ts";
+import { semaforoIA } from "./bot.ts";
 
 interface Local {
   cliente: Cliente;
@@ -20,7 +21,8 @@ interface Local {
 }
 
 // Un solo servidor atiende a todos los locales de clientes/: cada uno con su número, su base y su panel.
-const anthropic = new Anthropic();
+// Reintenta solo los errores temporales (429, 5xx, red) y corta las consultas que se cuelgan.
+const anthropic = new Anthropic({ maxRetries: 4, timeout: 90_000 });
 const locales = new Map<string, Local>(); // slug -> local
 const porNumero = new Map<string, Local>(); // phoneNumberId -> local
 
@@ -65,21 +67,47 @@ app.post("/webhook", express.raw({ type: "*/*", limit: "5mb" }), (req, res) => {
       console.warn(`mensaje para un número no configurado: ${m.phoneNumberId}`);
       continue;
     }
-    if (!local.store.marcarProcesado(m.id)) continue;
+    // Se guarda ANTES de procesar: si el servidor se reinicia, se retoma al arrancar.
+    if (!local.store.guardarEntrante(m.id, m)) continue; // Meta reintentó un mensaje que ya tenemos
     void local.wa.marcarLeido(m.id);
-    void (async () => {
-      try {
-        if (local.cliente.negocio.equipo.encargados.includes(m.from) && m.tipo === "text") {
-          const r = await comandoStaff(local.bot, m.texto ?? "");
-          if (r) return void (await local.wa.enviarTexto(m.from, r));
-        }
-        await local.bot.recibir(m.from, await aEntrante(local.wa, m));
-      } catch (e) {
-        console.error(`[webhook ${local.cliente.slug}]`, e);
-      }
-    })();
+    void procesarEntrante(local, m);
   }
 });
+
+const metricas = { mensajes: 0, errores: 0, msTotal: 0, msMax: 0 };
+
+async function procesarEntrante(local: Local, m: MensajeWebhook) {
+  const inicio = Date.now();
+  try {
+    if (local.cliente.negocio.equipo.encargados.includes(m.from) && m.tipo === "text") {
+      const r = await comandoStaff(local.bot, m.texto ?? "");
+      if (r) {
+        await local.wa.enviarTexto(m.from, r);
+        local.store.marcarEntrante(m.id, "hecho");
+        return;
+      }
+    }
+    await local.bot.recibir(m.from, await aEntrante(local.wa, m));
+    local.store.marcarEntrante(m.id, "hecho");
+  } catch (e) {
+    metricas.errores++;
+    local.store.marcarEntrante(m.id, "error");
+    console.error(`[webhook ${local.cliente.slug}]`, e);
+  } finally {
+    const ms = Date.now() - inicio;
+    metricas.mensajes++;
+    metricas.msTotal += ms;
+    metricas.msMax = Math.max(metricas.msMax, ms);
+  }
+}
+
+// Al arrancar: retomar lo que quedó a medias (mensajes de los últimos 10 minutos) y limpiar lo viejo.
+for (const local of locales.values()) {
+  local.store.limpiarEntrantes();
+  const pendientes = local.store.entrantesPendientes(10);
+  if (pendientes.length) console.log(`↻ ${local.cliente.slug}: retomando ${pendientes.length} mensajes pendientes`);
+  for (const p of pendientes) void procesarEntrante(local, p.payload as MensajeWebhook);
+}
 
 // ------------------- panel de cada local -------------------
 function localAutorizado(req: express.Request): Local | null {
@@ -148,7 +176,32 @@ app.get("/comprobante/:slug/:id", (req, res) => {
   res.sendFile(path.resolve(c.archivo));
 });
 
-app.get("/salud", (_req, res) => void res.json({ ok: true, locales: [...locales.keys()] }));
+app.get("/salud", (_req, res) =>
+  void res.json({
+    ok: true,
+    locales: [...locales.keys()],
+    ia: { enUso: semaforoIA.enUso, enEspera: semaforoIA.enEspera, maximo: semaforoIA.maximo },
+    conversacionesEnCurso: [...locales.values()].reduce((a, l) => a + l.bot.turnosEnCurso, 0),
+    mensajes: metricas.mensajes,
+    errores: metricas.errores,
+    respuestaPromedioMs: metricas.mensajes ? Math.round(metricas.msTotal / metricas.mensajes) : 0,
+    respuestaMaximaMs: metricas.msMax,
+  }),
+);
 
 const port = Number(process.env.PORT ?? 3000);
-app.listen(port, () => console.log(`🚀 Bot de pedidos escuchando en :${port} (${locales.size} locales)`));
+const servidor = app.listen(port, () => console.log(`🚀 Bot de pedidos escuchando en :${port} (${locales.size} locales)`));
+
+// Apagado prolijo (por ejemplo en cada actualización): deja de recibir y termina las respuestas en curso.
+let apagando = false;
+for (const senal of ["SIGTERM", "SIGINT"] as const) {
+  process.on(senal, async () => {
+    if (apagando) return;
+    apagando = true;
+    console.log(`${senal}: terminando las respuestas en curso…`);
+    servidor.close();
+    const limite = new Promise((r) => setTimeout(r, 25_000));
+    await Promise.race([Promise.allSettled([...locales.values()].map((l) => l.bot.terminarPendientes())), limite]);
+    process.exit(0);
+  });
+}

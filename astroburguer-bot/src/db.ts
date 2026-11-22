@@ -30,6 +30,8 @@ export interface Comprobante {
 
 export class Store {
   private db: DatabaseSync;
+  /** se llama cada vez que un pedido cambia de estado (para integraciones: n8n, Make, planillas…) */
+  alCambiarEstado?: (p: Pedido, anterior: EstadoPedido | null) => void;
 
   constructor(file: string) {
     if (file !== ":memory:") fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -67,6 +69,13 @@ export class Store {
       CREATE INDEX IF NOT EXISTS comprobantes_op ON comprobantes(numero_operacion);
       CREATE TABLE IF NOT EXISTS ajustes (clave TEXT PRIMARY KEY, valor TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS mensajes_procesados (id TEXT PRIMARY KEY, creado_en TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS entrantes (
+        id TEXT PRIMARY KEY,
+        payload TEXT NOT NULL,
+        estado TEXT NOT NULL,
+        creado_en TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS entrantes_estado ON entrantes(estado);
     `);
   }
 
@@ -84,9 +93,17 @@ export class Store {
 
   guardarPedido(p: Pedido) {
     if (!p.id) throw new Error("Pedido sin id");
+    const previo = this.db.prepare("SELECT estado FROM pedidos WHERE id = ?").get(p.id) as { estado: EstadoPedido } | undefined;
     this.db
       .prepare("UPDATE pedidos SET estado = ?, datos = ?, actualizado_en = ? WHERE id = ?")
       .run(p.estado, JSON.stringify(p), new Date().toISOString(), p.id);
+    if (this.alCambiarEstado && previo?.estado !== p.estado) {
+      try {
+        this.alCambiarEstado(p, previo?.estado ?? null);
+      } catch (e) {
+        console.error("[integracion]", e);
+      }
+    }
   }
 
   pedido(id: number): Pedido | null {
@@ -192,6 +209,35 @@ export class Store {
   }
 
   /** Idempotencia de webhooks: WhatsApp reintenta entregas. Devuelve false si ya se procesó. */
+  // ---------- bandeja de entrada durable ----------
+  /** Guarda el mensaje del webhook antes de procesarlo. false = ya lo teníamos (reintento de Meta). */
+  guardarEntrante(id: string, payload: unknown): boolean {
+    try {
+      this.db.prepare("INSERT INTO entrantes (id, payload, estado, creado_en) VALUES (?, ?, 'pendiente', ?)").run(id, JSON.stringify(payload), new Date().toISOString());
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  marcarEntrante(id: string, estado: "hecho" | "error") {
+    this.db.prepare("UPDATE entrantes SET estado = ? WHERE id = ?").run(estado, id);
+  }
+
+  /** Mensajes que quedaron sin procesar (por ejemplo, si el servidor se reinició a mitad de camino). */
+  entrantesPendientes(maxMinutos: number): { id: string; payload: unknown }[] {
+    const desde = new Date(Date.now() - maxMinutos * 60_000).toISOString();
+    return (this.db.prepare("SELECT id, payload FROM entrantes WHERE estado = 'pendiente' AND creado_en >= ? ORDER BY creado_en").all(desde) as {
+      id: string;
+      payload: string;
+    }[]).map((r) => ({ id: r.id, payload: JSON.parse(r.payload) }));
+  }
+
+  /** Borra mensajes ya procesados con más de N días (la tabla no crece sin límite). */
+  limpiarEntrantes(dias = 7) {
+    this.db.prepare("DELETE FROM entrantes WHERE estado != 'pendiente' AND creado_en < ?").run(new Date(Date.now() - dias * 86_400_000).toISOString());
+  }
+
   marcarProcesado(idMensaje: string): boolean {
     try {
       this.db.prepare("INSERT INTO mensajes_procesados (id, creado_en) VALUES (?, ?)").run(idMensaje, new Date().toISOString());

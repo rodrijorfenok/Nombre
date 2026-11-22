@@ -58,6 +58,8 @@ Si el local agrega un producto o un combo nuevo, se suma en `menu.json` y se rei
 
 ## Instalación
 
+👉 **Guía paso a paso para conectar WhatsApp, subirlo a Railway y hacer la demo: [docs/demo-whatsapp.md](docs/demo-whatsapp.md)** (incluye integración con n8n/Make y la prueba de carga).
+
 ```bash
 npm install
 cp .env.example .env        # ANTHROPIC_API_KEY y los secretos de cada local
@@ -109,6 +111,7 @@ src/server.ts       servidor multi-local: webhook + paneles
 ```
 
 ```bash
-npm test            # 21 pruebas: precios, tiempos, horarios, comprobantes, respuestas rápidas, comandos, flujo completo
+npm test            # 23 pruebas: precios, tiempos, horarios, comprobantes, respuestas rápidas, comandos, flujo completo
 npm run typecheck
+npm run carga -- 300 1500   # 300 clientes simultáneos con IA simulada
 ```

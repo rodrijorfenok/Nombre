@@ -12,6 +12,11 @@ import { calcularTotales, ErrorPedido, type Pedido } from "./order.ts";
 import { systemPrompt } from "./prompt.ts";
 import { respuestaRapida } from "./rapidas.ts";
 import { estaAbierto, estimarEspera, horaLocal } from "./tiempos.ts";
+import { avisarIntegracion } from "./integraciones.ts";
+import { Semaforo } from "./limites.ts";
+
+/** Compartido por todos los bots del proceso: limita las consultas simultáneas a la IA. */
+export const semaforoIA = new Semaforo(env.iaEnParalelo);
 
 export interface Mensajero {
   enviarTexto(telefono: string, texto: string): Promise<void>;
@@ -75,6 +80,18 @@ export class Bot {
     this.esperaRafagaMs = o.esperaRafagaMs ?? env.esperaRafagaMs;
     this.publicUrl = o.publicUrl ?? env.publicUrl;
     this.slug = o.slug ?? "local";
+    const url = this.negocio.integraciones.webhookPedidos;
+    if (url) this.store.alCambiarEstado = (p, anterior) => avisarIntegracion(url, this.slug, this.menu, this.negocio, p, anterior);
+  }
+
+  /** Para el apagado prolijo: espera a que terminen los turnos en curso. */
+  async terminarPendientes() {
+    for (const t of [...this.rafagas.keys()]) void this.soltarRafaga(t);
+    await Promise.allSettled([...this.colas.values()]);
+  }
+
+  get turnosEnCurso() {
+    return this.colas.size;
   }
 
   /** Menú con los precios y faltantes que el local cargó hoy por WhatsApp. */
@@ -122,6 +139,10 @@ export class Bot {
       .catch(async (e) => {
         console.error(`[bot ${this.negocio.nombre}] error con ${telefono}:`, e);
         await this.mensajero.enviarTexto(telefono, "Uy, se me trabó algo de mi lado 😅 ¿Me lo repetís?").catch(() => {});
+      })
+      .finally(() => {
+        // limpiar la cola si nadie más se encoló detrás (evita que el mapa crezca sin fin)
+        if (this.colas.get(telefono) === next) this.colas.delete(telefono);
       });
     this.colas.set(telefono, next);
     return next;
@@ -219,7 +240,7 @@ export class Bot {
   }
 
   private async llamarModelo(system: string, mensajes: Mensaje[]) {
-    return this.client.beta.messages.create({
+    return semaforoIA.usar(() => this.client.beta.messages.create({
       model: env.model,
       max_tokens: 16000,
       ...(soportaFallbacks(env.model) ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const } : {}),
@@ -228,7 +249,7 @@ export class Bot {
       system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
       tools: this.tools,
       messages: mensajes,
-    });
+    }));
   }
 
   private async turnoAgente(conv: Conversacion, pedidoInicial: Pedido, contenido: Anthropic.Beta.BetaContentBlockParam[]) {
@@ -339,7 +360,7 @@ export class Bot {
 
     let extraidos: DatosComprobante | null = null;
     try {
-      extraidos = await extraerDatosComprobante(this.client, datos, mime);
+      extraidos = await semaforoIA.usar(() => extraerDatosComprobante(this.client, datos, mime));
     } catch (e) {
       console.error("[comprobante] error leyendo imagen", e);
     }

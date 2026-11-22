@@ -98,6 +98,12 @@ export const NegocioSchema = z.object({
     })
     .default({ phoneNumberId: "", token: "" }),
   panel: z.object({ token: z.string().default("") }).default({ token: "" }),
+  integraciones: z
+    .object({
+      /** URL que recibe un POST con el pedido cada vez que cambia de estado (webhook de n8n, Make, etc.) */
+      webhookPedidos: z.string().default(""),
+    })
+    .default({ webhookPedidos: "" }),
 });
 
 export type Menu = z.infer<typeof MenuSchema>;
@@ -154,7 +160,9 @@ export const env = {
   dataDir: process.env.DATA_DIR ?? "data",
   publicUrl: process.env.PUBLIC_URL ?? "",
   /** milisegundos que se espera para juntar mensajes seguidos del mismo cliente */
-  esperaRafagaMs: Number(process.env.ESPERA_RAFAGA_MS ?? 2500),
+  esperaRafagaMs: Number(process.env.ESPERA_RAFAGA_MS ?? 1500),
+  /** consultas a la IA en paralelo como máximo (entre todos los locales); el resto hace fila */
+  iaEnParalelo: Number(process.env.IA_EN_PARALELO ?? 40),
 };
 
 /** Los fallbacks del servidor solo existen para algunos modelos (Haiku no los tiene). */

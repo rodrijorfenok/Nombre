@@ -1,5 +1,18 @@
 import crypto from "node:crypto";
 import type { Entrante, Mensajero, MediaType } from "./bot.ts";
+import { conReintentos } from "./limites.ts";
+
+class ErrorWhatsApp extends Error {
+  constructor(
+    readonly status: number,
+    cuerpo: string,
+  ) {
+    super(`WhatsApp ${status}: ${cuerpo}`);
+  }
+}
+
+/** 429 (demasiados mensajes) y errores 5xx o de red se reintentan; 4xx de datos inválidos no. */
+const reintentable = (e: unknown) => !(e instanceof ErrorWhatsApp) || e.status === 429 || e.status >= 500;
 
 /**
  * Cliente mínimo de la API oficial de WhatsApp Business (Cloud API de Meta).
@@ -20,12 +33,20 @@ export class WhatsAppCloud implements Mensajero {
   async enviarTexto(telefono: string, texto: string) {
     // WhatsApp corta en 4096 caracteres.
     for (let i = 0; i < texto.length; i += 4000) {
-      const res = await fetch(`${this.base}/${this.phoneNumberId}/messages`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${this.token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ messaging_product: "whatsapp", to: telefono, type: "text", text: { body: texto.slice(i, i + 4000), preview_url: false } }),
-      });
-      if (!res.ok) throw new Error(`WhatsApp ${res.status}: ${await res.text()}`);
+      const body = JSON.stringify({ messaging_product: "whatsapp", to: telefono, type: "text", text: { body: texto.slice(i, i + 4000), preview_url: false } });
+      await conReintentos(
+        async () => {
+          const res = await fetch(`${this.base}/${this.phoneNumberId}/messages`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${this.token}`, "Content-Type": "application/json" },
+            body,
+            signal: AbortSignal.timeout(15_000),
+          });
+          if (!res.ok) throw new ErrorWhatsApp(res.status, await res.text());
+        },
+        4,
+        reintentable,
+      );
     }
   }
 
@@ -44,12 +65,18 @@ export class WhatsAppCloud implements Mensajero {
   }
 
   async descargarMedia(mediaId: string): Promise<{ datos: Buffer; mime: string }> {
-    const meta = await fetch(`${this.base}/${mediaId}`, { headers: { Authorization: `Bearer ${this.token}` } });
-    if (!meta.ok) throw new Error(`media ${mediaId}: ${meta.status}`);
-    const { url, mime_type } = (await meta.json()) as { url: string; mime_type: string };
-    const bin = await fetch(url, { headers: { Authorization: `Bearer ${this.token}` } });
-    if (!bin.ok) throw new Error(`descarga media ${mediaId}: ${bin.status}`);
-    return { datos: Buffer.from(await bin.arrayBuffer()), mime: mime_type };
+    return conReintentos(
+      async () => {
+        const meta = await fetch(`${this.base}/${mediaId}`, { headers: { Authorization: `Bearer ${this.token}` }, signal: AbortSignal.timeout(15_000) });
+        if (!meta.ok) throw new ErrorWhatsApp(meta.status, `media ${mediaId}`);
+        const { url, mime_type } = (await meta.json()) as { url: string; mime_type: string };
+        const bin = await fetch(url, { headers: { Authorization: `Bearer ${this.token}` }, signal: AbortSignal.timeout(30_000) });
+        if (!bin.ok) throw new ErrorWhatsApp(bin.status, `descarga media ${mediaId}`);
+        return { datos: Buffer.from(await bin.arrayBuffer()), mime: mime_type };
+      },
+      3,
+      reintentable,
+    );
   }
 }
 

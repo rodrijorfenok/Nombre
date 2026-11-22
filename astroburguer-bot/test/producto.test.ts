@@ -138,3 +138,26 @@ test("estado del pedido confirmado se responde sin IA", async () => {
   assert.equal(llamadas.length, 0);
   assert.match(enviados.at(-1)!, /21:25/);
 });
+
+test("bandeja durable: no procesa dos veces el mismo mensaje y retoma pendientes", () => {
+  const store = new Store(":memory:");
+  assert.equal(store.guardarEntrante("wamid.1", { texto: "hola" }), true);
+  assert.equal(store.guardarEntrante("wamid.1", { texto: "hola" }), false, "reintento de Meta");
+  store.guardarEntrante("wamid.2", { texto: "quiero" });
+  store.marcarEntrante("wamid.1", "hecho");
+  assert.deepEqual(store.entrantesPendientes(10).map((x) => x.id), ["wamid.2"]);
+});
+
+test("integraciones: avisa solo cuando el pedido cambia de estado", () => {
+  const store = new Store(":memory:");
+  const avisos: string[] = [];
+  store.alCambiarEstado = (p, anterior) => avisos.push(`${anterior}->${p.estado}`);
+  const p = store.crearPedido("1");
+  store.guardarPedido(p);
+  p.estado = "en_cocina";
+  store.guardarPedido(p);
+  store.guardarPedido(p);
+  p.estado = "entregado";
+  store.guardarPedido(p);
+  assert.deepEqual(avisos, ["armando->en_cocina", "en_cocina->entregado"]);
+});
