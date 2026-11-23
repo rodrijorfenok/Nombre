@@ -20,6 +20,22 @@ INGESTA_TOKEN=otra-clave         # solo si vas a conectar Make/Zapier para las m
 Hosting: cualquier servicio con disco persistente alcanza (Railway, Render o un VPS chico, desde unos
 5 USD por mes). Costo de IA esperado: **5 a 15 USD por mes** entre el cliente y los leads del sitio.
 
+**Dónde va la API key:** en tu computadora, en el archivo `.env`. En el entorno de Claude Code en la nube,
+como variable de entorno `ANTHROPIC_API_KEY` (menú del entorno → Editar). Cualquier persona o comando que
+use ese entorno puede leerla, así que usá una key exclusiva para la agencia y con límite de gasto en
+console.anthropic.com. Una sesión nueva la toma.
+
+## 1 bis. Ver el sistema funcionando sin API key (modo demo)
+
+```
+npm run demo                 # servidor en modo demo, con demoras para ver los estados en vivo
+npm run cliente-ficticio     # carga a "Trama Lino (ficticio)" con su link de portal
+```
+
+Abrí http://localhost:3000 (sitio y chat) y http://localhost:3000/panel (contraseña `demo`). Las
+respuestas de los agentes son simuladas y están marcadas como DEMO: sirven para aprender el flujo, no
+para evaluar la calidad.
+
 ## 2. Antes de cargar al cliente: probar los agentes
 
 1. `npm install` y `npm start` con la API key.

@@ -6,9 +6,10 @@
   "scripts": {
     "test": "node --test test/*.test.js",
     "start": "node --env-file-if-exists=.env server.js",
-    "demo": "ESCALA_MOCK=1 ADMIN_TOKEN=demo node server.js",
+    "demo": "ESCALA_MOCK=1 ADMIN_TOKEN=demo ESCALA_DEMO_LATENCIA_MS=1200 node server.js",
     "eval": "node evals/run.js",
-    "simular": "node scripts/simular-mes.js"
+    "simular": "node scripts/simular-mes.js",
+    "cliente-ficticio": "node scripts/cliente-ficticio.js"
   },
   "keywords": [],
   "author": "",

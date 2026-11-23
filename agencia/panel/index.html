@@ -308,7 +308,7 @@ textarea{min-height:110px;resize:vertical}
       '<h2 style="margin-top:18px">Etapa</h2><div class="row"><select id="etapa" style="max-width:220px">'+['nuevo','contactado','propuesta','cliente','perdido'].map(function(e){ return '<option'+(e===l.etapa?' selected':'')+'>'+e+'</option>'; }).join('')+'</select>' +
       '<button class="btn" id="auditar" type="button"'+(l.link?'':' disabled')+'>Auditar tienda</button><button class="btn" id="diag" type="button"'+(l.link?'':' disabled')+'>Diagnóstico completo</button></div>' +
       '<h2 style="margin-top:18px">Trabajos de este lead</h2>' + (trabajos.length ? trabajos.map(function(j){ return '<p><a href="#" data-ver="'+j.id+'">'+esc(j.agente)+'</a> <span class="chip '+j.estado+'">'+j.estado.replace('_',' ')+'</span></p>'; }).join('') : '<p class="muted">Ninguno.</p>');
-    $('#etapa').addEventListener('change', function(){ api('/leads/'+id, { method:'PATCH', body: JSON.stringify({ etapa: this.value }) }).then(refrescar); });
+    $('#etapa').addEventListener('change', function(){ api('/leads/'+id, { method:'PATCH', body: JSON.stringify({ etapa: this.value }) }).then(function(r){ refrescar(); if (r.aviso) alertaPanel(r.aviso); else if (r.cliente) alertaPanel('Cliente creado: el diagnóstico y el plan de 90 días ya están en marcha.'); }); });
     if ($('#copiar-msg')) $('#copiar-msg').addEventListener('click', function(){ copiar(l.mensaje_sugerido, $('#copiado')); });
     $('#auditar').addEventListener('click', function(){ lanzar('auditoria', { url: l.link, contexto: l.problema || '' }, id); });
     $('#diag').addEventListener('click', function(){ lanzar('diagnostico', { marca: l.marca || l.nombre, url: l.link, rubro: 'a definir por la auditoría', objetivo: l.problema || '' }, id); });
@@ -376,6 +376,10 @@ textarea{min-height:110px;resize:vertical}
     var c = datos.chats.find(function(x){ return x.id === id; }); if (!c) return;
     seleccion = { tipo:'chat', id:id };
     $('#viewer').innerHTML = '<h2>Conversación</h2>' + c.turnos.map(function(t){ return '<p><b>'+(t.role==='user'?'Visitante':'Asesor IA')+':</b> '+esc(t.text)+'</p>'; }).join('');
+  }
+  function alertaPanel(texto){
+    var d = document.createElement('div'); d.className = 'box'; d.setAttribute('role','status'); d.textContent = texto;
+    $('#viewer').insertBefore(d, $('#viewer').firstChild);
   }
   function copiar(texto, aviso){
     try { navigator.clipboard.writeText(texto).then(function(){ aviso.textContent = 'Copiado'; }, function(){ aviso.textContent = 'No se pudo copiar'; }); } catch(e){ aviso.textContent = 'No se pudo copiar'; }

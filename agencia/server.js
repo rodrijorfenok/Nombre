@@ -111,6 +111,9 @@ app.post("/api/chat", limitador(40, 60 * 60 * 1000), async (req, res) => {
       if (actual().auditoriaPedida) return { ok: false, motivo: "ya hay una auditoría pedida en esta conversación" };
       if (!esTienda(link)) return { ok: false, motivo: "el link tiene que ser la URL de una tienda online, con https://" };
       crearTrabajo("auditoria", { url: link }, { leadId: actual().leadId });
+      // El link de la tienda queda en la ficha del lead (lo necesita el onboarding si se convierte en cliente).
+      const lead = store.get("leads", actual().leadId);
+      if (lead && !esTienda(lead.link)) store.update("leads", lead.id, { link });
       store.update("chats", chat.id, { auditoriaPedida: true });
       return { ok: true };
     },
@@ -196,11 +199,15 @@ admin.patch("/leads/:id", (req, res) => {
   if (!lead) return res.status(404).json({ error: "Lead no encontrado." });
   // Puesta en marcha automática: al cerrar un cliente se crea su ficha y corre el diagnóstico.
   let cliente = null;
+  let aviso = null;
   if (etapa === "cliente" && !store.find("clientes", { leadId: lead.id })) {
     cliente = crearCliente({ marca: lead.marca || lead.nombre, url: esTienda(lead.link) ? lead.link : "", redes: esTienda(lead.link) ? "" : lead.link, contacto: lead.contacto, objetivo: lead.problema, plan: lead.plan_recomendado || lead.plan_interes, leadId: lead.id });
+    // Lo trabajado durante la etapa de lead (auditorías, calificación) pasa a la historia del cliente.
+    for (const j of store.list("jobs", { where: { leadId: lead.id }, liviano: true })) if (!j.clienteId) store.update("jobs", j.id, { clienteId: cliente.id });
     if (cliente.url) crearTrabajo("diagnostico", {}, { clienteId: cliente.id, leadId: lead.id, origen: "onboarding" });
+    else aviso = "Se creó el cliente, pero falta la URL de su tienda: completala en su ficha y lanzá el diagnóstico.";
   }
-  res.json({ lead, cliente });
+  res.json({ lead, cliente, aviso });
 });
 
 admin.get("/clientes", (req, res) => res.json(store.list("clientes")));

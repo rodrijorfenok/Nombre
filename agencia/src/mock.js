@@ -2,7 +2,8 @@
 // sin API key ni costo. Todo lo que devuelve está marcado como DEMO.
 import { CHECKLIST_CRO } from "./agents/conocimiento.js";
 
-const espera = (ms) => new Promise((r) => setTimeout(r, ms));
+// ESCALA_DEMO_LATENCIA_MS simula la demora de una llamada real (útil para ver los estados en el panel).
+const espera = (ms) => new Promise((r) => setTimeout(r, Number(process.env.ESCALA_DEMO_LATENCIA_MS) || ms));
 const DEMO = "> **DEMO:** resultado simulado. Configurá ANTHROPIC_API_KEY y quitá ESCALA_MOCK para usar los agentes reales.";
 
 const TEXTOS = {
@@ -130,7 +131,8 @@ export async function runChat({ history, tools }) {
     return { text: "Te paso con una persona del equipo; te escriben a la brevedad. (DEMO)" };
   }
   if (contacto) {
-    await tool("registrar_lead").run({ nombre: "Contacto del chat (DEMO)", contacto: contacto[0].trim(), temperatura: "tibio" });
+    const nombre = ultimo.match(/soy ([A-ZÁÉÍÓÚÑ][\wáéíóúñ]+)/i)?.[1] || "Contacto del chat";
+    await tool("registrar_lead").run({ nombre: `${nombre} (DEMO)`, contacto: contacto[0].trim(), ...(link ? { link: link[0], marca: new URL(link[0]).hostname.split(".")[0].replace(/-/g, " ") } : {}), temperatura: "tibio" });
     if (link) await tool("solicitar_auditoria").run({ link: link[0] });
     return { text: `¡Gracias! Ya guardé tu contacto${link ? " y pedí la auditoría de tu tienda" : ""}. El equipo te escribe en 48 h hábiles. (DEMO)` };
   }

@@ -94,6 +94,28 @@ test("cliente: al pasar un lead a cliente se crea su ficha y arranca el diagnós
   assert.equal(j.input.marca ?? "", "", "el pedido guarda lo que se pidió; el brief se completa al ejecutar");
 });
 
+test("cliente desde el chat: el link queda en el lead, arranca el onboarding y su auditoría pasa al cliente", async () => {
+  const h = { "content-type": "application/json" };
+  let r = (await post("/api/chat", { mensaje: "Hola, vendo ropa de lino" }, h)).body;
+  r = (await post("/api/chat", { sesion: r.sesion, mensaje: "Soy Lucía, lucia@trama.example.com, mi tienda es https://trama.example.com" }, h)).body;
+  const chat = store.get("chats", r.sesion);
+  const lead = store.get("leads", chat.leadId);
+  assert.equal(lead.link, "https://trama.example.com");
+  const aud = store.find("jobs", { leadId: lead.id, tipo: "auditoria" });
+  await esperar(aud.id);
+  const res = await patch(`/api/admin/leads/${lead.id}`, { etapa: "cliente" });
+  assert.equal(res.aviso, null);
+  assert.equal(store.get("jobs", aud.id).clienteId, res.cliente.id, "la auditoría previa pasa a la historia del cliente");
+  assert.ok(store.find("jobs", { clienteId: res.cliente.id, tipo: "diagnostico" }), "arranca el diagnóstico");
+});
+
+test("cliente sin URL de tienda: se crea igual y se avisa qué falta", async () => {
+  const lead = store.insert("leads", { nombre: "Sin tienda", contacto: "s@x.com", etapa: "propuesta", link: "https://instagram.com/sintienda" });
+  const res = await patch(`/api/admin/leads/${lead.id}`, { etapa: "cliente" });
+  assert.ok(res.cliente.id);
+  assert.match(res.aviso, /falta la URL/);
+});
+
 test("feedback: rechazar crea una versión nueva y guarda la lección en la memoria del cliente", async () => {
   const c = (await post("/api/admin/clientes", { marca: "Mila Kids", rubro: "Ropa infantil", productos: "Bodies de algodón" })).body;
   const { body } = await post("/api/admin/jobs", { tipo: "creativos", input: { cantidad: 4 }, clienteId: c.id });
