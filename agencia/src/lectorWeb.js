@@ -64,8 +64,21 @@ export function htmlATexto(html, base) {
   return `${cabecera}\n\n${cuerpo}`;
 }
 
-/** Lee una página; `dominioPermitido` limita la lectura al sitio auditado. */
-export async function leerPagina(url, { dominioPermitido } = {}) {
+/**
+ * Lee una página; `dominioPermitido` limita la lectura al sitio auditado. Si la conexión
+ * segura (https) falla, reintenta una vez con http: algunas tiendas chicas no tienen certificado.
+ */
+export async function leerPagina(url, opciones = {}) {
+  try {
+    return await leerPaginaUnaVez(url, opciones);
+  } catch (err) {
+    const deRed = /fetch failed|ECONNREFUSED|certificate|SSL|ENOTFOUND/i.test(`${err.message} ${err.cause?.message || ""}`);
+    if (url.startsWith("https://") && deRed) return leerPaginaUnaVez(url.replace(/^https:/, "http:"), opciones);
+    throw err;
+  }
+}
+
+async function leerPaginaUnaVez(url, { dominioPermitido } = {}) {
   let u = await validarDestino(url);
   const raiz = (h) => h.replace(/^www\./, "");
   if (dominioPermitido && raiz(u.hostname) !== raiz(dominioPermitido) && !raiz(u.hostname).endsWith(`.${raiz(dominioPermitido)}`)) {

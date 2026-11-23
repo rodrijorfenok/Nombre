@@ -24,7 +24,7 @@ const server = http.createServer((req, res) => {
 });
 
 // Respuesta en formato streaming (Server-Sent Events), solo con bloques de texto.
-function responderSSE(res, content) {
+function responderSSE(res, content, stopReason = "end_turn") {
   res.setHeader("content-type", "text/event-stream");
   const ev = (type, data) => res.write(`event: ${type}\ndata: ${JSON.stringify({ type, ...data })}\n\n`);
   ev("message_start", { message: { id: "msg_test", type: "message", role: "assistant", model: "claude-opus-5-5", content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: 10, output_tokens: 0 } } });
@@ -33,7 +33,7 @@ function responderSSE(res, content) {
     ev("content_block_delta", { index, delta: { type: "text_delta", text: b.text } });
     ev("content_block_stop", { index });
   });
-  ev("message_delta", { delta: { stop_reason: "end_turn", stop_sequence: null }, usage: { output_tokens: 10 } });
+  ev("message_delta", { delta: { stop_reason: stopReason, stop_sequence: null }, usage: { output_tokens: 10 } });
   ev("message_stop", {});
   res.end();
 }
@@ -108,7 +108,10 @@ test("rechazo del modelo se informa como error claro", async () => {
   const orig = server.listeners("request")[0];
   server.removeAllListeners("request");
   server.on("request", (req, res) => {
-    req.resume(); req.on("end", () => {
+    let body = "";
+    req.on("data", (c) => (body += c));
+    req.on("end", () => {
+      if (JSON.parse(body).stream) return responderSSE(res, [], "refusal");
       res.setHeader("content-type", "application/json");
       res.end(JSON.stringify({ id: "m", type: "message", role: "assistant", model: "claude-opus-5-5", content: [], stop_reason: "refusal", stop_sequence: null, stop_details: { type: "refusal", category: null }, usage: { input_tokens: 1, output_tokens: 0 } }));
     });

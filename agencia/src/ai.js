@@ -79,7 +79,7 @@ async function medir(agente, tipo, fn) {
  * Respuesta en texto libre (markdown). Admite herramientas del servidor de
  * Anthropic (búsqueda y lectura web), que corren sin código de nuestro lado.
  */
-export function runText({ agent, system, prompt, effort = "medium", serverTools = [], tools = [], maxTokens = 16000 }) {
+export function runText({ agent, system, prompt, effort = "medium", serverTools = [], tools = [], maxTokens = 32000 }) {
   return medir(agent, "texto", async () => {
     if (config.mock) return mock.runText({ agent, prompt });
     const runner = getClient().beta.messages.toolRunner({
@@ -90,6 +90,8 @@ export function runText({ agent, system, prompt, effort = "medium", serverTools 
       tools: [...serverTools, ...tools],
       messages: [{ role: "user", content: prompt }],
       max_iterations: 10,
+      // Streaming: los informes largos con razonamiento alto no chocan con el límite de tiempo.
+      stream: true,
       ...CACHE,
       ...FALLBACK,
     });

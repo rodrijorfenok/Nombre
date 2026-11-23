@@ -96,7 +96,7 @@ function herramientaLectura(urlTienda) {
   return betaZodTool({
     name: "leer_pagina",
     description: `Lee una página de la tienda auditada (${dominio}) y devuelve su contenido como texto: títulos, textos, precios, botones, enlaces e imágenes con su texto alternativo. Solo acepta URLs de ${dominio}. Máximo 5 lecturas por auditoría: elegí la home, una colección y una ficha de producto.`,
-    inputSchema: z.object({ url: z.string().describe(`URL completa de una página de ${dominio}`) }),
+    inputSchema: z.object({ url: z.string().describe(`URL completa de una página de ${dominio}. Para la home usá exactamente la URL que te pasaron (mismo http o https).`) }),
     run: async ({ url }) => {
       if (++usos > 5) return "Ya leíste 5 páginas: escribí el informe con lo que tenés.";
       try {
