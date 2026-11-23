@@ -49,6 +49,21 @@ flowchart LR
 | Avisos | Webhook con eventos `lead_nuevo`, `entregable_listo`, `entregable_aprobado` y `requiere_atencion`. |
 | Calibración | El panel muestra cuánto coincide el revisor automático con las decisiones del equipo. |
 
+## Preparado para 20 clientes
+
+| Qué | Cómo funciona |
+|---|---|
+| Cartera | Vista principal del panel: semáforo por cliente, cumplimiento de los entregables de su plan, trabajos trabados, costo de IA y margen del mes |
+| Cola justa | Prioridades (los leads primero, después las entregas y por último el mantenimiento) y como máximo un trabajo a la vez por cliente: ninguno acapara la cola |
+| Agenda escalonada | Cada cliente tiene su propio día de planificación (del 20 al 25) y de re-auditoría (del 1 al 10), así no se acumula todo el mismo día |
+| Portal del cliente | Link privado por cliente (`/portal/...`) con sus entregas y un espacio para comentar. Por cliente se elige si ve solo lo aprobado por el equipo o también lo aprobado por el control de calidad. Los comentarios llegan a **Requieren atención** |
+| Responsables | Cada cliente tiene un account manager; los avisos del webhook lo incluyen |
+| Métricas faltantes | Si un plan con reporte semanal no recibe métricas en 8 días, se avisa |
+| Base de datos | SQLite (incluido en Node, sin instalar nada), con índices y migración automática desde la versión anterior |
+| Copias de seguridad | Una por día en `data/backups`, se guardan las últimas 14 |
+| Monitoreo | `GET /api/salud` para un servicio externo de uptime |
+| Simulación | `npm run simular` corre un mes con 20 clientes en modo demo y proyecta carga, tiempos y costos (`docs/SIMULACION_20_CLIENTES.md`) |
+
 Rutina sugerida: 15 minutos por día en la pestaña **Requieren atención**, y feedback sobre algunas entregas
 aprobadas para que la memoria y la calibración mejoren.
 
@@ -81,7 +96,9 @@ Abrí http://localhost:3000 (sitio) y http://localhost:3000/panel (panel, token 
 agencia/
 ├── server.js              API, sitio y panel
 ├── sitio/index.html       Sitio público con calculadora, formulario y chat
-├── panel/index.html       Panel interno: leads, trabajos, lanzar agentes, conversaciones
+├── panel/index.html       Panel interno: cartera, leads, atención, trabajos, clientes, conversaciones
+├── portal/index.html      Portal privado de cada cliente
+├── scripts/simular-mes.js Simulación de un mes con 20 clientes
 ├── docs/                  Investigación y decisiones de diseño
 ├── evals/                 Banco de evaluaciones (casos + runner)
 ├── src/
@@ -91,7 +108,8 @@ agencia/
 │   ├── memoria.js         Clientes: brief y lecciones
 │   ├── agenda.js          Trabajo recurrente y seguimientos
 │   ├── telemetria.js      Costos por llamada, trabajo y día
-│   ├── store.js           Base de datos en archivo JSON (data/db.json)
+│   ├── store.js           Base de datos SQLite (data/escala.db) con migración desde JSON
+│   ├── cartera.js         Cumplimiento por plan, salud, costo y margen por cliente
 │   ├── mock.js            Respuestas simuladas para el modo demo
 │   └── agents/            Un archivo por agente + conocimiento.js (precios, tono, checklist)
 ├── test/                  Pruebas de punta a punta y de la integración con la API
@@ -119,7 +137,8 @@ Para cambiar precios, servicios, tono o el checklist de auditoría, editá
 ## Pruebas y evaluaciones
 
 ```bash
-npm test                    # 30 pruebas, sin costo
+npm test                    # 38 pruebas, sin costo
+npm run simular             # un mes con 20 clientes en modo demo
 npm run eval -- --reps 3    # banco de evaluaciones con la API real
 ```
 
@@ -144,7 +163,9 @@ de prompts compensa parte de ese costo. Poné un `PRESUPUESTO_DIARIO_USD` desde 
 
 ## Para producción
 
-- Desplegarlo en un servicio con disco persistente (Railway, Render, Fly.io o un VPS) para `data/db.json`,
-  o reemplazar `src/store.js` por Postgres cuando crezca el volumen.
+- Desplegarlo en un servicio con disco persistente (Railway, Render, Fly.io o un VPS) para `data/`.
+  SQLite alcanza con holgura para 20 a 50 clientes; más allá, migrar `src/store.js` a Postgres
+  (la interfaz está aislada en ese archivo).
+- Copiar `data/backups` fuera del servidor (por ejemplo, a un bucket) una vez por semana.
 - Servirlo detrás de HTTPS y con un `ADMIN_TOKEN` largo.
-- Si va detrás de un proxy, activar `app.set("trust proxy", 1)` para que el límite por IP funcione bien.
+- Si va detrás de un proxy, poner `TRUST_PROXY=1` para que el límite por IP funcione bien.

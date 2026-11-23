@@ -1,12 +1,17 @@
 // Memoria de largo plazo por cliente: brief (quién es, qué vende, tono, objetivos)
 // y lecciones aprendidas del feedback del equipo. Se inyecta en cada pedido a los
 // agentes para que las entregas sean consistentes mes a mes y no repitan errores.
+import crypto from "node:crypto";
 import { store } from "./store.js";
 
 const MAX_LECCIONES = 40;
 const LECCIONES_EN_CONTEXTO = 15;
 
-export const CAMPOS_CLIENTE = ["marca", "rubro", "url", "redes", "publico", "tono", "productos", "objetivo", "plan", "contacto"];
+export const CAMPOS_CLIENTE = ["marca", "rubro", "url", "redes", "publico", "tono", "productos", "objetivo", "plan", "contacto", "responsable"];
+// Campos internos: no se mandan a los agentes.
+const NO_PARA_AGENTES = ["responsable", "contacto", "plan"];
+
+export const nuevoTokenPortal = () => crypto.randomBytes(18).toString("base64url");
 
 export function crearCliente(datos) {
   const limpio = Object.fromEntries(CAMPOS_CLIENTE.map((k) => [k, typeof datos[k] === "string" ? datos[k].trim().slice(0, 1000) : ""]));
@@ -15,6 +20,9 @@ export function crearCliente(datos) {
     ...limpio,
     activo: true,
     leadId: datos.leadId || null,
+    portalToken: nuevoTokenPortal(),
+    // "con_aprobacion": el cliente ve solo lo aprobado por el equipo; "automatica": también lo que aprobó el control de calidad.
+    publicacion: datos.publicacion === "automatica" ? "automatica" : "con_aprobacion",
     automatizaciones: { contenido: true, creativos: Boolean(limpio.productos), reauditoria: Boolean(limpio.url), ...(datos.automatizaciones || {}) },
     lecciones: [],
   });
@@ -31,7 +39,7 @@ export function agregarLeccion(clienteId, texto, origen) {
 export function contextoCliente(clienteId) {
   const c = clienteId && store.get("clientes", clienteId);
   if (!c) return "";
-  const brief = CAMPOS_CLIENTE.filter((k) => c[k]).map((k) => `- ${k}: ${c[k]}`).join("\n");
+  const brief = CAMPOS_CLIENTE.filter((k) => c[k] && !NO_PARA_AGENTES.includes(k)).map((k) => `- ${k}: ${c[k]}`).join("\n");
   const lecciones = (c.lecciones || []).slice(-LECCIONES_EN_CONTEXTO).map((l) => `- ${l.texto}`).join("\n");
   return `Brief del cliente:\n${brief}${lecciones ? `\n\nLecciones de entregas anteriores (más recientes al final):\n${lecciones}` : ""}`;
 }

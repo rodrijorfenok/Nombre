@@ -7,7 +7,8 @@ import { config } from "./src/config.js";
 import { store } from "./src/store.js";
 import { AGENTES, crearTrabajo, reintentar, retomarPendientes, estadoCola, avisar, feedback, ESTADOS_ACTIVOS } from "./src/jobs.js";
 import { chatear } from "./src/agents/comercial.js";
-import { crearCliente, agregarLeccion, CAMPOS_CLIENTE } from "./src/memoria.js";
+import { crearCliente, agregarLeccion, CAMPOS_CLIENTE, nuevoTokenPortal } from "./src/memoria.js";
+import { resumenCartera } from "./src/cartera.js";
 import { gastoDeHoy } from "./src/telemetria.js";
 import { iniciarAgenda, tick } from "./src/agenda.js";
 
@@ -19,8 +20,10 @@ app.use(express.json({ limit: "200kb" }));
 const dir = (p) => fileURLToPath(new URL(p, import.meta.url));
 app.use("/", express.static(dir("./sitio")));
 app.use("/panel", express.static(dir("./panel")));
+app.get("/portal/:token", (req, res) => res.sendFile(dir("./portal/index.html")));
 app.get("/panel/vendor/marked.min.js", (req, res) => res.sendFile(dir("./node_modules/marked/marked.min.js")));
 app.get("/panel/vendor/purify.min.js", (req, res) => res.sendFile(dir("./node_modules/dompurify/dist/purify.min.js")));
+app.get("/api/salud", (req, res) => res.json({ ok: true, cola: estadoCola(), hora: new Date().toISOString() }));
 
 // ---------- utilidades ----------
 const texto = (v, max = 500) => (typeof v === "string" ? v.trim().slice(0, max) : "");
@@ -139,7 +142,41 @@ app.post("/api/ingesta/metricas", limitador(60, 60 * 60 * 1000), (req, res) => {
   const datos = typeof metricas === "string" ? metricas : JSON.stringify(metricas, null, 2);
   if (!datos || datos.length < 5) return res.status(400).json({ error: "Faltan las métricas." });
   const job = crearTrabajo("reporte", { periodo: texto(periodo, 80), metricas: datos.slice(0, 60000) }, { clienteId: cliente.id, origen: "ingesta" });
+  if (cliente.alerta) store.update("clientes", cliente.id, { alerta: undefined });
   res.status(201).json({ ok: true, trabajo: job.id });
+});
+
+// ---------- Portal del cliente ----------
+// Cada cliente tiene un link privado con sus entregas. Solo ve lo publicable según su
+// configuración, nunca datos internos (costos, revisiones, lecciones).
+function clienteDelPortal(req, res) {
+  const token = texto(req.params.token, 60);
+  const cliente = token.length >= 20 && store.find("clientes", { portalToken: token });
+  if (!cliente || !cliente.activo) { res.status(404).json({ error: "Link inválido o vencido. Pedile uno nuevo a tu contacto de la agencia." }); return null; }
+  return cliente;
+}
+const publicable = (cliente, j) => j.estado === "aprobado" || (cliente.publicacion === "automatica" && j.estado === "listo");
+
+app.get("/api/portal/:token", limitador(120, 60 * 60 * 1000), (req, res) => {
+  const cliente = clienteDelPortal(req, res);
+  if (!cliente) return;
+  const entregas = store.list("jobs", { where: { clienteId: cliente.id, estado: ["aprobado", "listo"] } })
+    .filter((j) => publicable(cliente, j) && j.tipo !== "calificacion" && j.tipo !== "seguimiento")
+    .map((j) => ({ id: j.id, tipo: j.tipo, titulo: j.agente, fecha: j.actualizado || j.creado, markdown: j.resultado?.markdown || "", comentarios: (j.comentarios_cliente || []).map((c) => ({ texto: c.texto, fecha: c.fecha })) }));
+  res.json({ agencia: config.agencia.nombre, marca: cliente.marca, entregas });
+});
+
+app.post("/api/portal/:token/comentarios", limitador(30, 60 * 60 * 1000), (req, res) => {
+  const cliente = clienteDelPortal(req, res);
+  if (!cliente) return;
+  const job = store.get("jobs", texto(req.body?.entregaId, 40));
+  const comentario = texto(req.body?.texto, 1500);
+  if (!job || job.clienteId !== cliente.id || !publicable(cliente, job)) return res.status(404).json({ error: "Entrega no encontrada." });
+  if (!comentario) return res.status(400).json({ error: "Escribí tu comentario." });
+  const comentarios = [...(job.comentarios_cliente || []), { texto: comentario, fecha: new Date().toISOString(), leido: false }];
+  store.update("jobs", job.id, { comentarios_cliente: comentarios });
+  avisar({ evento: "requiere_atencion", motivo: "comentario_cliente", cliente: cliente.marca, clienteId: cliente.id, responsable: cliente.responsable || null, trabajo: job.id, comentario });
+  res.status(201).json({ ok: true });
 });
 
 // ---------- API del panel ----------
@@ -159,7 +196,7 @@ admin.patch("/leads/:id", (req, res) => {
   if (!lead) return res.status(404).json({ error: "Lead no encontrado." });
   // Puesta en marcha automática: al cerrar un cliente se crea su ficha y corre el diagnóstico.
   let cliente = null;
-  if (etapa === "cliente" && !store.find("clientes", (c) => c.leadId === lead.id)) {
+  if (etapa === "cliente" && !store.find("clientes", { leadId: lead.id })) {
     cliente = crearCliente({ marca: lead.marca || lead.nombre, url: esTienda(lead.link) ? lead.link : "", redes: esTienda(lead.link) ? "" : lead.link, contacto: lead.contacto, objetivo: lead.problema, plan: lead.plan_recomendado || lead.plan_interes, leadId: lead.id });
     if (cliente.url) crearTrabajo("diagnostico", {}, { clienteId: cliente.id, leadId: lead.id, origen: "onboarding" });
   }
@@ -167,6 +204,11 @@ admin.patch("/leads/:id", (req, res) => {
 });
 
 admin.get("/clientes", (req, res) => res.json(store.list("clientes")));
+admin.get("/cartera", (req, res) => res.json(resumenCartera()));
+admin.post("/clientes/:id/portal/renovar", (req, res) => {
+  const c = store.update("clientes", req.params.id, { portalToken: nuevoTokenPortal() });
+  c ? res.json(c) : res.status(404).json({ error: "Cliente no encontrado." });
+});
 admin.post("/clientes", (req, res) => {
   try { res.status(201).json(crearCliente(req.body || {})); } catch (err) { res.status(400).json({ error: err.message }); }
 });
@@ -175,6 +217,7 @@ admin.patch("/clientes/:id", (req, res) => {
   const cambios = {};
   for (const k of CAMPOS_CLIENTE) if (typeof b[k] === "string") cambios[k] = b[k].trim().slice(0, 1000);
   if (typeof b.activo === "boolean") cambios.activo = b.activo;
+  if (["automatica", "con_aprobacion"].includes(b.publicacion)) cambios.publicacion = b.publicacion;
   if (b.automatizaciones && typeof b.automatizaciones === "object") {
     const actual = store.get("clientes", req.params.id)?.automatizaciones || {};
     cambios.automatizaciones = { ...actual, ...Object.fromEntries(Object.entries(b.automatizaciones).filter(([, v]) => typeof v === "boolean")) };
@@ -187,7 +230,14 @@ admin.post("/clientes/:id/lecciones", (req, res) => {
   c ? res.status(201).json(c) : res.status(400).json({ error: "Cliente no encontrado o lección vacía." });
 });
 
-admin.get("/jobs", (req, res) => res.json({ cola: estadoCola(), trabajos: store.list("jobs").map(resumenJob) }));
+admin.get("/jobs", (req, res) => {
+  const where = {};
+  if (req.query.estado) where.estado = String(req.query.estado).split(",");
+  if (req.query.clienteId) where.clienteId = String(req.query.clienteId);
+  const limit = Math.min(Number(req.query.limit) || 200, 1000);
+  const offset = Number(req.query.offset) || 0;
+  res.json({ cola: estadoCola(), total: store.count("jobs", where), trabajos: store.list("jobs", { where, limit, offset, liviano: true }).map(resumenJob) });
+});
 admin.get("/jobs/:id", (req, res) => {
   const job = store.get("jobs", req.params.id);
   job ? res.json(job) : res.status(404).json({ error: "Trabajo no encontrado." });
@@ -212,11 +262,17 @@ admin.post("/jobs/:id/feedback", (req, res) => {
     res.status(400).json({ error: err.message });
   }
 });
-admin.get("/chats", (req, res) => res.json(store.list("chats")));
+admin.post("/jobs/:id/comentarios/leidos", (req, res) => {
+  const job = store.get("jobs", req.params.id);
+  if (!job) return res.status(404).json({ error: "Trabajo no encontrado." });
+  store.update("jobs", job.id, { comentarios_cliente: (job.comentarios_cliente || []).map((c) => ({ ...c, leido: true })) });
+  res.json({ ok: true });
+});
+admin.get("/chats", (req, res) => res.json(store.list("chats", { limit: 200 })));
 
 // Tablero de operación: cuánto se gastó, cuánto se aprueba solo, qué necesita atención.
 admin.get("/metricas", (req, res) => {
-  const jobs = store.list("jobs");
+  const jobs = store.list("jobs", { liviano: true });
   const terminados = jobs.filter((j) => j.calidad);
   const porTipo = {};
   for (const j of jobs) {
@@ -236,7 +292,7 @@ admin.get("/metricas", (req, res) => {
     presupuesto_diario_usd: Number(process.env.PRESUPUESTO_DIARIO_USD || 0) || null,
     gasto_7_dias: Object.entries(gastos).sort().slice(-7),
     aprobacion_automatica: terminados.length ? Math.round((terminados.filter((j) => j.calidad.aprobado).length / terminados.length) * 100) : null,
-    requieren_atencion: jobs.filter((j) => ["requiere_revision", "error"].includes(j.estado)).length,
+    requieren_atencion: jobs.filter((j) => ["requiere_revision", "error"].includes(j.estado) || (j.comentarios_cliente || []).some((c) => !c.leido)).length,
     en_curso: jobs.filter((j) => ESTADOS_ACTIVOS.includes(j.estado)).length,
     por_agente: Object.entries(porTipo).map(([id, t]) => ({
       id, nombre: t.nombre, total: t.total, auto_aprobados: t.auto_aprobados, costo_usd: Number(t.costo_usd.toFixed(4)),
@@ -256,6 +312,7 @@ app.use((err, req, res, next) => {
 export { app, adminToken };
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  for (const c of store.list("clientes")) if (!c.portalToken) store.update("clientes", c.id, { portalToken: nuevoTokenPortal(), publicacion: c.publicacion || "con_aprobacion" });
   retomarPendientes({ arranque: true });
   if (process.env.AGENDA !== "0") iniciarAgenda();
   app.listen(config.port, () => {

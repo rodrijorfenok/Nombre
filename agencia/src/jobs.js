@@ -27,35 +27,66 @@ export const AGENTES = {
   seguimiento: { nombre: "Seguimiento de lead", run: seguimientoLead, sinRevisorIA: true },
 };
 
-const MAX_CONCURRENTES = Number(process.env.MAX_JOBS || 2);
+const MAX_CONCURRENTES = Number(process.env.MAX_JOBS || 4);
+const MAX_POR_CLIENTE = Number(process.env.MAX_JOBS_POR_CLIENTE || 1);
 const MAX_REVISIONES = Number(process.env.MAX_REVISIONES || 2);
 const MAX_INTENTOS = Number(process.env.MAX_INTENTOS || 4);
 const ESPERA_BASE_MS = Number(process.env.ESPERA_REINTENTO_MS || 30000);
 
-const cola = [];
-let activos = 0;
+// La cola vive en la base de datos (sobrevive reinicios). En memoria solo se lleva
+// qué se está ejecutando, para limitar la concurrencia total y por cliente.
+const enCurso = new Map(); // jobId -> clienteId
+let pausaGlobalHasta = 0;
+let despertador = null;
+
+// Prioridad: 1 = lo que toca a un prospecto en vivo, 2 = entregas de clientes, 3 = mantenimiento.
+export function prioridadDe(tipo, meta = {}) {
+  if (meta.prioridad) return meta.prioridad;
+  if (["calificacion", "seguimiento"].includes(tipo) || (tipo === "auditoria" && meta.leadId && !meta.clienteId)) return 1;
+  if (meta.origen === "onboarding") return 1;
+  if (meta.origen === "agenda" && tipo === "auditoria") return 3;
+  return 2;
+}
 
 export const ESTADOS_ACTIVOS = ["en_cola", "trabajando", "revisando", "esperando_reintento", "pausado_presupuesto"];
 
 export function crearTrabajo(tipo, input, meta = {}) {
   if (!AGENTES[tipo]) throw new Error(`Agente desconocido: ${tipo}`);
   const job = store.insert("jobs", {
-    tipo, agente: AGENTES[tipo].nombre, input, estado: "en_cola", progreso: "", intentos: 0, revisiones: [], ...meta,
+    tipo, agente: AGENTES[tipo].nombre, input, estado: "en_cola", progreso: "", intentos: 0, revisiones: [],
+    prioridad: prioridadDe(tipo, meta), ...meta,
   });
-  encolar(job.id);
+  encolar();
   return job;
 }
 
-function encolar(id) {
-  if (!cola.includes(id)) cola.push(id);
+function encolar() {
   setImmediate(procesar);
 }
 
+/** Elige el próximo trabajo: mayor prioridad, más antiguo, y de un cliente que no esté ocupado. */
+function siguiente() {
+  const ocupados = new Map();
+  for (const c of enCurso.values()) if (c) ocupados.set(c, (ocupados.get(c) || 0) + 1);
+  // Orden de llegada (desempata por orden de inserción) y después prioridad (sort estable).
+  const candidatos = store.list("jobs", { where: { estado: "en_cola" }, liviano: true, orden: "asc" })
+    .sort((a, b) => (a.prioridad || 2) - (b.prioridad || 2));
+  return candidatos.find((j) => !enCurso.has(j.id) && (!j.clienteId || (ocupados.get(j.clienteId) || 0) < MAX_POR_CLIENTE));
+}
+
 function procesar() {
-  while (activos < MAX_CONCURRENTES && cola.length) {
-    const id = cola.shift();
-    activos++;
-    ejecutar(id).finally(() => { activos--; procesar(); });
+  if (Date.now() < pausaGlobalHasta) {
+    clearTimeout(despertador);
+    despertador = setTimeout(procesar, pausaGlobalHasta - Date.now() + 50);
+    despertador.unref?.();
+    return;
+  }
+  while (enCurso.size < MAX_CONCURRENTES) {
+    const job = siguiente();
+    if (!job) return;
+    enCurso.set(job.id, job.clienteId || null);
+    store.update("jobs", job.id, { estado: "trabajando" });
+    ejecutar(job.id).finally(() => { enCurso.delete(job.id); procesar(); });
   }
 }
 
@@ -106,6 +137,8 @@ async function ejecutar(id) {
   } catch (err) {
     console.error(`[jobs] ${job.tipo} ${id} (intento ${intentos}):`, err.message);
     const reintentar = err.retryable && intentos < MAX_INTENTOS;
+    // Ante un límite de la API, frena toda la cola un rato en lugar de seguir chocando.
+    if (err.code === "rate_limit") pausaGlobalHasta = Date.now() + Number(process.env.PAUSA_LIMITE_MS || 60000);
     const espera = ESPERA_BASE_MS * 2 ** (intentos - 1) * (0.8 + Math.random() * 0.4);
     store.update("jobs", id, {
       estado: reintentar ? "esperando_reintento" : "error",
@@ -135,7 +168,10 @@ function alTerminar(job) {
   else avisar({ evento: "requiere_atencion", motivo: "calidad", trabajo: resumen(job), problemas: job.calidad.motivo });
 }
 
-const resumen = (j) => ({ id: j.id, tipo: j.tipo, estado: j.estado, leadId: j.leadId || null, clienteId: j.clienteId || null, puntaje: j.calidad?.puntaje ?? null });
+const resumen = (j) => {
+  const cliente = j.clienteId && store.get("clientes", j.clienteId);
+  return { id: j.id, tipo: j.tipo, estado: j.estado, leadId: j.leadId || null, clienteId: j.clienteId || null, cliente: cliente?.marca || null, responsable: cliente?.responsable || null, puntaje: j.calidad?.puntaje ?? null };
+};
 
 /**
  * Feedback humano sobre una entrega. Aprobar la cierra; rechazar lanza una nueva
@@ -164,22 +200,21 @@ export function reintentar(id) {
   const job = store.get("jobs", id);
   if (!job || !["error", "requiere_revision"].includes(job.estado)) return null;
   store.update("jobs", id, { estado: "en_cola", error: null, intentos: 0 });
-  encolar(id);
+  encolar();
   return job;
 }
 
 /** Retoma lo pendiente: al arrancar el servidor y en cada vuelta de la agenda. */
 export function retomarPendientes({ arranque = false } = {}) {
   const ahora = Date.now();
-  for (const job of store.list("jobs")) {
+  const estados = ["esperando_reintento", "pausado_presupuesto", ...(arranque ? ["trabajando", "revisando"] : [])];
+  for (const job of store.list("jobs", { where: { estado: estados }, liviano: true })) {
     const vencido = job.estado === "esperando_reintento" && new Date(job.proximoIntento).getTime() <= ahora;
     const pausado = job.estado === "pausado_presupuesto" && !presupuestoAgotado();
-    const huerfano = arranque && ["en_cola", "trabajando", "revisando"].includes(job.estado);
-    if (vencido || pausado || huerfano) {
-      store.update("jobs", job.id, { estado: "en_cola" });
-      encolar(job.id);
-    }
+    const huerfano = arranque && !enCurso.has(job.id);
+    if (vencido || pausado || huerfano) store.update("jobs", job.id, { estado: "en_cola" });
   }
+  encolar();
 }
 
 export async function avisar(payload) {
@@ -191,4 +226,8 @@ export async function avisar(payload) {
   }
 }
 
-export const estadoCola = () => ({ activos, en_cola: cola.length });
+export const estadoCola = () => ({
+  activos: enCurso.size,
+  en_cola: store.count("jobs", { estado: "en_cola" }),
+  pausa_por_limite: pausaGlobalHasta > Date.now() ? new Date(pausaGlobalHasta).toISOString() : null,
+});

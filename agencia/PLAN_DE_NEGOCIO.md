@@ -118,7 +118,7 @@ Precios mensuales en USD, sin IVA. La inversión publicitaria va aparte y la pag
 
 **Capacidad estimada:** 8 a 10 clientes activos con ese equipo.
 
-**Escala (mes 6–18):** sumar media buyer dedicado, segundo editor de video y un account manager cuando se superen los 10 clientes.
+**Escala (mes 6–18):** ver la sección 13 para la estructura de 20 clientes y en qué momento sumar a cada persona.
 
 ---
 
@@ -210,6 +210,132 @@ y dejan al equipo humano la estrategia, la relación con el cliente y la aprobac
 | Tanda de 8–12 anuncios | 4 | ~2 minutos | Media buyer elige qué testear |
 | Reporte semanal | 2 por semana | ~1 minuto | Director/a de growth lo firma |
 
-Con esto el mismo equipo de 3 personas puede atender **15 a 20 clientes** en lugar de 8 a 10,
-con un costo de API estimado de 20 a 60 USD por cliente por mes. Regla de oro: ningún entregable
-generado por un agente llega al cliente sin revisión humana.
+Los agentes absorben el trabajo intelectual repetitivo: análisis, planificación, guiones, textos y
+reportes. No reemplazan la producción (grabar, editar, diseñar), la gestión de comunidad, la
+implementación en las tiendas ni el manejo de la pauta: eso sigue siendo trabajo humano y es lo que
+dimensiona el equipo (sección 13).
+
+**Costo de IA, corregido con la simulación de 20 clientes** (`docs/SIMULACION_20_CLIENTES.md`): unos
+**4 a 10 USD por cliente por mes**, menos del 1% del ingreso. La estimación anterior (20 a 60 USD) era
+conservadora. Igual hay que medir el costo real en el panel desde el primer mes.
+
+**Política de publicación (escalera de confianza):** durante los primeros 2 meses de cada cliente, todo
+pasa por aprobación del equipo antes de llegar a su portal. Cuando el revisor automático coincide con el
+equipo en 90% o más de las entregas de ese tipo, los reportes pasan a publicación automática. Los
+calendarios, los anuncios y las auditorías se publican siempre con aprobación.
+
+---
+
+## 13. Operar 20 clientes en simultáneo
+
+### Dónde está el cuello de botella
+
+Se simuló un mes completo con 20 clientes y 3 leads por día (`npm run simular`, detalle en
+`docs/SIMULACION_20_CLIENTES.md`). Resultados:
+
+| Recurso | Carga mensual con 20 clientes | ¿Es un límite? |
+|---|---|---|
+| Agentes de IA | ~380 trabajos; el día más cargado son ~30 trabajos, menos de 1 hora de cómputo | No |
+| Costo de IA | ~90 USD estimados (0,5% del ingreso) | No |
+| Revisión humana de entregas | ~125 entregas, menos de 1 hora por día hábil | No |
+| **Producción de video** | ~120 reels + ~120 piezas para anuncios | **Sí** |
+| **Gestión de comunidad** | 15 cuentas con comentarios y DMs diarios | **Sí** |
+| **Implementación CRO** | ~60 mejoras para subir a las tiendas | **Sí** |
+| **Pauta** | 10 cuentas publicitarias activas | **Sí** |
+
+Conclusión: la estructura de la agencia se dimensiona por la producción y la ejecución, no por la
+estrategia ni los reportes. Las dos palancas de rentabilidad son definir bien qué produce la agencia y
+qué graba el cliente, y estandarizar la producción con plantillas.
+
+### Alcance de producción (decisión clave)
+
+Recomendación: los planes incluyen **guion, edición y publicación**. El material en bruto lo graba el
+cliente con las guías que arma el agente de contenido (por escena, encuadre y texto en pantalla), o se
+contrata como adicional:
+
+| Adicional | Precio de referencia |
+|---|---|
+| Jornada de producción en locación (2 h, hasta 12 piezas) | 250 USD |
+| Pack de 5 videos UGC con creadores | 300 USD |
+| Diseño de piezas extra para lanzamientos | 15 USD por pieza |
+
+Esto hay que dejarlo escrito en la propuesta comercial y en el contrato.
+
+### Equipo para 20 clientes
+
+Mezcla de cartera usada en la simulación: 10 Growth 360, 5 Tienda que convierte y 5 Redes que crecen.
+
+| Rol | Dedicación | Clientes por persona | Qué hace (con los agentes) |
+|---|---|---|---|
+| Director/a de growth (fundador/a) | Tiempo completo | Toda la cartera | Ventas, estrategia, revisión de planes de 90 días, calibración de agentes |
+| Account manager | 2 × tiempo completo | 10 cada uno | Relación con el cliente, aprobación de entregas, reunión mensual, comentarios del portal |
+| Especialista CRO | Tiempo completo | 15 tiendas | Valida auditorías e implementa las mejoras |
+| Media buyer | Tiempo completo | 10 cuentas | Pauta en Meta y TikTok con las tandas de anuncios de los agentes |
+| Community manager | Tiempo completo | 15 cuentas | Comentarios y DMs con respuestas sugeridas |
+| Editor/a de video | 1,5 personas | ~160 piezas por mes | Edición con plantillas por cliente |
+| Diseñador/a | Medio tiempo (freelance) | ~120 carruseles | Plantillas por marca, adaptación de textos de los agentes |
+
+**Cuándo sumar a cada persona:**
+
+| Clientes activos | Incorporación |
+|---|---|
+| 1–6 | Fundador/a + especialista CRO + content/editor; freelancers por demanda |
+| 7–10 | Primer account manager y media buyer |
+| 11–15 | Community manager y diseñador/a freelance |
+| 16–20 | Segundo account manager y medio editor más |
+| 20+ | Repetir la célula: 10 clientes por account manager |
+
+### Números con 20 clientes
+
+Salarios de referencia para Argentina en USD (ajustar al mercado y a la modalidad de contratación).
+
+| Concepto | USD por mes |
+|---|---|
+| Ingreso (10 × 1.200 + 5 × 650 + 5 × 450) | **17.500** |
+| Equipo (incluye retiro del fundador/a) | 8.900 |
+| Herramientas (planificación, diseño, edición, gestión, hosting) | 400 |
+| IA (Claude API, estimado) | 100 |
+| Adicionales y freelancers variables | 600 |
+| **Resultado operativo** | **≈ 7.500 (43%)** |
+
+Sin los agentes, la misma cartera necesitaría unas 3 personas más (redacción, análisis y
+reportes, preventa), unos 3.000 USD por mes. El margen bajaría a cerca del 26%.
+
+### Cómo crecer de 0 a 20 sin romper la calidad
+
+- **Cohortes de onboarding:** como máximo 4 clientes nuevos por mes. Cada onboarding consume horas del
+  especialista CRO y del account manager durante 2 semanas.
+- **Escalera de confianza** por cliente (sección 12): primero todo con aprobación, después publicación
+  automática de reportes.
+- **Plantillas por cliente** (video y carruseles) armadas en el mes 1: son las que hacen escalable la
+  producción.
+- **Prioridad a Growth 360:** es el plan con mejor relación entre ingreso y carga operativa por cliente.
+
+### Retención
+
+- Reunión mensual de 30 minutos con cada cliente, apoyada en el reporte y el portal.
+- Semáforo de la **Cartera** en el panel: cada cliente en amarillo o rojo tiene una acción asignada esa
+  misma semana.
+- Comentarios del portal respondidos en menos de 24 horas hábiles.
+
+### Indicadores de la agencia
+
+| Indicador | Meta |
+|---|---|
+| Cumplimiento de entregables del mes (Cartera) | ≥ 95% |
+| Clientes en rojo | 0 por más de una semana |
+| Churn mensual | < 4% |
+| Coincidencia del revisor automático con el equipo | ≥ 85% |
+| Costo de IA sobre el ingreso | < 2% |
+| Respuesta a comentarios del portal | < 24 h hábiles |
+
+### Recomendaciones de precio (decisión pendiente)
+
+No se aplicaron todavía al sitio ni a los agentes. Si se aprueban, hay que actualizar
+`sitio/index.html` y `src/agents/conocimiento.js`.
+
+1. **Cargo de puesta en marcha de 300 USD** (diagnóstico, plan de 90 días, plantillas y medición). Cubre
+   el costo de las 2 semanas de onboarding y filtra clientes poco comprometidos. Se bonifica con
+   compromiso de 6 meses.
+2. **10% de descuento por pago semestral adelantado:** mejora la caja y baja el churn.
+3. **Ajuste trimestral de precios** en USD según el alcance real de producción de cada cliente.

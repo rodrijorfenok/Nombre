@@ -10,7 +10,10 @@ export const config = {
   autoAudit: process.env.AUTO_AUDIT !== "0",
   // Webhook opcional (Make, Zapier, n8n) que recibe cada lead y cada trabajo terminado.
   webhookUrl: process.env.WEBHOOK_URL || "",
-  dataFile: process.env.DATA_FILE || new URL("../data/db.json", import.meta.url).pathname,
+  // Base SQLite. DATA_FILE se acepta por compatibilidad (se usa la misma ruta con extensión .db).
+  dbFile: process.env.DB_FILE || (process.env.DATA_FILE ? process.env.DATA_FILE.replace(/\.json$/, "") + ".db" : new URL("../data/escala.db", import.meta.url).pathname),
+  // Si existe el archivo JSON de la versión anterior, se migra solo la primera vez.
+  legacyJsonFile: process.env.DATA_FILE || (process.env.DB_FILE ? null : new URL("../data/db.json", import.meta.url).pathname),
   agencia: {
     nombre: process.env.AGENCIA_NOMBRE || "Escalá Growth Studio",
     whatsapp: process.env.AGENCIA_WHATSAPP || "",

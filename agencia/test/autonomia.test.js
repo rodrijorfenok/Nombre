@@ -130,12 +130,14 @@ test("ingesta: con token, las métricas generan el reporte del cliente", async (
 
 test("agenda: planifica el mes siguiente de cada cliente una sola vez", async () => {
   const c = (await post("/api/admin/clientes", { marca: "Nube", rubro: "Deco", productos: "Velas", url: "https://nube.com" })).body;
-  const dia26 = new Date(Date.UTC(2026, 10, 26, 12));
+  const dia26 = new Date(Date.UTC(2026, 10, 27, 12)); // después de toda la ventana de planificación
   const primera = tick(dia26).filter((j) => j.clienteId === c.id).map((j) => j.tipo).sort();
   assert.deepEqual(primera, ["contenido", "creativos"]);
   assert.equal(tick(dia26).filter((j) => j.clienteId === c.id).length, 0, "no duplica");
-  const dia3 = new Date(Date.UTC(2026, 11, 3, 12));
-  assert.deepEqual(tick(dia3).filter((j) => j.clienteId === c.id).map((j) => j.tipo), ["auditoria"]);
+  const { desfase } = await import("../src/agenda.js");
+  const diaAuditoria = 1 + desfase(c.id + ":auditoria", Number(process.env.VENTANA_REAUDITORIA || 10));
+  if (diaAuditoria > 1) assert.equal(tick(new Date(Date.UTC(2026, 11, diaAuditoria - 1, 12))).filter((j) => j.clienteId === c.id).length, 0, "no audita antes de su día");
+  assert.deepEqual(tick(new Date(Date.UTC(2026, 11, diaAuditoria, 12))).filter((j) => j.clienteId === c.id).map((j) => j.tipo), ["auditoria"]);
 });
 
 test("agenda: hace seguimiento de leads quietos", async () => {
