@@ -1,7 +1,7 @@
 // Agente de Creativos: genera tandas de anuncios para Meta y TikTok con ángulos
 // distintos (dolor, deseo, prueba social, objeción, comparación, oferta).
 import { z } from "zod";
-import { runStructured } from "../ai.js";
+import { runStructured, contextoExtra } from "../ai.js";
 import { AGENCIA, ESTILO } from "./conocimiento.js";
 
 export const CreativosSchema = z.object({
@@ -28,14 +28,16 @@ Criterios:
 - Guiones de 15 a 35 segundos, escena por escena, con texto en pantalla.
 - Respetá las políticas publicitarias: nada de promesas de salud, antes/después engañosos ni datos inventados.`;
 
-export async function creativos({ producto, oferta = "", publico = "", diferencial = "", cantidad = 8 }) {
+export async function creativos(input) {
+  const { producto, oferta = "", publico = "", diferencial = "", cantidad = 8 } = input;
   if (!producto) throw new Error("Falta el producto.");
   const n = Math.min(Math.max(Number(cantidad) || 8, 3), 20);
   const prompt = `Generá ${n} anuncios para:
 Producto: ${producto}
 Oferta: ${oferta || "sin oferta especial"}
 Público: ${publico || "definilo vos"}
-Diferencial: ${diferencial || "no especificado"}`;
+Diferencial: ${diferencial || "no especificado"}
+Generá exactamente ${n} anuncios.` + contextoExtra(input);
   const { data } = await runStructured({ agent: "creativos", system: SYSTEM, prompt, schema: CreativosSchema, effort: "medium", maxTokens: 24000 });
   const markdown = `# Tanda de anuncios · ${producto}
 

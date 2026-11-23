@@ -1,8 +1,13 @@
 # Escalá Growth Studio: agencia operada con agentes de IA
 
-Sitio web, panel interno y 6 agentes de IA (Claude) que hacen el trabajo operativo de la
-agencia: atienden a los interesados, califican leads, auditan tiendas, arman calendarios de
+Sitio web, panel interno y agentes de IA (Claude) que hacen el trabajo operativo de la agencia:
+atienden a los interesados, califican leads, hacen seguimiento, auditan tiendas, arman calendarios de
 contenido, escriben anuncios, redactan reportes y preparan el plan de 90 días de cada cliente.
+
+Funcionan solos: cada entrega pasa por control de calidad y se autocorrige; una agenda lanza el trabajo
+recurrente; los errores transitorios se reintentan; el gasto tiene un límite diario. Las personas
+intervienen solo cuando el sistema lo pide. La investigación detrás del diseño está en
+[`docs/INVESTIGACION_AGENTES.md`](docs/INVESTIGACION_AGENTES.md).
 
 ## Qué hace cada agente
 
@@ -14,7 +19,9 @@ contenido, escriben anuncios, redactan reportes y preparan el plan de 90 días d
 | **Contenido mensual** | Panel | Estrategia, pilares y calendario con guiones de reels, carruseles e historias |
 | **Creativos de pauta** | Panel | Tanda de anuncios para Meta/TikTok con ángulos distintos y plan de testeo |
 | **Reporte semanal** | Panel (pegás las métricas) | Reporte para el cliente: dato → señal → hipótesis → acción |
-| **Diagnóstico + plan 90 días** | Panel o desde un lead | Corre auditoría y calendario en paralelo y arma el plan de 90 días con backlog ICE |
+| **Diagnóstico + plan 90 días** | Automático al marcar un lead como cliente, o desde el panel | Corre auditoría y calendario en paralelo y arma el plan de 90 días con backlog ICE |
+| **Seguimiento** | Agenda: leads sin movimiento hace 3 días | Mensaje de seguimiento que aporta algo concreto (máximo 2 por lead) |
+| **Revisor de calidad** | Después de cada entrega | Chequeos de código + rúbrica por criterio; si no aprueba, devuelve correcciones y el agente rehace |
 
 Flujo automático de un lead que llega por el sitio:
 
@@ -27,6 +34,23 @@ flowchart LR
   D --> E
   E --> F[Diagnóstico + plan 90 días al cerrar]
 ```
+
+## Operación autónoma
+
+| Qué | Cómo funciona |
+|---|---|
+| Control de calidad | Chequeos objetivos (cantidades, evidencia, números que no están en los datos) + rúbrica con criterios críticos. Aprueba el código, no el modelo. Hasta 2 rondas de autocorrección; si no alcanza, va a **Requieren atención**. |
+| Memoria por cliente | Brief + lecciones que salen del feedback del equipo. Cada agente las recibe en cada pedido. |
+| Agenda | Desde el día 25: calendario y anuncios del mes siguiente. Primera semana: re-auditoría. Todos los días: seguimiento de leads quietos. Nunca duplica. |
+| Puesta en marcha | Al marcar un lead como cliente se crea su ficha y corre el diagnóstico con el plan de 90 días. |
+| Ingesta de métricas | `POST /api/ingesta/metricas` (header `x-ingesta-token`) con `{clienteId, periodo, metricas}`. Lo usa Make, Zapier o n8n para generar el reporte semanal solo. |
+| Reintentos | Errores de red o de límite de la API: espera exponencial, hasta 4 intentos, aun tras reiniciar. |
+| Presupuesto | `PRESUPUESTO_DIARIO_USD`: al llegar al límite la cola se pausa y se retoma al día siguiente. |
+| Avisos | Webhook con eventos `lead_nuevo`, `entregable_listo`, `entregable_aprobado` y `requiere_atencion`. |
+| Calibración | El panel muestra cuánto coincide el revisor automático con las decisiones del equipo. |
+
+Rutina sugerida: 15 minutos por día en la pestaña **Requieren atención**, y feedback sobre algunas entregas
+aprobadas para que la memoria y la calibración mejoren.
 
 ## Cómo ponerlo en marcha
 
@@ -58,9 +82,15 @@ agencia/
 ├── server.js              API, sitio y panel
 ├── sitio/index.html       Sitio público con calculadora, formulario y chat
 ├── panel/index.html       Panel interno: leads, trabajos, lanzar agentes, conversaciones
+├── docs/                  Investigación y decisiones de diseño
+├── evals/                 Banco de evaluaciones (casos + runner)
 ├── src/
-│   ├── ai.js              Acceso único a Claude (modelo, fallbacks, errores)
-│   ├── jobs.js            Cola de trabajos en segundo plano con reintentos
+│   ├── ai.js              Acceso único a Claude (modelo, fallbacks, caché, telemetría)
+│   ├── jobs.js            Cola: calidad, autocorrección, reintentos, presupuesto, feedback
+│   ├── calidad.js         Revisor: chequeos de código + rúbrica
+│   ├── memoria.js         Clientes: brief y lecciones
+│   ├── agenda.js          Trabajo recurrente y seguimientos
+│   ├── telemetria.js      Costos por llamada, trabajo y día
 │   ├── store.js           Base de datos en archivo JSON (data/db.json)
 │   ├── mock.js            Respuestas simuladas para el modo demo
 │   └── agents/            Un archivo por agente + conocimiento.js (precios, tono, checklist)
@@ -86,22 +116,31 @@ Para cambiar precios, servicios, tono o el checklist de auditoría, editá
 - Webhook opcional (`WEBHOOK_URL`) para mandar cada lead y cada trabajo terminado a Make, Zapier o n8n
   (por ejemplo, para avisar por WhatsApp o cargarlo en un CRM).
 
-## Pruebas
+## Pruebas y evaluaciones
 
 ```bash
-npm test
+npm test                    # 30 pruebas, sin costo
+npm run eval -- --reps 3    # banco de evaluaciones con la API real
 ```
 
-Cubren el flujo completo en modo demo (formulario, chat, calificación, auditoría, los 6 agentes desde
-el panel, errores y reintentos) y verifican contra un servidor falso que los pedidos a la API de
-Anthropic salen bien armados (modelo, fallbacks, salida estructurada, herramientas, rechazos, API key inválida).
+- **Pruebas:** flujo completo en modo demo (formulario, chat, agentes, control de calidad con
+  autocorrección, feedback y memoria, puesta en marcha de clientes, ingesta, agenda, presupuesto,
+  reintentos, derivación) y verificación contra un servidor falso de que los pedidos a la API salen bien
+  armados (fallbacks, caché, estado del CRM, salida estructurada, costos).
+- **Evaluaciones** (`evals/`): 13 casos reales en ambas direcciones (registrar y no registrar un lead,
+  resistir una inyección, no inventar descuentos, no auditar un sitio inexistente, no inventar números,
+  respetar políticas publicitarias). Reportan aciertos y pass^k, separan errores de ejecución de errores
+  del modelo y guardan las transcripciones. Corré las evaluaciones después de cada cambio de prompt y sumá
+  como caso cada error real que aparezca.
 
 ## Costos de referencia
 
 Cada trabajo consume tokens de la API (Claude Opus 5.5: 4 USD por millón de tokens de entrada y
 20 USD por millón de salida). Una conversación de chat o una calificación cuesta centavos; una auditoría
 con lectura web o un calendario mensual completo, del orden de decenas de centavos a un dólar. Mirá el
-consumo real en console.anthropic.com y limitá la concurrencia con `MAX_JOBS`.
+consumo real en el panel (costo por trabajo y gasto del día) y en console.anthropic.com.
+El control de calidad agrega una llamada por entrega (y una más por cada ronda de corrección); el caché
+de prompts compensa parte de ese costo. Poné un `PRESUPUESTO_DIARIO_USD` desde el primer día.
 
 ## Para producción
 

@@ -1,6 +1,6 @@
 // Orquestador de onboarding: cuando entra un cliente nuevo corre la auditoría y el
 // calendario en paralelo y con ambos resultados arma el plan de 90 días.
-import { runText } from "../ai.js";
+import { runText, contextoExtra } from "../ai.js";
 import { AGENCIA, ESTILO } from "./conocimiento.js";
 import { auditar } from "./auditor.js";
 import { calendario } from "./contenido.js";
@@ -19,13 +19,15 @@ Formato (markdown):
 ## Métricas del tablero semanal
 ## Riesgos y supuestos`;
 
-export async function diagnostico({ marca, url, rubro, publico = "", objetivo = "", redes = "", productos = "", progreso = () => {} }) {
+export async function diagnostico(input) {
+  const { marca, url, rubro, publico = "", objetivo = "", redes = "", productos = "", progreso = () => {} } = input;
+  const heredado = { _memoria: input._memoria };
   if (!marca || !url || !rubro) throw new Error("Faltan marca, URL de la tienda y rubro.");
 
   progreso("Auditando la tienda y armando el calendario en paralelo");
   const [aud, cal] = await Promise.all([
-    auditar({ url, redes, contexto: objetivo }),
-    calendario({ marca, rubro, publico, objetivo, productos }),
+    auditar({ url, redes, contexto: objetivo, ...heredado }),
+    calendario({ marca, rubro, publico, objetivo, productos, ...heredado }),
   ]);
 
   progreso("Armando el plan de 90 días");
@@ -42,7 +44,7 @@ ${aud.markdown}
 <calendario_resumen>
 Estrategia: ${cal.data.estrategia}
 Pilares: ${cal.data.pilares.map((p) => p.nombre).join(", ")}
-</calendario_resumen>`,
+</calendario_resumen>` + contextoExtra(input),
   });
 
   return {

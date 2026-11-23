@@ -6,7 +6,8 @@
   "scripts": {
     "test": "node --test test/*.test.js",
     "start": "node --env-file-if-exists=.env server.js",
-    "demo": "ESCALA_MOCK=1 ADMIN_TOKEN=demo node server.js"
+    "demo": "ESCALA_MOCK=1 ADMIN_TOKEN=demo node server.js",
+    "eval": "node evals/run.js"
   },
   "keywords": [],
   "author": "",

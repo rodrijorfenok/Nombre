@@ -1,6 +1,6 @@
 // Agente de Reportes: convierte las métricas de la semana en un reporte para el
 // cliente con la lógica dato → señal → hipótesis → acción.
-import { runText } from "../ai.js";
+import { runText, contextoExtra } from "../ai.js";
 import { AGENCIA, ESTILO, DATOS_EXTERNOS } from "./conocimiento.js";
 
 const SYSTEM = `${AGENCIA}
@@ -24,7 +24,8 @@ Formato (markdown):
 ## Plan para la semana que viene (3 a 5 acciones con responsable)
 ## Datos que faltan`;
 
-export async function reporte({ cliente, periodo = "", metricas, objetivos = "" }) {
+export async function reporte(input) {
+  const { cliente, periodo = "", metricas, objetivos = "" } = input;
   if (!cliente || !metricas) throw new Error("Faltan el cliente y las métricas.");
   const prompt = `Cliente: ${cliente}
 Período: ${periodo || "última semana"}
@@ -33,7 +34,7 @@ Objetivos vigentes: ${objetivos || "no especificados"}
 Métricas (pegadas por el equipo, pueden venir en CSV o texto):
 <metricas>
 ${String(metricas).slice(0, 60000)}
-</metricas>`;
+</metricas>` + contextoExtra(input);
   const { text } = await runText({ agent: "reportes", system: SYSTEM, prompt, effort: "medium" });
   return { markdown: text };
 }

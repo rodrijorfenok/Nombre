@@ -66,6 +66,26 @@ test("runChat: ejecuta la herramienta propia y devuelve la respuesta final", asy
   assert.equal(ultimo.content[0].type, "tool_result");
 });
 
+test("runChat: el estado del CRM va como mensaje de sistema al final y el prompt se cachea", async () => {
+  respuestas = [[{ type: "text", text: "ok" }]];
+  await ai.runChat({ agent: "x", system: "s", history: [{ role: "user", text: "hola" }], tools: [], estado: "Estado del CRM: lead registrado." });
+  const body = pedidos.at(-1).body;
+  assert.deepEqual(body.messages.at(-1), { role: "system", content: "Estado del CRM: lead registrado." });
+  assert.equal(body.system[0].cache_control.type, "ephemeral");
+});
+
+test("runStructured: activa el caché automático del prompt", async () => {
+  respuestas = [[{ type: "text", text: JSON.stringify({ a: 1 }) }]];
+  await ai.runStructured({ agent: "x", system: "s", prompt: "p", schema: z.object({ a: z.number() }) });
+  assert.equal(pedidos.at(-1).body.cache_control.type, "ephemeral");
+});
+
+test("telemetría: calcula el costo con tokens, caché y búsquedas", async () => {
+  const { costoDe } = await import("../src/telemetria.js");
+  const c = costoDe({ input_tokens: 1e6, output_tokens: 1e5, cache_read_input_tokens: 1e6, server_tool_use: { web_search_requests: 10 } }, "claude-opus-5-5");
+  assert.equal(Number(c.toFixed(4)), 4 + 2 + 0.2 + 0.1);
+});
+
 test("rechazo del modelo se informa como error claro", async () => {
   respuestas = [[]];
   const orig = server.listeners("request")[0];

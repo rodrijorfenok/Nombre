@@ -1,7 +1,7 @@
 // Agente de Contenido: arma la estrategia y el calendario mensual de redes con
 // guiones de reels, carruseles e historias listos para producir.
 import { z } from "zod";
-import { runStructured } from "../ai.js";
+import { runStructured, contextoExtra } from "../ai.js";
 import { AGENCIA, ESTILO } from "./conocimiento.js";
 
 export const CalendarioSchema = z.object({
@@ -35,7 +35,8 @@ Criterios:
 - Los carruseles indican el texto de cada slide.
 - Priorizá guardados y compartidos por sobre likes.`;
 
-export async function calendario({ marca, rubro, publico, tono = "", productos = "", objetivo = "", mes = "", reels = 8, carruseles = 8, historias = 4 }) {
+export async function calendario(input) {
+  const { marca, rubro, publico, tono = "", productos = "", objetivo = "", mes = "", reels = 8, carruseles = 8, historias = 4 } = input;
   if (!marca || !rubro) throw new Error("Faltan la marca y el rubro.");
   const prompt = `Armá el calendario de contenido del mes${mes ? ` (${mes})` : ""} para:
 Marca: ${marca}
@@ -45,7 +46,8 @@ Tono de marca: ${tono || "cercano y profesional"}
 Productos o servicios destacados: ${productos || "no especificados"}
 Objetivo del mes: ${objetivo || "crecer en alcance y llevar tráfico a la tienda"}
 
-Cantidad de piezas: ${reels} reels, ${carruseles} carruseles y ${historias} secuencias de historias destacadas.`;
+Cantidad de piezas: ${reels} reels, ${carruseles} carruseles y ${historias} secuencias de historias destacadas.
+La lista de piezas tiene que tener exactamente ${Number(reels) + Number(carruseles) + Number(historias)} elementos.` + contextoExtra(input);
 
   const { data } = await runStructured({ agent: "contenido", system: SYSTEM, prompt, schema: CalendarioSchema, effort: "medium", maxTokens: 32000 });
   data.piezas.sort((a, b) => a.dia - b.dia);

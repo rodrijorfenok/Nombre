@@ -76,7 +76,7 @@ test("chat: responde, registra el lead y pide la auditoría", async () => {
   assert.ok(chat.leadId);
   assert.equal(chat.auditoriaPedida, true);
   const jobs = await esperarJobs((j) => j.leadId === chat.leadId);
-  assert.equal(jobs[0].tipo, "auditoria");
+  assert.deepEqual(jobs.map((j) => j.tipo).sort(), ["auditoria", "calificacion"]);
 });
 
 test("panel: lanza cada agente y obtiene su resultado", async () => {

@@ -5,7 +5,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { config } from "./config.js";
 
-const EMPTY = { leads: [], jobs: [], chats: [], clientes: [] };
+const EMPTY = { leads: [], jobs: [], chats: [], clientes: [], meta: {} };
 let db = null;
 let writing = Promise.resolve();
 
@@ -50,6 +50,8 @@ export const store = {
     persist();
     return item;
   },
+  meta(clave) { return load().meta[clave]; },
+  setMeta(clave, valor) { load().meta[clave] = valor; persist(); return valor; },
   flush() { return writing; },
   reset() { db = structuredClone(EMPTY); return persist(); },
 };
