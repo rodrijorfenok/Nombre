@@ -194,3 +194,22 @@ Supuestos: mezcla de clientes 40% Redes, 30% Tienda, 30% Growth 360. Ticket prom
 | Inflación / tipo de cambio | Precios en USD, cobro en pesos al tipo de cambio del día de facturación |
 | Cambios de algoritmo o de costos de pauta | Diversificar: orgánico + pauta + email/WhatsApp como canal propio |
 | Rotación del equipo | Procesos documentados y plantillas para todo |
+
+---
+
+## 12. Operación con agentes de IA
+
+La agencia funciona con 6 agentes de IA (detalle técnico en `README.md`) que hacen el trabajo repetitivo
+y dejan al equipo humano la estrategia, la relación con el cliente y la aprobación final:
+
+| Tarea | Antes (horas por cliente/mes) | Con agentes | Quién revisa |
+|---|---|---|---|
+| Responder consultas y calificar leads | 6 | Automático, 24/7 | Comercial aprueba el primer mensaje |
+| Auditoría de tienda (20 puntos) | 4 | ~5 minutos | Especialista CRO valida y ajusta |
+| Calendario mensual con guiones | 8 | ~3 minutos | Content lead edita y aprueba |
+| Tanda de 8–12 anuncios | 4 | ~2 minutos | Media buyer elige qué testear |
+| Reporte semanal | 2 por semana | ~1 minuto | Director/a de growth lo firma |
+
+Con esto el mismo equipo de 3 personas puede atender **15 a 20 clientes** en lugar de 8 a 10,
+con un costo de API estimado de 20 a 60 USD por cliente por mes. Regla de oro: ningún entregable
+generado por un agente llega al cliente sin revisión humana.

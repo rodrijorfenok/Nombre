@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Panel Escalá</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<script src="/panel/vendor/marked.min.js"></script>
+<script src="/panel/vendor/purify.min.js"></script>
+<style>
+/* Layout: barra superior + pestañas; tablas densas y un visor lateral de resultados */
+:root{
+  --bg:#F2F4F7; --surface:#FFFFFF; --ink:#0E1626; --muted:#556072; --line:#D9DEE7;
+  --accent:#2F49F5; --accent-ink:#FFFFFF; --accent-soft:#E3E7FF;
+  --ok:#0F9D6E; --ok-soft:#DDF4EA; --warn:#B45309; --warn-soft:#FDF0DC; --bad:#C0262D; --bad-soft:#FBE3E4;
+  --f-display:"Bricolage Grotesque", system-ui, sans-serif; --f-body:"Figtree", system-ui, sans-serif; --f-data:"JetBrains Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0B1020; --surface:#121a2e; --ink:#EEF1F8; --muted:#9AA5BA; --line:#243049; --accent:#7C8DFF; --accent-ink:#0B1020; --accent-soft:#1D2550;
+  --ok:#34D399; --ok-soft:#12352b; --warn:#FBBF24; --warn-soft:#3a2c0c; --bad:#F87171; --bad-soft:#3d1518; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0B1020; --surface:#121a2e; --ink:#EEF1F8; --muted:#9AA5BA; --line:#243049; --accent:#7C8DFF; --accent-ink:#0B1020; --accent-soft:#1D2550;
+  --ok:#34D399; --ok-soft:#12352b; --warn:#FBBF24; --warn-soft:#3a2c0c; --bad:#F87171; --bad-soft:#3d1518; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 15px/1.5 var(--f-body)}
+.wrap{max-width:1280px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header.top{background:var(--ink);color:var(--bg)}
+header.top .wrap{display:flex;justify-content:space-between;align-items:center;gap:16px;padding-block:14px;flex-wrap:wrap}
+header.top b{font:700 1.2rem var(--f-display)}
+.tag{font:600 .72rem/1 var(--f-data);letter-spacing:.06em;text-transform:uppercase;padding:5px 8px;border-radius:6px;background:var(--accent-soft);color:var(--ink)}
+nav.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-block:20px 18px;overflow-x:auto}
+nav.tabs button{font:600 .95rem var(--f-body);background:none;border:0;border-bottom:2px solid transparent;padding:10px 14px;color:var(--muted);cursor:pointer;white-space:nowrap}
+nav.tabs button[aria-selected="true"]{color:var(--ink);border-color:var(--accent)}
+.btn{font:600 .9rem/1 var(--f-body);padding:10px 14px;border-radius:9px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn:disabled{opacity:.5;cursor:default}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:20px;align-items:start}
+@media (max-width:960px){.grid{grid-template-columns:1fr}}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.9rem}
+th{text-align:left;font:600 .72rem var(--f-data);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:10px;border-bottom:1px solid var(--line);vertical-align:top}
+tr.sel td{background:var(--accent-soft)}
+tbody tr{cursor:pointer}
+.num{font-family:var(--f-data);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.chip{display:inline-block;font:600 .75rem/1 var(--f-data);padding:5px 8px;border-radius:999px;white-space:nowrap}
+.chip.listo,.chip.caliente,.chip.cliente{background:var(--ok-soft);color:var(--ok)}
+.chip.trabajando,.chip.en_cola,.chip.tibio,.chip.propuesta,.chip.contactado{background:var(--warn-soft);color:var(--warn)}
+.chip.error,.chip.frio,.chip.perdido{background:var(--bad-soft);color:var(--bad)}
+.chip.nuevo{background:var(--accent-soft);color:var(--ink)}
+.empty{padding:28px;text-align:center;color:var(--muted)}
+.viewer h2{font:700 1.15rem var(--f-display);margin:0 0 10px}
+.md{overflow-wrap:anywhere}
+.md h1{font:700 1.4rem var(--f-display)} .md h2{font:700 1.15rem var(--f-display);margin-top:1.4em} .md h3{font-size:1rem}
+.md table{margin-block:10px;display:block;overflow-x:auto} .md td,.md th{border:1px solid var(--line)}
+.md pre{white-space:pre-wrap}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+form.launch{display:grid;gap:14px}
+form.launch label{display:grid;gap:5px;font-weight:600;font-size:.88rem}
+input,select,textarea{font:400 .95rem var(--f-body);padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:var(--bg);color:var(--ink);width:100%}
+textarea{min-height:110px;resize:vertical}
+.hint{font-size:.82rem;color:var(--muted);font-weight:400}
+.login{max-width:420px;margin:12vh auto 0;display:grid;gap:14px}
+.err{color:var(--bad);font-size:.9rem}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:18px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px}
+.kpi b{display:block;font:700 1.6rem var(--f-display)}
+.kpi span{font-size:.82rem;color:var(--muted)}
+@media (max-width:700px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap"><b>Escalá · Panel de agentes</b><span class="row"><span class="tag" id="modo">—</span><button class="btn" id="salir" type="button" hidden>Salir</button></span></div></header>
+
+<main class="wrap">
+  <section class="card login" id="login">
+    <h2 style="margin:0;font-family:var(--f-display)">Ingresar al panel</h2>
+    <p class="muted" style="margin:0">Usá el ADMIN_TOKEN configurado en el servidor (si no lo configuraste, el servidor muestra uno temporal al arrancar).</p>
+    <form id="login-form" class="launch"><label>Token<input id="token" type="password" autocomplete="current-password" required></label><button class="btn primary" type="submit">Entrar</button><span class="err" id="login-err"></span></form>
+  </section>
+
+  <div id="app" hidden>
+    <div class="kpis" id="kpis"></div>
+    <nav class="tabs" role="tablist">
+      <button role="tab" data-tab="leads" aria-selected="true">Leads</button>
+      <button role="tab" data-tab="jobs" aria-selected="false">Trabajos de agentes</button>
+      <button role="tab" data-tab="lanzar" aria-selected="false">Lanzar agente</button>
+      <button role="tab" data-tab="chats" aria-selected="false">Conversaciones</button>
+    </nav>
+
+    <div class="grid">
+      <section class="card" style="padding:0">
+        <div data-panel="leads" class="table-wrap"></div>
+        <div data-panel="jobs" class="table-wrap" hidden></div>
+        <div data-panel="chats" class="table-wrap" hidden></div>
+        <div data-panel="lanzar" hidden style="padding:20px">
+          <form class="launch" id="launch">
+            <label>Agente<select id="l-tipo"></select></label>
+            <div id="l-campos" class="launch"></div>
+            <button class="btn primary" type="submit">Lanzar</button>
+            <span class="err" id="l-err"></span>
+          </form>
+        </div>
+      </section>
+      <section class="card viewer" id="viewer"><div class="empty">Elegí un lead o un trabajo para ver el detalle.</div></section>
+    </div>
+  </div>
+</main>
+
+<script>
+(function(){
+  var $ = function(s){ return document.querySelector(s); };
+  var TOKEN = '';
+  try { TOKEN = localStorage.getItem('escala-admin') || ''; } catch(e){}
+  var tab = 'leads', seleccion = null, datos = { leads: [], jobs: [], chats: [] };
+
+  var CAMPOS = {
+    auditoria: [['url','URL de la tienda','https://…',1],['redes','Redes (opcional)','@marca en Instagram'],['contexto','Contexto (opcional)','Qué le preocupa al cliente','area']],
+    contenido: [['marca','Marca','',1],['rubro','Rubro','Indumentaria femenina',1],['publico','Público','Mujeres 25–40, AMBA'],['tono','Tono de marca','Cercano, canchero'],['productos','Productos destacados','',0,'area'],['objetivo','Objetivo del mes','Lanzamiento de temporada'],['mes','Mes','Diciembre 2026']],
+    creativos: [['producto','Producto','',1],['oferta','Oferta','2x1 hasta el domingo'],['publico','Público',''],['diferencial','Diferencial',''],['cantidad','Cantidad de anuncios','8']],
+    reporte: [['cliente','Cliente','',1],['periodo','Período','16 al 22 de noviembre'],['objetivos','Objetivos vigentes',''],['metricas','Métricas (pegá CSV o texto)','métrica, esta semana, anterior\nventas, 84, 71',1,'area']],
+    diagnostico: [['marca','Marca','',1],['url','URL de la tienda','https://…',1],['rubro','Rubro','',1],['publico','Público',''],['objetivo','Objetivo del cliente',''],['redes','Redes',''],['productos','Productos destacados','',0,'area']],
+    calificacion: [['nombre','Nombre','',1],['marca','Marca',''],['link','Link',''],['facturacion','Facturación',''],['problema','Problema','',0,'area']]
+  };
+
+  function api(path, opts){
+    opts = opts || {};
+    opts.headers = Object.assign({ 'x-admin-token': TOKEN, 'content-type': 'application/json' }, opts.headers || {});
+    return fetch('/api/admin' + path, opts).then(function(r){
+      return r.json().then(function(j){ if (!r.ok) { var e = new Error(j.error || 'Error'); e.status = r.status; throw e; } return j; });
+    });
+  }
+  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function fecha(iso){ try { return new Date(iso).toLocaleString('es-AR',{dateStyle:'short',timeStyle:'short'}); } catch(e){ return iso; } }
+  function md(texto){
+    if (window.marked && window.DOMPurify) return DOMPurify.sanitize(marked.parse(texto || ''));
+    return '<pre>' + esc(texto) + '</pre>';
+  }
+
+  /* ---- login ---- */
+  function entrar(){
+    return api('/agentes').then(function(agentes){
+      $('#login').hidden = true; $('#app').hidden = false; $('#salir').hidden = false;
+      $('#l-tipo').innerHTML = agentes.map(function(a){ return '<option value="'+a.id+'">'+esc(a.nombre)+'</option>'; }).join('');
+      dibujarCampos(); refrescar(); setInterval(refrescar, 5000);
+    });
+  }
+  $('#login-form').addEventListener('submit', function(e){
+    e.preventDefault(); TOKEN = $('#token').value.trim();
+    entrar().then(function(){ try { localStorage.setItem('escala-admin', TOKEN); } catch(e){} })
+      .catch(function(err){ $('#login-err').textContent = err.message; });
+  });
+  $('#salir').addEventListener('click', function(){ try { localStorage.removeItem('escala-admin'); } catch(e){} location.reload(); });
+  fetch('/api/estado').then(function(r){ return r.json(); }).then(function(j){ $('#modo').textContent = j.demo ? 'Modo demo' : 'Agentes reales'; }).catch(function(){});
+  if (TOKEN) entrar().catch(function(){ TOKEN=''; });
+
+  /* ---- pestañas ---- */
+  document.querySelectorAll('[data-tab]').forEach(function(b){
+    b.addEventListener('click', function(){
+      tab = b.getAttribute('data-tab');
+      document.querySelectorAll('[data-tab]').forEach(function(x){ x.setAttribute('aria-selected', x === b); });
+      document.querySelectorAll('[data-panel]').forEach(function(p){ p.hidden = p.getAttribute('data-panel') !== tab; });
+    });
+  });
+
+  /* ---- datos ---- */
+  function refrescar(){
+    Promise.all([api('/leads'), api('/jobs'), api('/chats')]).then(function(r){
+      datos.leads = r[0]; datos.jobs = r[1].trabajos; datos.chats = r[2];
+      kpis(r[1].cola); tablaLeads(); tablaJobs(); tablaChats();
+      if (seleccion && seleccion.tipo === 'job') {
+        var j = datos.jobs.find(function(x){ return x.id === seleccion.id; });
+        if (j && j.estado !== seleccion.estado) verJob(j.id);
+      }
+    }).catch(function(err){ if (err.status === 401) location.reload(); });
+  }
+  function kpis(cola){
+    var calientes = datos.leads.filter(function(l){ return l.temperatura === 'caliente'; }).length;
+    var listos = datos.jobs.filter(function(j){ return j.estado === 'listo'; }).length;
+    $('#kpis').innerHTML = [
+      [datos.leads.length, 'Leads totales'], [calientes, 'Leads calientes'],
+      [cola.activos + cola.en_cola, 'Trabajos en curso'], [listos, 'Trabajos terminados']
+    ].map(function(k){ return '<div class="kpi"><b class="num">'+k[0]+'</b><span>'+k[1]+'</span></div>'; }).join('');
+  }
+  function tablaLeads(){
+    var el = document.querySelector('[data-panel="leads"]');
+    if (!datos.leads.length) { el.innerHTML = '<div class="empty">Todavía no hay leads. Llegan desde el formulario y el chat del sitio.</div>'; return; }
+    el.innerHTML = '<table><thead><tr><th>Fecha</th><th>Nombre</th><th>Marca</th><th>Origen</th><th>Puntaje</th><th>Temp.</th><th>Etapa</th></tr></thead><tbody>' +
+      datos.leads.map(function(l){
+        return '<tr data-lead="'+l.id+'"'+(seleccion&&seleccion.id===l.id?' class="sel"':'')+'><td class="num">'+fecha(l.creado)+'</td><td>'+esc(l.nombre)+'<br><span class="muted">'+esc(l.contacto)+'</span></td><td>'+esc(l.marca)+'</td><td>'+esc(l.origen)+'</td><td class="num">'+(l.puntaje!=null?l.puntaje:'…')+'</td><td>'+(l.temperatura?'<span class="chip '+l.temperatura+'">'+l.temperatura+'</span>':'')+'</td><td><span class="chip '+esc(l.etapa)+'">'+esc(l.etapa)+'</span></td></tr>';
+      }).join('') + '</tbody></table>';
+    el.querySelectorAll('[data-lead]').forEach(function(tr){ tr.addEventListener('click', function(){ verLead(tr.getAttribute('data-lead')); }); });
+  }
+  function tablaJobs(){
+    var el = document.querySelector('[data-panel="jobs"]');
+    if (!datos.jobs.length) { el.innerHTML = '<div class="empty">No hay trabajos. Lanzá uno desde “Lanzar agente”.</div>'; return; }
+    el.innerHTML = '<table><thead><tr><th>Fecha</th><th>Agente</th><th>Estado</th><th>Duración</th></tr></thead><tbody>' +
+      datos.jobs.map(function(j){
+        return '<tr data-job="'+j.id+'"'+(seleccion&&seleccion.id===j.id?' class="sel"':'')+'><td class="num">'+fecha(j.creado)+'</td><td>'+esc(j.agente)+(j.progreso?'<br><span class="muted">'+esc(j.progreso)+'</span>':'')+'</td><td><span class="chip '+j.estado+'">'+j.estado.replace('_',' ')+'</span></td><td class="num">'+(j.segundos!=null?j.segundos+' s':'')+'</td></tr>';
+      }).join('') + '</tbody></table>';
+    el.querySelectorAll('[data-job]').forEach(function(tr){ tr.addEventListener('click', function(){ verJob(tr.getAttribute('data-job')); }); });
+  }
+  function tablaChats(){
+    var el = document.querySelector('[data-panel="chats"]');
+    if (!datos.chats.length) { el.innerHTML = '<div class="empty">Sin conversaciones todavía.</div>'; return; }
+    el.innerHTML = '<table><thead><tr><th>Fecha</th><th>Mensajes</th><th>Primer mensaje</th><th>Lead</th></tr></thead><tbody>' +
+      datos.chats.map(function(c){
+        var primero = (c.turnos[0] || {}).text || '';
+        return '<tr data-chat="'+c.id+'"><td class="num">'+fecha(c.creado)+'</td><td class="num">'+c.turnos.length+'</td><td>'+esc(primero.slice(0,80))+'</td><td>'+(c.leadId?'Sí':'—')+'</td></tr>';
+      }).join('') + '</tbody></table>';
+    el.querySelectorAll('[data-chat]').forEach(function(tr){ tr.addEventListener('click', function(){ verChat(tr.getAttribute('data-chat')); }); });
+  }
+
+  /* ---- visor ---- */
+  function verLead(id){
+    var l = datos.leads.find(function(x){ return x.id === id; }); if (!l) return;
+    seleccion = { tipo:'lead', id:id }; tablaLeads();
+    var trabajos = datos.jobs.filter(function(j){ return j.leadId === id; });
+    $('#viewer').innerHTML = '<h2>'+esc(l.nombre)+' · '+esc(l.marca||'')+'</h2>' +
+      '<p class="muted">'+esc(l.contacto)+(l.link?' · <a href="'+esc(l.link)+'" target="_blank" rel="noopener">'+esc(l.link)+'</a>':'')+'</p>' +
+      '<p><b>Facturación:</b> '+esc(l.facturacion||'—')+' · <b>Interés:</b> '+esc(l.plan_interes||'—')+' · <b>Recomendado:</b> '+esc(l.plan_recomendado||'…')+'</p>' +
+      (l.problema?'<p><b>Problema:</b> '+esc(l.problema)+'</p>':'') +
+      (l.mensaje_sugerido?'<h2>Mensaje sugerido</h2><pre class="md" id="msg-sug" style="white-space:pre-wrap;font-family:var(--f-body)">'+esc(l.mensaje_sugerido)+'</pre><div class="row"><button class="btn" id="copiar-msg" type="button">Copiar mensaje</button><span class="hint" id="copiado"></span></div>':'<p class="muted">El Agente Comercial está calificando este lead…</p>') +
+      '<h2 style="margin-top:18px">Etapa</h2><div class="row"><select id="etapa" style="max-width:220px">'+['nuevo','contactado','propuesta','cliente','perdido'].map(function(e){ return '<option'+(e===l.etapa?' selected':'')+'>'+e+'</option>'; }).join('')+'</select>' +
+      '<button class="btn" id="auditar" type="button"'+(l.link?'':' disabled')+'>Auditar tienda</button><button class="btn" id="diag" type="button"'+(l.link?'':' disabled')+'>Diagnóstico completo</button></div>' +
+      '<h2 style="margin-top:18px">Trabajos de este lead</h2>' + (trabajos.length ? trabajos.map(function(j){ return '<p><a href="#" data-ver="'+j.id+'">'+esc(j.agente)+'</a> <span class="chip '+j.estado+'">'+j.estado.replace('_',' ')+'</span></p>'; }).join('') : '<p class="muted">Ninguno.</p>');
+    $('#etapa').addEventListener('change', function(){ api('/leads/'+id, { method:'PATCH', body: JSON.stringify({ etapa: this.value }) }).then(refrescar); });
+    if ($('#copiar-msg')) $('#copiar-msg').addEventListener('click', function(){ copiar(l.mensaje_sugerido, $('#copiado')); });
+    $('#auditar').addEventListener('click', function(){ lanzar('auditoria', { url: l.link, contexto: l.problema || '' }, id); });
+    $('#diag').addEventListener('click', function(){ lanzar('diagnostico', { marca: l.marca || l.nombre, url: l.link, rubro: 'a definir por la auditoría', objetivo: l.problema || '' }, id); });
+    document.querySelectorAll('[data-ver]').forEach(function(a){ a.addEventListener('click', function(e){ e.preventDefault(); verJob(a.getAttribute('data-ver')); }); });
+  }
+  function verJob(id){
+    seleccion = { tipo:'job', id:id }; tablaJobs();
+    api('/jobs/'+id).then(function(j){
+      seleccion.estado = j.estado;
+      var cuerpo = j.estado === 'listo' ? '<div class="row" style="margin-bottom:10px"><button class="btn" id="copiar-md" type="button">Copiar en markdown</button><span class="hint" id="copiado"></span></div><div class="md">'+md(j.resultado.markdown)+'</div>'
+        : j.estado === 'error' ? '<p class="err">'+esc(j.error)+'</p><button class="btn" id="reintentar" type="button">Reintentar</button>'
+        : '<p class="muted">El agente está trabajando'+(j.progreso?': '+esc(j.progreso):'')+'… Esta vista se actualiza sola.</p>';
+      $('#viewer').innerHTML = '<h2>'+esc(j.agente)+' <span class="chip '+j.estado+'">'+j.estado.replace('_',' ')+'</span></h2><p class="muted num">'+fecha(j.creado)+(j.segundos!=null?' · '+j.segundos+' s':'')+'</p>' + cuerpo;
+      if ($('#copiar-md')) $('#copiar-md').addEventListener('click', function(){ copiar(j.resultado.markdown, $('#copiado')); });
+      if ($('#reintentar')) $('#reintentar').addEventListener('click', function(){ api('/jobs/'+id+'/reintentar', { method:'POST' }).then(function(){ refrescar(); verJob(id); }); });
+    });
+  }
+  function verChat(id){
+    var c = datos.chats.find(function(x){ return x.id === id; }); if (!c) return;
+    seleccion = { tipo:'chat', id:id };
+    $('#viewer').innerHTML = '<h2>Conversación</h2>' + c.turnos.map(function(t){ return '<p><b>'+(t.role==='user'?'Visitante':'Asesor IA')+':</b> '+esc(t.text)+'</p>'; }).join('');
+  }
+  function copiar(texto, aviso){
+    try { navigator.clipboard.writeText(texto).then(function(){ aviso.textContent = 'Copiado'; }, function(){ aviso.textContent = 'No se pudo copiar'; }); } catch(e){ aviso.textContent = 'No se pudo copiar'; }
+  }
+
+  /* ---- lanzar ---- */
+  function dibujarCampos(){
+    var tipo = $('#l-tipo').value;
+    $('#l-campos').innerHTML = (CAMPOS[tipo] || []).map(function(c){
+      var id = 'f-'+c[0], req = c[3] ? ' required' : '';
+      var ctrl = c[4] === 'area' ? '<textarea id="'+id+'" placeholder="'+esc(c[2])+'"'+req+'></textarea>' : '<input id="'+id+'" placeholder="'+esc(c[2])+'"'+req+'>';
+      return '<label>'+esc(c[1])+ctrl+'</label>';
+    }).join('');
+  }
+  $('#l-tipo').addEventListener('change', dibujarCampos);
+  function lanzar(tipo, input, leadId){
+    return api('/jobs', { method:'POST', body: JSON.stringify({ tipo: tipo, input: input, leadId: leadId }) })
+      .then(function(j){ refrescar(); document.querySelector('[data-tab="jobs"]').click(); verJob(j.id); });
+  }
+  $('#launch').addEventListener('submit', function(e){
+    e.preventDefault(); $('#l-err').textContent = '';
+    var tipo = $('#l-tipo').value, input = {};
+    (CAMPOS[tipo] || []).forEach(function(c){ var v = document.getElementById('f-'+c[0]).value.trim(); if (v) input[c[0]] = v; });
+    lanzar(tipo, input).catch(function(err){ $('#l-err').textContent = err.message; });
+  });
+})();
+</script>
+</body>
+</html>

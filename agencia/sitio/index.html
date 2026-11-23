@@ -170,6 +170,19 @@ form textarea{min-height:96px;resize:vertical}
 .result .row{display:flex;flex-wrap:wrap;gap:10px}
 @media (max-width:860px){.contact{grid-template-columns:1fr}form.lead-form{grid-template-columns:1fr}}
 
+/* chat del Agente Comercial */
+.chat-btn{position:fixed;right:calc(20px + env(safe-area-inset-right,0px));bottom:calc(20px + env(safe-area-inset-bottom,0px));z-index:40;box-shadow:0 12px 30px -10px rgba(14,22,38,.5)}
+.chat{position:fixed;right:calc(20px + env(safe-area-inset-right,0px));bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:40;width:min(380px,calc(100vw - 32px));height:min(540px,calc(100vh - 120px));background:var(--surface);border:1px solid var(--line);border-radius:18px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 30px 60px -25px rgba(14,22,38,.55)}
+.chat header{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px 16px;background:var(--ink);color:var(--bg)}
+.chat header small{display:block;opacity:.7;font-size:.78rem}
+.chat header button{background:transparent;border:0;color:inherit;font-size:1.4rem;cursor:pointer;line-height:1}
+.chat-log{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px}
+.msg{max-width:85%;padding:10px 13px;border-radius:14px;font-size:.95rem;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere}
+.msg.bot{background:var(--bg);align-self:flex-start;border-bottom-left-radius:4px}
+.msg.user{background:var(--accent);color:var(--accent-ink);align-self:flex-end;border-bottom-right-radius:4px}
+.msg.wait{color:var(--muted);font-style:italic}
+.chat form{display:flex;gap:8px;padding:12px;border-top:1px solid var(--line)}
+.chat input{flex:1;min-width:0;font:400 .95rem var(--f-body);padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink)}
 footer{padding-block:40px;border-top:1px solid var(--line);color:var(--muted);font-size:.9rem}
 footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:16px}
 </style>
@@ -423,6 +436,7 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:16px}
       <form class="lead-form" id="lead">
         <label>Nombre<input id="l-name" name="nombre" required autocomplete="name"></label>
         <label>Marca o tienda<input id="l-brand" name="marca" required></label>
+        <label class="full">Email o WhatsApp<input id="l-contact" name="contacto" required autocomplete="email" placeholder="tu@email.com o +54 9 11 …"></label>
         <label class="full">Link a tu tienda o Instagram<input id="l-url" name="link" placeholder="https://"></label>
         <label>Facturación mensual aprox.
           <select id="l-rev" name="facturacion">
@@ -443,9 +457,13 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:16px}
           </select>
         </label>
         <label class="full">¿Cuál es tu principal problema hoy?<textarea id="l-msg" name="mensaje" placeholder="Ej.: tengo visitas pero casi no vendo; mis reels no llegan a nadie…"></textarea></label>
-        <button class="btn btn-primary full" type="submit">Preparar mi consulta</button>
+        <button class="btn btn-primary full" type="submit" id="l-submit">Enviar consulta</button>
+        <div class="result" id="l-ok" hidden role="status">
+          <b id="l-ok-title">¡Listo! Recibimos tu consulta.</b>
+          <span id="l-ok-text">Te escribimos en 48 horas hábiles.</span>
+        </div>
         <div class="result" id="l-result" hidden>
-          <b>Tu consulta está lista. Copiala y enviala por WhatsApp o email.</b>
+          <b>No pudimos enviar la consulta desde acá. Copiala y mandala por WhatsApp o email.</b>
           <pre id="l-text"></pre>
           <div class="row"><button class="btn btn-ghost btn-sm" type="button" id="l-copy">Copiar texto</button><span class="hint" id="l-copied"></span></div>
         </div>
@@ -460,6 +478,15 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:16px}
     <span>Redes sociales · CRO para e‑commerce · Pauta digital</span>
   </div>
 </footer>
+
+<button class="btn btn-primary chat-btn" id="chat-open" type="button" hidden aria-controls="chat">Hablá con un asesor</button>
+<section class="chat" id="chat" hidden aria-label="Chat con el asesor de Escalá">
+  <header><div><b>Asesor de Escalá</b><small>Asistente con IA · te responde al instante</small></div><button type="button" id="chat-close" aria-label="Cerrar chat">×</button></header>
+  <div class="chat-log" id="chat-log" aria-live="polite">
+    <div class="msg bot">¡Hola! Contame qué vendés y dónde (tienda online, Instagram…), y te digo por dónde conviene empezar.</div>
+  </div>
+  <form id="chat-form"><input id="chat-input" autocomplete="off" placeholder="Escribí tu mensaje…" aria-label="Tu mensaje" maxlength="2000"><button class="btn btn-primary btn-sm" type="submit">Enviar</button></form>
+</section>
 
 <script>
 (function(){
@@ -514,17 +541,41 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:16px}
     a.addEventListener('click',function(){ $('l-plan').value = a.getAttribute('data-plan'); });
   });
 
-  /* Formulario: arma el mensaje listo para enviar */
+  /* Formulario: envía el lead al servidor (lo califica el Agente Comercial y,
+     si dejó el link de su tienda, el Agente Auditor la analiza). Si no hay
+     servidor disponible, arma el mensaje para copiar. */
   $('lead').addEventListener('submit',function(e){
     e.preventDefault();
-    var t = 'Hola Escalá, soy ' + $('l-name').value.trim() + ' de ' + $('l-brand').value.trim() + '.\n' +
-      ($('l-url').value.trim() ? 'Link: ' + $('l-url').value.trim() + '\n' : '') +
-      'Facturación mensual: ' + $('l-rev').value + '\n' +
-      'Me interesa: ' + $('l-plan').value + '\n' +
-      ($('l-msg').value.trim() ? 'Problema principal: ' + $('l-msg').value.trim() : '');
-    $('l-text').textContent = t.trim();
-    $('l-result').hidden = false;
-    $('l-copied').textContent = '';
+    var datos = {
+      nombre: $('l-name').value.trim(), marca: $('l-brand').value.trim(), contacto: $('l-contact').value.trim(),
+      link: $('l-url').value.trim(), facturacion: $('l-rev').value, plan: $('l-plan').value, mensaje: $('l-msg').value.trim()
+    };
+    var porCopia = function(){
+      var t = 'Hola Escalá, soy ' + datos.nombre + ' de ' + datos.marca + '.\n' +
+        'Contacto: ' + datos.contacto + '\n' +
+        (datos.link ? 'Link: ' + datos.link + '\n' : '') +
+        'Facturación mensual: ' + datos.facturacion + '\n' +
+        'Me interesa: ' + datos.plan + '\n' +
+        (datos.mensaje ? 'Problema principal: ' + datos.mensaje : '');
+      $('l-text').textContent = t.trim();
+      $('l-result').hidden = false;
+      $('l-copied').textContent = '';
+    };
+    $('l-submit').disabled = true; $('l-submit').textContent = 'Enviando…';
+    $('l-ok').hidden = true; $('l-result').hidden = true;
+    fetch('/api/leads', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify(datos) })
+      .then(function(r){ return r.json().then(function(j){ return { ok:r.ok, j:j }; }); })
+      .then(function(res){
+        if (!res.ok) { if (res.j && res.j.error && res.j.error.indexOf('Necesitamos') === 0) { $('l-ok-title').textContent = res.j.error; $('l-ok-text').textContent = ''; $('l-ok').hidden = false; } else porCopia(); return; }
+        $('l-ok-title').textContent = '¡Listo, ' + datos.nombre.split(' ')[0] + '! Recibimos tu consulta.';
+        $('l-ok-text').textContent = res.j.auditoria
+          ? 'Nuestro auditor ya está analizando tu tienda. Te escribimos en 48 horas hábiles con el diagnóstico.'
+          : 'Te escribimos en 48 horas hábiles con tres oportunidades concretas.';
+        $('l-ok').hidden = false;
+        $('lead').querySelectorAll('input,textarea').forEach(function(i){ i.value=''; });
+      })
+      .catch(porCopia)
+      .then(function(){ $('l-submit').disabled = false; $('l-submit').textContent = 'Enviar consulta'; });
   });
   $('l-copy').addEventListener('click',function(){
     var t = $('l-text').textContent;
@@ -535,6 +586,34 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:16px}
       $('l-copied').textContent = 'Texto seleccionado: copialo con Ctrl+C o mantené presionado';
     };
     try { navigator.clipboard.writeText(t).then(done, fallback); } catch(err){ fallback(); }
+  });
+
+  /* Chat con el Agente Comercial: solo aparece si el servidor de agentes responde */
+  var sesion = null;
+  try { sesion = sessionStorage.getItem('escala-chat'); } catch(e){}
+  function burbuja(texto, clase){
+    var d = document.createElement('div'); d.className = 'msg ' + clase; d.textContent = texto;
+    $('chat-log').appendChild(d); $('chat-log').scrollTop = $('chat-log').scrollHeight; return d;
+  }
+  fetch('/api/estado').then(function(r){ return r.ok ? r.json() : null; }).then(function(j){
+    if (j && j.ok) $('chat-open').hidden = false;
+  }).catch(function(){});
+  $('chat-open').addEventListener('click', function(){ $('chat').hidden = !$('chat').hidden; if (!$('chat').hidden) $('chat-input').focus(); });
+  $('chat-close').addEventListener('click', function(){ $('chat').hidden = true; $('chat-open').focus(); });
+  $('chat-form').addEventListener('submit', function(e){
+    e.preventDefault();
+    var texto = $('chat-input').value.trim();
+    if (!texto) return;
+    $('chat-input').value = '';
+    burbuja(texto, 'user');
+    var espera = burbuja('Escribiendo…', 'bot wait');
+    fetch('/api/chat', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ sesion: sesion, mensaje: texto }) })
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        if (j.sesion) { sesion = j.sesion; try { sessionStorage.setItem('escala-chat', sesion); } catch(e){} }
+        espera.remove(); burbuja(j.respuesta || j.error || 'No pude responder. Probá de nuevo.', 'bot');
+      })
+      .catch(function(){ espera.remove(); burbuja('Se cortó la conexión. Probá de nuevo o dejanos tus datos en el formulario.', 'bot'); });
   });
 })();
 </script>
