@@ -79,7 +79,7 @@ async function medir(agente, tipo, fn) {
  * Respuesta en texto libre (markdown). Admite herramientas del servidor de
  * Anthropic (búsqueda y lectura web), que corren sin código de nuestro lado.
  */
-export function runText({ agent, system, prompt, effort = "medium", serverTools = [], maxTokens = 16000 }) {
+export function runText({ agent, system, prompt, effort = "medium", serverTools = [], tools = [], maxTokens = 16000 }) {
   return medir(agent, "texto", async () => {
     if (config.mock) return mock.runText({ agent, prompt });
     const runner = getClient().beta.messages.toolRunner({
@@ -87,9 +87,9 @@ export function runText({ agent, system, prompt, effort = "medium", serverTools 
       max_tokens: maxTokens,
       output_config: { effort },
       system,
-      tools: serverTools,
+      tools: [...serverTools, ...tools],
       messages: [{ role: "user", content: prompt }],
-      max_iterations: 8,
+      max_iterations: 10,
       ...CACHE,
       ...FALLBACK,
     });
@@ -103,7 +103,9 @@ export function runText({ agent, system, prompt, effort = "medium", serverTools 
 export function runStructured({ agent, system, prompt, schema, effort = "medium", maxTokens = 16000 }) {
   return medir(agent, "estructurado", async () => {
     if (config.mock) return mock.runStructured({ agent, prompt, schema });
-    const message = await getClient().beta.messages.parse({
+    // Con streaming: las respuestas largas (un calendario completo) no chocan con los
+    // límites de tiempo de una petición común, y el SDK igual devuelve la salida validada.
+    const stream = getClient().beta.messages.stream({
       model: config.model,
       max_tokens: maxTokens,
       output_config: { effort, format: betaZodOutputFormat(schema) },
@@ -112,6 +114,7 @@ export function runStructured({ agent, system, prompt, schema, effort = "medium"
       ...CACHE,
       ...FALLBACK,
     });
+    const message = await stream.finalMessage();
     checkStop(message);
     if (!message.parsed_output) throw new AgentError("La respuesta no tuvo el formato esperado.", { code: "parse", retryable: true });
     return { message, data: message.parsed_output };

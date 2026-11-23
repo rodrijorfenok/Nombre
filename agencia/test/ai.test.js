@@ -13,6 +13,7 @@ const server = http.createServer((req, res) => {
   req.on("end", () => {
     pedidos.push({ headers: req.headers, body: JSON.parse(body) });
     const content = respuestas.shift();
+    if (JSON.parse(body).stream) return responderSSE(res, content);
     res.setHeader("content-type", "application/json");
     res.end(JSON.stringify({
       id: "msg_test", type: "message", role: "assistant", model: "claude-opus-5-5",
@@ -21,6 +22,21 @@ const server = http.createServer((req, res) => {
     }));
   });
 });
+
+// Respuesta en formato streaming (Server-Sent Events), solo con bloques de texto.
+function responderSSE(res, content) {
+  res.setHeader("content-type", "text/event-stream");
+  const ev = (type, data) => res.write(`event: ${type}\ndata: ${JSON.stringify({ type, ...data })}\n\n`);
+  ev("message_start", { message: { id: "msg_test", type: "message", role: "assistant", model: "claude-opus-5-5", content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: 10, output_tokens: 0 } } });
+  content.forEach((b, index) => {
+    ev("content_block_start", { index, content_block: { type: "text", text: "" } });
+    ev("content_block_delta", { index, delta: { type: "text_delta", text: b.text } });
+    ev("content_block_stop", { index });
+  });
+  ev("message_delta", { delta: { stop_reason: "end_turn", stop_sequence: null }, usage: { output_tokens: 10 } });
+  ev("message_stop", {});
+  res.end();
+}
 
 let ai;
 before(async () => {
@@ -42,6 +58,7 @@ test("runStructured: usa el modelo, fallbacks y formato JSON", async () => {
   assert.match(p.headers["anthropic-beta"], /server-side-fallback-2026-07-01/);
   assert.equal(p.body.output_config.effort, "low");
   assert.equal(p.body.output_config.format.type, "json_schema");
+  assert.equal(p.body.stream, true, "la salida estructurada usa streaming");
 });
 
 test("runText: envía las herramientas web del servidor", async () => {

@@ -1,7 +1,9 @@
 // Agente Auditor CRO: visita la tienda (y opcionalmente las redes) con lectura web,
 // evalúa los 20 puntos del checklist y devuelve un informe con mejoras priorizadas.
 import { z } from "zod";
+import { betaZodTool } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { runText, runStructured, WEB_TOOLS, contextoExtra } from "../ai.js";
+import { leerPagina } from "../lectorWeb.js";
 import { AGENCIA, ESTILO, CHECKLIST_CRO, DATOS_EXTERNOS, PLANES } from "./conocimiento.js";
 
 export const AuditoriaSchema = z.object({
@@ -30,7 +32,7 @@ ${ESTILO}
 ${DATOS_EXTERNOS}
 
 Cómo trabajás:
-1. Leé la URL de la tienda con web_fetch. Si podés, leé también una ficha de producto y una colección
+1. Leé la URL de la tienda con tu herramienta de lectura web. Si podés, leé también una ficha de producto y una colección
    enlazadas desde la home (máximo 4 páginas en total). Si te pasan una red social, podés buscarla.
 2. Evaluá cada punto del checklist con lo que realmente viste. Si algo no se puede verificar desde
    afuera (por ejemplo el checkout o la velocidad real), marcalo como "sin datos" y decí cómo medirlo.
@@ -60,13 +62,21 @@ export async function auditar(input) {
     contexto && `Contexto que dio el cliente: ${contexto}`,
   ].filter(Boolean).join("\n") + contextoExtra(input);
 
-  const informe = await runText({
-    agent: "auditor",
-    system: SYSTEM,
-    prompt,
-    effort: "high",
-    serverTools: [WEB_TOOLS.fetch(5), WEB_TOOLS.search(2)],
-  });
+  // Lectura web: por defecto la de Anthropic. Si no está disponible (red restringida,
+  // organización que la desactiva), el servidor lee las páginas con su propio lector.
+  const modo = process.env.AUDITOR_LECTURA || "anthropic";
+  const conLectorPropio = () => runText({ agent: "auditor", system: SYSTEM, prompt, effort: "high", tools: [herramientaLectura(url)] });
+  let informe;
+  if (modo === "servidor") {
+    informe = await conLectorPropio();
+  } else {
+    try {
+      informe = await runText({ agent: "auditor", system: SYSTEM, prompt, effort: "high", serverTools: [WEB_TOOLS.fetch(5), WEB_TOOLS.search(2)] });
+    } catch (err) {
+      if (err.code !== "bad_request" || !/web_fetch|web_search/.test(err.message)) throw err;
+      informe = await conLectorPropio();
+    }
+  }
 
   const estructura = await runStructured({
     agent: "auditor",
@@ -77,4 +87,23 @@ export async function auditar(input) {
   });
 
   return { markdown: informe.text, data: estructura.data };
+}
+
+/** Herramienta de lectura limitada al dominio de la tienda y a 5 páginas por auditoría. */
+function herramientaLectura(urlTienda) {
+  const dominio = new URL(urlTienda).hostname;
+  let usos = 0;
+  return betaZodTool({
+    name: "leer_pagina",
+    description: `Lee una página de la tienda auditada (${dominio}) y devuelve su contenido como texto: títulos, textos, precios, botones, enlaces e imágenes con su texto alternativo. Solo acepta URLs de ${dominio}. Máximo 5 lecturas por auditoría: elegí la home, una colección y una ficha de producto.`,
+    inputSchema: z.object({ url: z.string().describe(`URL completa de una página de ${dominio}`) }),
+    run: async ({ url }) => {
+      if (++usos > 5) return "Ya leíste 5 páginas: escribí el informe con lo que tenés.";
+      try {
+        return await leerPagina(url, { dominioPermitido: dominio });
+      } catch (err) {
+        return `No se pudo leer ${url}: ${err.message} Si es la home, informá que la tienda no es accesible.`;
+      }
+    },
+  });
 }

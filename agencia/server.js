@@ -21,6 +21,8 @@ const dir = (p) => fileURLToPath(new URL(p, import.meta.url));
 app.use("/", express.static(dir("./sitio")));
 app.use("/panel", express.static(dir("./panel")));
 app.get("/portal/:token", (req, res) => res.sendFile(dir("./portal/index.html")));
+// Tienda ficticia para demostraciones (solo con ESCALA_DEMO=1).
+if (process.env.ESCALA_DEMO === "1") app.use("/demo-tienda", express.static(dir("./demo-tienda")));
 app.get("/panel/vendor/marked.min.js", (req, res) => res.sendFile(dir("./node_modules/marked/marked.min.js")));
 app.get("/panel/vendor/purify.min.js", (req, res) => res.sendFile(dir("./node_modules/dompurify/dist/purify.min.js")));
 app.get("/api/salud", (req, res) => res.json({ ok: true, cola: estadoCola(), hora: new Date().toISOString() }));
