@@ -110,11 +110,34 @@ async function ejecutar(id) {
       const memoria = contextoCliente(job.clienteId);
       if (memoria) input = { ...input, _memoria: memoria };
 
-      const revisiones = [];
+      // El diagnóstico reutiliza una auditoría aprobada de los últimos 30 días en lugar de
+      // pagarla de nuevo (es la misma auditoría, ya pasó el control de calidad).
+      if (job.tipo === "diagnostico") {
+        const previa = auditoriaReciente(job);
+        if (previa) input = { ...input, _auditoriaPrevia: { markdown: previa.resultado.markdown, data: previa.resultado.data } };
+      }
+
+      // Punto de control: cada borrador y cada revisión se guardan apenas existen. Si el
+      // trabajo se corta (reinicio, presupuesto, error de red), se retoma desde ahí sin
+      // volver a pagar lo ya generado.
+      const avance = job.avance || {};
+      const revisiones = avance.revisiones || [];
+      if (avance.correcciones) input = { ...input, _correcciones: avance.correcciones };
+      const guardarAvance = (cambios) => {
+        Object.assign(avance, cambios);
+        store.update("jobs", id, { avance, traza: { pasos: traza.pasos }, costo_usd: traza.costo_usd });
+      };
+
       let resultado, veredicto;
-      for (let ronda = 0; ronda <= MAX_REVISIONES; ronda++) {
-        progreso(ronda ? `Corrigiendo (ronda ${ronda}) según el revisor` : "Generando");
-        resultado = await AGENTES[job.tipo].run({ ...input, progreso });
+      for (let ronda = avance.ronda || 0; ronda <= MAX_REVISIONES; ronda++) {
+        if (avance.ronda === ronda && avance.borrador) {
+          resultado = avance.borrador;
+          progreso(`Retomando la ronda ${ronda + 1} desde el borrador guardado`);
+        } else {
+          progreso(ronda ? `Corrigiendo (ronda ${ronda}) según el revisor` : "Generando");
+          resultado = await AGENTES[job.tipo].run({ ...input, progreso });
+          guardarAvance({ ronda, borrador: resultado });
+        }
         if (!tieneRubrica(job.tipo)) { veredicto = { aprobado: true, puntaje: null }; break; }
 
         store.update("jobs", id, { estado: "revisando", progreso: "Control de calidad" });
@@ -122,12 +145,13 @@ async function ejecutar(id) {
         revisiones.push({ ronda, aprobado: veredicto.aprobado, puntaje: veredicto.puntaje, problemas_codigo: veredicto.problemas_codigo, criterios: veredicto.criterios, correcciones: veredicto.correcciones });
         if (veredicto.aprobado || veredicto.bloqueante) break;
         input = { ...input, _correcciones: veredicto.correcciones.map((c, i) => `${i + 1}. ${c}`).join("\n") };
+        guardarAvance({ ronda: ronda + 1, borrador: null, correcciones: input._correcciones, revisiones });
         store.update("jobs", id, { estado: "trabajando" });
       }
 
       const estado = veredicto.aprobado ? "listo" : "requiere_revision";
       store.update("jobs", id, {
-        estado, resultado, revisiones, progreso: "",
+        estado, resultado, revisiones, progreso: "", avance: undefined,
         calidad: { aprobado: veredicto.aprobado, puntaje: veredicto.puntaje, rondas: revisiones.length, motivo: veredicto.aprobado ? null : veredicto.correcciones.slice(0, 5) },
         segundos: Math.round((Date.now() - inicio) / 1000),
         traza: { pasos: traza.pasos }, costo_usd: traza.costo_usd,
@@ -139,6 +163,11 @@ async function ejecutar(id) {
     const reintentar = err.retryable && intentos < MAX_INTENTOS;
     // Ante un límite de la API, frena toda la cola un rato en lugar de seguir chocando.
     if (err.code === "rate_limit") pausaGlobalHasta = Date.now() + Number(process.env.PAUSA_LIMITE_MS || 60000);
+    // Presupuesto agotado a mitad de un trabajo: queda en pausa con su avance guardado.
+    if (err.code === "presupuesto") {
+      store.update("jobs", id, { estado: "pausado_presupuesto", progreso: "Presupuesto diario agotado: se retoma desde el último avance guardado.", traza: { pasos: traza.pasos }, costo_usd: traza.costo_usd });
+      return;
+    }
     const espera = ESPERA_BASE_MS * 2 ** (intentos - 1) * (0.8 + Math.random() * 0.4);
     store.update("jobs", id, {
       estado: reintentar ? "esperando_reintento" : "error",
@@ -148,6 +177,13 @@ async function ejecutar(id) {
     });
     if (!reintentar) avisar({ evento: "requiere_atencion", motivo: "error", trabajo: resumen(store.get("jobs", id)) });
   }
+}
+
+function auditoriaReciente(job) {
+  const limite = new Date(Date.now() - 30 * 86400000).toISOString();
+  const deCliente = job.clienteId ? store.list("jobs", { where: { clienteId: job.clienteId, tipo: "auditoria", estado: ["listo", "aprobado"] }, limit: 1, desde: limite }) : [];
+  const deLead = job.leadId ? store.list("jobs", { where: { leadId: job.leadId, tipo: "auditoria", estado: ["listo", "aprobado"] }, limit: 1, desde: limite }) : [];
+  return deCliente[0] || deLead[0] || null;
 }
 
 /** Efectos de negocio de un trabajo terminado. */

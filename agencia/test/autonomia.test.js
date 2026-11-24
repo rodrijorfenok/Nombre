@@ -116,6 +116,29 @@ test("cliente sin URL de tienda: se crea igual y se avisa qué falta", async () 
   assert.match(res.aviso, /falta la URL/);
 });
 
+test("diagnóstico: reutiliza la auditoría aprobada reciente en vez de pagarla de nuevo", async () => {
+  const c = (await post("/api/admin/clientes", { marca: "Reuso", rubro: "Deco", url: "https://reuso.example.com" })).body;
+  const aud = (await post("/api/admin/jobs", { tipo: "auditoria", input: {}, clienteId: c.id })).body;
+  await esperar(aud.id);
+  const diag = (await post("/api/admin/jobs", { tipo: "diagnostico", input: {}, clienteId: c.id })).body;
+  const j = await esperar(diag.id);
+  assert.equal(j.estado, "listo");
+  assert.equal(j.traza.pasos.filter((p) => p.agente === "auditor").length, 0, "no vuelve a llamar al auditor");
+});
+
+test("punto de control: un trabajo interrumpido se retoma desde el borrador guardado", async () => {
+  const { crearTrabajo } = await import("../src/jobs.js");
+  const borrador = { data: { anuncios: [1, 2, 3].map((i) => ({ angulo: `Ángulo ${i}`, formato: "UGC", gancho: `Gancho ${i}`, guion: "x", texto_principal: "t", titulo: "t", cta: "Comprar" })), recomendacion_de_testeo: "x" }, markdown: "# Borrador guardado" };
+  const j = store.insert("jobs", { tipo: "creativos", agente: "Creativos de pauta", input: { producto: "Mate", cantidad: 3 }, estado: "esperando_reintento", proximoIntento: new Date(0).toISOString(), intentos: 1, revisiones: [], avance: { ronda: 0, borrador }, traza: { pasos: [{ agente: "creativos", costo_usd: 0.1 }] }, costo_usd: 0.1 });
+  retomar();
+  const fin = await esperar(j.id);
+  assert.equal(fin.estado, "listo");
+  assert.equal(fin.resultado.markdown, "# Borrador guardado", "usa el borrador, no lo regenera");
+  assert.equal(fin.traza.pasos.filter((p) => p.agente === "creativos").length, 1, "no hay una segunda llamada al generador");
+  assert.equal(fin.avance, undefined);
+  void crearTrabajo;
+});
+
 test("feedback: rechazar crea una versión nueva y guarda la lección en la memoria del cliente", async () => {
   const c = (await post("/api/admin/clientes", { marca: "Mila Kids", rubro: "Ropa infantil", productos: "Bodies de algodón" })).body;
   const { body } = await post("/api/admin/jobs", { tipo: "creativos", input: { cantidad: 4 }, clienteId: c.id });

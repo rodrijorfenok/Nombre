@@ -24,9 +24,10 @@ export async function diagnostico(input) {
   const heredado = { _memoria: input._memoria };
   if (!marca || !url || !rubro) throw new Error("Faltan marca, URL de la tienda y rubro.");
 
-  progreso("Auditando la tienda y armando el calendario en paralelo");
+  const previa = input._auditoriaPrevia;
+  progreso(previa ? "Usando la auditoría aprobada reciente y armando el calendario" : "Auditando la tienda y armando el calendario en paralelo");
   const [aud, cal] = await Promise.all([
-    auditar({ url, redes, contexto: objetivo, ...heredado }),
+    previa || auditar({ url, redes, contexto: objetivo, ...heredado }),
     calendario({ marca, rubro, publico, objetivo, productos, ...heredado }),
   ]);
 

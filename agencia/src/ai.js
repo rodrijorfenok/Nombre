@@ -4,7 +4,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { config } from "./config.js";
-import { registrarPaso } from "./telemetria.js";
+import { registrarPaso, presupuestoAgotado } from "./telemetria.js";
 import * as mock from "./mock.js";
 
 // Si un clasificador de seguridad rechaza un pedido, la API lo reintenta sola
@@ -63,6 +63,8 @@ function translateError(err) {
 
 /** Mide la llamada y la registra en la traza del trabajo en curso. */
 async function medir(agente, tipo, fn) {
+  // Tope duro: se revisa antes de cada llamada, no solo al empezar un trabajo.
+  if (!config.mock && presupuestoAgotado()) throw new AgentError("Se alcanzó el presupuesto diario de IA.", { code: "presupuesto" });
   const t0 = Date.now();
   try {
     const { message, ...res } = await fn();
