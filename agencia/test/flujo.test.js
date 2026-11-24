@@ -29,7 +29,7 @@ async function esperarJobs(filtro, ms = 5000) {
 }
 
 test("sirve el sitio y el panel", async () => {
-  assert.match(await (await fetch(`${base}/`)).text(), /Escalá Growth Studio/);
+  assert.match(await (await fetch(`${base}/`)).text(), /Kairos Creative/);
   assert.match(await (await fetch(`${base}/panel/`)).text(), /Panel Escalá/);
 });
 

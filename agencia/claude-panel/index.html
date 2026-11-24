@@ -62,7 +62,7 @@ main{padding-block:20px 60px;padding-left:max(16px,env(safe-area-inset-left,0px)
 .btn:disabled{opacity:.5;cursor:default}
 .fila{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 
-.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px;display:grid;gap:12px;min-width:0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px;display:grid;gap:12px;min-width:0;align-content:start}
 .tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);overflow-x:auto}
 .tabs button{border:0;background:none;padding:10px 14px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap}
 .tabs button[aria-selected="true"]{color:var(--ink);border-color:var(--accent)}
@@ -93,6 +93,24 @@ textarea.editor{min-height:420px;font:400 .88rem/1.5 var(--f-data)}
 .agente p{color:var(--muted);font-size:.88rem}
 .agente .t{font:600 .7rem var(--f-data);color:var(--muted)}
 
+.kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:700px){.kpis{grid-template-columns:1fr}}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;display:grid;gap:2px}
+.kpi b{font:800 1.6rem var(--f-display)} .kpi span{color:var(--muted);font-size:.85rem}
+.tabla-casos{overflow-x:auto}
+.tabla-casos table{width:100%;border-collapse:collapse;font-size:.9rem}
+.tabla-casos th{text-align:left;font:600 .7rem var(--f-data);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+.tabla-casos td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+.tabla-casos tbody tr{cursor:pointer}
+.tabla-casos tbody tr:hover{background:var(--sunken)}
+.chat{display:grid;gap:10px;max-height:460px;overflow:auto}
+.msg{padding:10px 12px;border-radius:10px;font-size:.92rem;min-width:0}
+.msg.yo{background:var(--accent-soft);justify-self:end;max-width:85%}
+.msg.ia{background:var(--sunken)}
+.bitacora{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.bitacora li{display:grid;gap:3px;padding-bottom:10px;border-bottom:1px solid var(--line);justify-items:start}
+.diff{font:400 .82rem/1.5 var(--f-data);background:var(--sunken);border-radius:8px;padding:10px;overflow-x:auto;max-height:600px;overflow-y:auto}
+.diff .da{background:var(--ok-soft);color:var(--ok)} .diff .dq{background:var(--bad-soft);color:var(--bad);text-decoration:line-through} .diff .di{color:var(--muted)}
 .proceso{list-style:none;margin:0;padding:0;display:grid;gap:8px}
 .proceso li{display:grid;grid-template-columns:36px minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px;border:1px solid var(--line);border-radius:10px}
 .proceso li.actual{border-color:var(--accent);background:var(--accent-soft)}
@@ -167,8 +185,10 @@ const S = {
   clientes: new Map(), entregas: new Map(), config: {},
   cargado: { clientes: false, entregas: false },
   vista: "inicio", clienteId: null, tab: "ficha", entregaId: null, agente: null,
-  run: null, // { ctl, pasos:[], activo, preview, tipo, clienteId }
+  run: null, // { titulo, ctl, pasos:[], preview, clienteId, error }
   editando: false,
+  mcp: null, user: null, yo: null, navegador: false, nombres: new Map(), equipo: [],
+  bitacora: [], chat: { clienteId: null, turnos: [] }, filtro: "todos", comparar: false,
 };
 const $ = (s, r = document) => r.querySelector(s);
 const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -315,13 +335,15 @@ Formato (markdown, sin texto antes del título):
     paso: 2, nombre: "Investigación profunda", tiempo: "2–4 min",
     desc: "Mercado, público objetivo y competencia. Usa lo que le pasás de los competidores y separa lo observado de lo que hay que validar.",
     campos: [
-      { id: "competidores", tipo: "textarea", label: "Competidores", ayuda: "Nombres, links y lo que sepas de cada uno (precios, ofertas, cómo comunican).", valor: (c) => c.competidores || "" },
+      { id: "web", tipo: "web", label: "Investigar en la web" },
+      { id: "competidores", tipo: "textarea", label: "Competidores", ayuda: "Nombres, links y lo que sepas de cada uno. Con la investigación web activada, el agente busca más por su cuenta.", valor: (c) => c.competidores || "" },
       { id: "capturas", tipo: "imagenes", label: "Capturas de competidores (opcional)", ayuda: "Perfiles, anuncios, fichas de producto." },
       { id: "mercado", tipo: "textarea", label: "Datos de mercado o público (opcional)", ayuda: "Encuestas, reseñas de clientes, comentarios frecuentes, tendencias que notaste." },
     ],
     generar: (c, e, x) => x.pedir(`${encabezado("analista de investigación de mercado, público y competencia")}
 
-No podés navegar la web: trabajás con el material que te pasan y con tu conocimiento general. Etiquetá cada afirmación: [Observado] si sale del material, [Conocimiento general] si sale de lo que sabés del rubro (puede estar desactualizado) y [A validar] si es una hipótesis.
+${x.web !== false ? `Tenés herramientas para buscar en la web (buscar_en_web) y leer páginas (leer_pagina). Investigá de verdad: buscá competidores directos e indirectos, sus sitios, precios, ofertas y reseñas, y notas o tendencias del rubro. Leé al menos 5 páginas relevantes antes de escribir. Citá la URL de cada dato que saques de la web.` : "No tenés acceso a la web en esta ejecución: trabajás con el material que te pasan y con tu conocimiento general."}
+Etiquetá cada afirmación: [Observado] si sale del material o de una página que leíste (con su URL), [Conocimiento general] si sale de lo que sabés del rubro (puede estar desactualizado) y [A validar] si es una hipótesis.
 
 ${contextoCliente(c)}
 ${contextoPrevio(c, ["diagnostico"])}
@@ -336,17 +358,19 @@ Formato (markdown, sin texto antes del título):
 ## Competencia (tabla: Competidor | Propuesta | Precio u oferta | Canales | Fortaleza | Debilidad)
 ## Qué están haciendo bien los competidores en contenido y pauta
 ## Huecos que nadie está cubriendo
-## Qué validar y cómo${x.correcciones}`, { images: e.capturas }),
+## Fuentes consultadas
+## Qué validar y cómo${x.correcciones}`, { images: e.capturas, web: true }),
   },
   auditoria: {
     paso: 3, nombre: "Auditoría de marca", tiempo: "2–5 min",
     desc: "Evaluación cualitativa y cuantitativa: identidad, percepción, presencia digital y performance, con puntaje por dimensión.",
     campos: [
+      { id: "web", tipo: "web", label: "Leer el sitio y las redes de la marca en la web" },
       { id: "capturas", tipo: "imagenes", label: "Capturas de la marca", ayuda: "Perfil y posteos de Instagram, tienda (home, producto, carrito), anuncios, reseñas." },
       { id: "metricas", tipo: "textarea", label: "Métricas (opcional)", ayuda: "Alcance, engagement, seguidores, visitas, conversión, ventas, ROAS." },
       { id: "texto", tipo: "textarea", label: "Texto de la tienda o perfil (opcional)" },
     ],
-    validar: (e) => (!e.capturas?.length && !(e.texto || "").trim() && !(e.metricas || "").trim() ? "Subí capturas, pegá texto o métricas de la marca." : null),
+    validar: (e, c) => (!e.capturas?.length && !(e.texto || "").trim() && !(e.metricas || "").trim() && !(e.web && S.navegador && (c?.url || c?.redes)) ? "Subí capturas, pegá texto o métricas de la marca, o activá la lectura web (con la URL cargada en la ficha)." : null),
     generar: (c, e, x) => x.pedir(`${encabezado("auditor/a de marca: evaluás identidad, percepción, presencia digital y performance")}
 
 ${contextoCliente(c)}
@@ -355,7 +379,8 @@ ${e.metricas ? `<metricas>\n${e.metricas.slice(0, 20000)}\n</metricas>` : ""}
 ${e.texto ? `<texto_de_la_marca>\n${e.texto.slice(0, 30000)}\n</texto_de_la_marca>` : ""}
 ${e.capturas?.length ? `Adjunto ${e.capturas.length} captura(s).` : "Sin capturas."}
 
-Reglas: cada evaluación se apoya en algo que se ve en las capturas, el texto o las métricas (citalo o describilo). Lo que no se puede ver va como "Sin datos" con cómo obtenerlo. Si hay tienda online, revisá además estos puntos de conversión: ${CHECKLIST_CRO.join("; ")}.
+${x.web !== false ? `Tenés herramientas para leer páginas (leer_pagina) y buscar en la web (buscar_en_web). Leé el sitio de la marca${c.url ? ` (${c.url})` : ""}: home, una colección, una ficha de producto y las páginas de envío y cambios. Buscá reseñas o menciones de la marca. Citá la URL de lo que evalúes.` : ""}
+Reglas: cada evaluación se apoya en algo que se ve en las capturas, el texto, las páginas leídas o las métricas (citalo o describilo). Lo que no se puede ver va como "Sin datos" con cómo obtenerlo. Si hay tienda online, revisá además estos puntos de conversión: ${CHECKLIST_CRO.join("; ")}.
 
 Formato (markdown, sin texto antes del título):
 # Auditoría de marca · ${c.marca}
@@ -367,7 +392,7 @@ Formato (markdown, sin texto antes del título):
 ## Presencia digital (redes, tienda, consistencia)
 ## Performance (cuantitativo: tabla Métrica | Valor | Lectura)
 ## Conversión de la tienda (si aplica: tabla Punto | Estado | Evidencia)
-## Las 10 mejoras de mayor impacto (numeradas, con impacto y esfuerzo)${x.correcciones}`, { images: e.capturas }),
+## Las 10 mejoras de mayor impacto (numeradas, con impacto y esfuerzo)${x.correcciones}`, { images: e.capturas, web: true }),
   },
   foda: {
     paso: 4, nombre: "FODA + competencia", tiempo: "2–3 min",
@@ -601,6 +626,48 @@ Formato EXACTO por pieza (markdown, sin texto antes ni después):
       return `# Calendario de contenido · ${c.marca} · ${e.mes}\n\n## Estrategia\n${grilla.estrategia}\n\n## Pilares\n${(grilla.pilares || []).map((p) => `- **${p.nombre}** (${p.objetivo}): ${p.descripcion || ""}`).join("\n")}\n\n## Resumen del mes\n${tabla}\n\n## Piezas\n\n${partes.join("\n\n")}`;
     },
   },
+  cuestionario: {
+    herramienta: true, nombre: "Cuestionario de ingreso", tiempo: "1–2 min", sinRevisor: true,
+    desc: "Preguntas para mandarle a la marca antes de la reunión de ingreso, adaptadas a su rubro, más el mensaje para enviarlas.",
+    campos: [{ id: "canal", tipo: "select", label: "Cómo lo va a responder", opciones: ["WhatsApp", "Email", "Formulario"] }],
+    generar: (c, e, x) => x.pedir(`${encabezado("account manager: preparás el ingreso de un cliente nuevo")}
+
+${contextoCliente(c)}
+Armá un cuestionario de ingreso para ${c.marca} (rubro: ${c.rubro || "a definir"}) que se responde por ${e.canal}. Entre 15 y 25 preguntas cortas, agrupadas en: Negocio y objetivos, Clientes, Productos y precios, Ventas y canales, Redes y contenido, Pauta y presupuesto, Medición y accesos, Competencia. Que el paso 1 (diagnóstico) arranque con datos: pedí números concretos (ventas, ticket, inversión) con la opción "no sé".
+
+Formato (markdown, sin texto antes del título):
+# Cuestionario de ingreso · ${c.marca}
+## Mensaje para enviarlo (voseo, máximo 6 líneas)
+## Preguntas (numeradas, agrupadas por sección)${x.correcciones}`),
+  },
+  legales: {
+    herramienta: true, nombre: "Borradores legales", tiempo: "2–4 min",
+    desc: "Borrador de política de devolución y de contrato de servicios para revisar con un abogado. Nunca se usa sin esa revisión.",
+    campos: [
+      { id: "plan", tipo: "plan", label: "Plan", valor: (c) => c.plan || "Growth 360" },
+      { id: "condiciones", tipo: "textarea", label: "Condiciones que querés incluir", ayuda: "Qué resultado se mide, en qué plazo, qué se devuelve, forma de pago, jurisdicción…" },
+    ],
+    generar(c, e, x) {
+      const plan = planes().find((p) => p.id === e.plan) || planes()[3];
+      return x.pedir(`${encabezado("asistente legal-comercial: redactás BORRADORES para que los revise un abogado")}
+
+${contextoCliente(c)}
+${contextoPrevio(c, ["plan90"], 6000)}
+Plan: ${plan.id}: ${plan.precio} USD ${plan.periodo}. ${plan.incluye}
+Condiciones que quiere la agencia: ${e.condiciones || "no especificadas"}
+${politica() ? `Texto actual de la política de devolución: "${politica()}"` : ""}
+
+Reglas: es un BORRADOR para revisión legal. No inventes datos de identificación (razón social, CUIT, domicilios), montos ni plazos que no te dieron: usá [completar: dato]. La política de devolución tiene que ser medible y verificable: métrica, línea base, meta, plazo, compromisos de la marca que la habilitan (los del plan de 90 días), qué se devuelve (honorarios, nunca la inversión en pauta), cómo se pide y en qué plazo se paga, y exclusiones. Nada de promesas de resultados.
+
+Formato (markdown, sin texto antes del título):
+# Borradores legales · ${c.marca}
+> BORRADOR PARA REVISIÓN LEGAL. No enviar ni firmar sin la revisión de un abogado.
+## Política de devolución (borrador)
+## Contrato de prestación de servicios (borrador)
+(partes, objeto, alcance, honorarios y forma de pago, duración y renovación, obligaciones de cada parte, propiedad intelectual, confidencialidad, política de devolución, rescisión, jurisdicción)
+## Puntos que tiene que definir el abogado${x.correcciones}`);
+    },
+  },
   mensaje: {
     herramienta: true, nombre: "Mensaje para el cliente", tiempo: "menos de 1 min", sinRevisor: true,
     desc: "WhatsApp o email listo para copiar: bienvenida, pedido de accesos, entrega, seguimiento.",
@@ -654,6 +721,7 @@ const RUBRICAS = {
   propuesta: [["precios", "Usa solo los precios publicados, sin descuentos ni promesas de resultados.", true], ["politica", "La política de devolución aparece solo con su texto oficial (o sin detalles si no hay texto).", true], ["personalizada", "Se apoya en lo concreto del cliente.", true], ["clara", "Se entiende qué recibe, cuándo y cuánto paga.", false]],
   calendario: [["alineado", "Responde a la marca, el plan y las lecciones del cliente.", true], ["ganchos", "Ganchos específicos que no se repiten.", false], ["producible", "Los guiones se pueden producir tal cual.", true], ["sin_invencion", "No inventa testimonios, cifras ni promociones.", true]],
   comentarios: [["sin_invencion", "No inventa precios, stock, plazos ni promociones.", true], ["tono", "Respeta el tono de la marca.", false], ["derivacion", "Marca para derivar los casos delicados.", true]],
+  legales: [["borrador", "Está marcado como borrador para revisión legal.", true], ["sin_invencion", "No inventa razón social, CUIT, domicilios, montos ni plazos: usa [completar].", true], ["medible", "La política de devolución es medible y verificable (métrica, base, meta, plazo, compromisos, qué se devuelve).", true], ["sin_promesas", "No promete resultados.", true]],
 };
 function numeros(t, csv) {
   const norm = (s) => { const n = /^\d{1,3}(\.\d{3})+(,\d+)?$/.test(s) ? s.replace(/\./g, "").replace(",", ".") : s.replace(",", "."); return String(parseFloat(n)); };
@@ -696,6 +764,7 @@ const CHEQUEOS = {
     return p;
   },
   mensaje: (m) => (m.split("\n").filter((l) => l.trim()).length > 25 ? ["El mensaje es demasiado largo."] : []),
+  legales: (m) => (/BORRADOR/.test(m) ? [] : ["Falta la marca de BORRADOR PARA REVISIÓN LEGAL."]),
 };
 
 async function revisar(tipo, c, e, m, x) {
@@ -733,63 +802,298 @@ const COPIAS = {
   not_granted: "No se dio permiso para usar Claude desde el panel. Recargá la página y aceptá el permiso para usar los agentes.",
   sampling_disabled: "Claude no está disponible para esta cuenta.", rate_limited: "Llegaste al límite de uso de Claude por ahora. Probá de nuevo en un rato.",
   session_expired: "Tu sesión venció: volvé a iniciar sesión en claude.ai.", prompt_too_large: "El material es demasiado largo. Recortá el texto pegado o subí menos capturas.",
-  image_rejected: "Una captura no se pudo usar (tipo o tamaño). Probá con PNG o JPG más livianos.", images_unavailable: "En esta vista no se pueden mandar capturas: pegá el texto de la tienda.",
+  image_rejected: "Una captura no se pudo usar (tipo o tamaño). Probá con PNG o JPG más livianos.", images_unavailable: "En esta vista no se pueden mandar capturas: pegá el texto.",
+  tools_unavailable: "En esta vista los agentes no pueden usar el navegador. Desmarcá la investigación web y subí capturas o texto.",
   refused: "Claude no pudo completar este pedido. Revisá el material y probá con otro enfoque.", empty_completion: "Claude no devolvió texto. Probá de nuevo con menos material.",
   invalid_json: "La respuesta no vino en el formato esperado. Probá de nuevo.", upstream_error: "Hubo un corte de conexión con Claude. Probá de nuevo.",
 };
-const copia = (err) => err?.code === "grilla" ? err.message : COPIAS[err?.code] || `Error: ${err?.message || err?.code || "desconocido"}`;
+const copia = (err) => ["grilla", "truncated"].includes(err?.code) ? err.message : COPIAS[err?.code] || `Error: ${err?.message || err?.code || "desconocido"}`;
+const tituloDe = (m, def) => (m.match(/^#\s+(.+)$/m)?.[1] || def).slice(0, 140);
+const espera = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function ejecutar(tipo, c, entrada) {
+/* ---------- Navegador de Claude (app de escritorio) ---------- */
+// Los agentes investigan en la web con el navegador integrado de la app de escritorio.
+// Solo está disponible para la cuenta dueña del panel; si no está, se trabaja con capturas y texto.
+const NAV = "host:claude_browser";
+let pestana = null, colaNav = Promise.resolve();
+function textoResultado(r) {
+  if (typeof r?.payload === "string") return r.payload;
+  const t = (r?.content || []).filter((b) => b.type === "text").map((b) => b.text).join("\n");
+  return t || (r?.payload ? JSON.stringify(r.payload) : "");
+}
+function idPestana(r) {
+  const p = r?.payload;
+  const directo = p && typeof p === "object" ? (p.tabId ?? p.tab_id ?? p.id ?? p.tab?.id) : null;
+  if (directo != null) return directo;
+  const m = textoResultado(r).match(/tab\s*_?id["':\s]*(\d+)/i);
+  return m ? Number(m[1]) : null;
+}
+function leerWeb(url) {
+  // Una lectura a la vez: el navegador tiene una sola pestaña de trabajo.
+  const tarea = colaNav.then(async () => {
+    try {
+      if (pestana == null) { const r = await S.mcp.callTool(NAV, "preview_start", { url }); pestana = idPestana(r); }
+      else await S.mcp.callTool(NAV, "navigate", { url, tabId: pestana });
+    } catch (e) {
+      if (e?.code !== "tool_error") throw e;
+      const r = await S.mcp.callTool(NAV, "preview_start", { url }); pestana = idPestana(r); // la pestaña se cerró: abrir otra
+    }
+    await espera(1800);
+    const r = await S.mcp.callTool(NAV, "get_page_text", pestana != null ? { tabId: pestana } : {});
+    const t = textoResultado(r).replace(/\n{3,}/g, "\n\n").trim();
+    return t ? `URL: ${url}\n\n${t.slice(0, 12000)}` : `La página ${url} no devolvió texto.`;
+  });
+  colaNav = tarea.catch(() => {});
+  return tarea;
+}
+function herramientasWeb(x) {
+  let usos = 0;
+  const limite = 24;
+  const control = () => { if (++usos > limite) throw new Error("Se alcanzó el máximo de lecturas para esta tarea: escribí con lo que ya tenés."); };
+  const fallo = (e) => { throw new Error(e?.code === "server_not_connected" ? "El navegador no está disponible: seguí con el material que tenés y marcá lo que falte como a validar." : e?.code === "cancelled" ? "La lectura no se aprobó." : `No se pudo leer (${e?.code || e?.message || "error"}).`); };
+  return [
+    { name: "buscar_en_web", description: "Busca en la web y devuelve el texto de la página de resultados (títulos, fragmentos y direcciones). Usalo para encontrar competidores, precios, reseñas, notas y tendencias. Después leé las páginas relevantes con leer_pagina.", inputSchema: { type: "object", properties: { consulta: { type: "string", description: "Búsqueda en lenguaje natural" } }, required: ["consulta"] },
+      async execute(i) { control(); x.paso(`Buscando en la web: ${String(i.consulta).slice(0, 80)}`); try { return await leerWeb("https://duckduckgo.com/html/?q=" + encodeURIComponent(String(i.consulta))); } catch (e) { fallo(e); } } },
+    { name: "leer_pagina", description: "Abre una página pública y devuelve su texto: el sitio o la tienda de la marca, sitios de competidores, fichas de producto, notas de prensa o reseñas.", inputSchema: { type: "object", properties: { url: { type: "string", description: "Dirección completa, con https://" } }, required: ["url"] },
+      async execute(i) { const u = String(i.url || ""); if (!/^https?:\/\//i.test(u)) throw new Error("La dirección tiene que empezar con https://"); control(); x.paso(`Leyendo: ${u.slice(0, 90)}`); try { return await leerWeb(u); } catch (e) { fallo(e); } } },
+  ];
+}
+
+/* ---------- Un agente: generar → revisar → corregir → guardar ---------- */
+async function correrAgente(tipo, c, entrada) {
   const ag = AGENTES[tipo];
-  const ctl = new AbortController();
-  S.run = { tipo, clienteId: c.id, ctl, pasos: [], preview: "", error: null };
-  render();
+  const ctl = S.run.ctl;
   const x = {
     memo: {}, correcciones: "",
     pedido: entrada._pedido ? `\n\n<pedido_del_equipo>\nRehacé la entrega aplicando este pedido del equipo, sin perder lo que estaba bien:\n${entrada._pedido}\n</pedido_del_equipo>` : "",
+    web: entrada.web && S.navegador ? null : false,
     paso(t) { S.run.pasos.forEach((p) => (p.hecho = true)); S.run.pasos.push({ t, hecho: false }); S.run.preview = ""; pintarRun(); },
-    async pedir(prompt, { json = false, images } = {}) {
+    async pedir(prompt, { json = false, images, web = false } = {}) {
       const opts = { modelTier: "complex", cache: false, signal: ctl.signal, onText: ({ text }) => { S.run.preview = text.slice(-1600); pintarPreview(); } };
       if (images && images.length) opts.images = images;
+      if (web && x.web !== false) opts.tools = herramientasWeb(x);
       if (json) return S.sample.json(prompt, opts);
       const r = await S.sample(prompt, opts);
       if (r.truncated) throw { code: "truncated", message: "La respuesta quedó cortada por longitud. Pedí menos piezas o menos material." };
       return r.text.trim();
     },
   };
+  const rondas = Number(S.config.rondas ?? 1);
+  let m, v, hist = [];
+  x.correcciones = x.pedido;
+  for (let r = 0; r <= rondas; r++) {
+    x.paso(r ? `${ag.nombre}: corrigiendo según el control de calidad` : `${ag.nombre}: generando`);
+    m = await ag.generar(c, entrada, x);
+    v = await revisar(tipo, c, entrada, m, x);
+    hist.push({ ronda: r + 1, aprobado: v.aprobado, puntaje: v.puntaje, correcciones: v.correcciones.slice(0, 8) });
+    if (v.aprobado) break;
+    x.correcciones = x.pedido + `\n\n<correcciones_del_revisor>\nTu entrega anterior no pasó el control de calidad. Corregí cada punto y mantené lo que estaba bien:\n${v.correcciones.map((t, i) => `${i + 1}. ${t}`).join("\n")}\n</correcciones_del_revisor>`;
+  }
+  x.paso(`${ag.nombre}: guardando`);
+  const datos = Object.fromEntries(Object.entries(entrada).filter(([k]) => k !== "capturas" && !k.startsWith("_")));
+  if (entrada.capturas?.length) datos.capturas = `${entrada.capturas.length} captura(s)`;
+  const ref = S.db.collection("entregas").doc();
+  const doc = {
+    clienteId: c.id, tipo, titulo: tituloDe(m, ag.nombre), markdown: m, estado: v.aprobado ? "lista" : "revisar",
+    calidad: { aprobado: v.aprobado, puntaje: v.puntaje, rondas: hist.length, correcciones: v.correcciones.slice(0, 8), historial: hist },
+    entrada: datos, creado: ahora(), autorId: S.yo?.id || null, versionDe: entrada._versionDe || null,
+  };
+  await ref.set(doc);
+  S.entregas.set(ref.id, { id: ref.id, ...doc });
+  anotar(c.id, "Sistema", `Se generó "${doc.titulo}" · calidad ${v.puntaje}/100${v.aprobado ? "" : " (con observaciones)"}`);
+  return { id: ref.id, aprobado: v.aprobado };
+}
+
+async function ejecutar(tipo, c, entrada) {
+  S.run = { titulo: AGENTES[tipo].nombre, clienteId: c.id, ctl: new AbortController(), pasos: [], preview: "", error: null };
+  render();
   try {
-    const rondas = Number(S.config.rondas ?? 1);
-    let m, v, hist = [];
-    x.correcciones = x.pedido;
-    for (let r = 0; r <= rondas; r++) {
-      x.paso(r ? `Corrigiendo según el control de calidad (ronda ${r + 1})` : `Generando: ${ag.nombre}`);
-      m = await ag.generar(c, entrada, x);
-      v = await revisar(tipo, c, entrada, m, x);
-      hist.push({ ronda: r + 1, aprobado: v.aprobado, puntaje: v.puntaje, correcciones: v.correcciones.slice(0, 8) });
-      if (v.aprobado) break;
-      x.correcciones = x.pedido + `\n\n<correcciones_del_revisor>\nTu entrega anterior no pasó el control de calidad. Corregí cada punto y mantené lo que estaba bien:\n${v.correcciones.map((t, i) => `${i + 1}. ${t}`).join("\n")}\n</correcciones_del_revisor>`;
-    }
-    x.paso("Guardando la entrega");
-    const datos = Object.fromEntries(Object.entries(entrada).filter(([k]) => k !== "capturas" && !k.startsWith("_")));
-    if (entrada.capturas?.length) datos.capturas = `${entrada.capturas.length} captura(s)`;
-    const ref = S.db.collection("entregas").doc();
-    const doc = {
-      clienteId: c.id, tipo, titulo: tituloDe(m, ag.nombre), markdown: m, estado: v.aprobado ? "lista" : "revisar",
-      calidad: { aprobado: v.aprobado, puntaje: v.puntaje, rondas: hist.length, correcciones: v.correcciones.slice(0, 8), historial: hist },
-      entrada: datos, creado: ahora(), versionDe: entrada._versionDe || null,
-    };
-    await ref.set(doc);
-    S.entregas.set(ref.id, { id: ref.id, ...doc });
-    S.run = null; S.agente = null; S.tab = "entregas"; S.entregaId = ref.id; S.editando = false;
-    toast(v.aprobado ? "Entrega lista y aprobada por el control de calidad" : "Entrega lista: revisá las observaciones del control de calidad");
+    const r = await correrAgente(tipo, c, entrada);
+    S.run = null; S.agente = null; S.tab = "entregas"; S.entregaId = r.id; S.editando = false;
+    toast(r.aprobado ? "Entrega lista y aprobada por el control de calidad" : "Entrega lista: revisá las observaciones del control de calidad");
   } catch (err) {
-    if (err?.code === "cancelled") { S.run = null; toast("Detenido"); }
-    else S.run.error = err?.code === "truncated" ? err.message : copia(err);
+    if (err?.code === "cancelled") { S.run = null; toast("Detenido"); } else S.run.error = copia(err);
   }
   render();
 }
-const tituloDe = (m, def) => (m.match(/^#\s+(.+)$/m)?.[1] || def).slice(0, 140);
 
+const CADENA = ["diagnostico", "investigacion", "auditoria", "foda", "hipotesis"];
+async function ejecutarCadena(c, e) {
+  S.run = { titulo: "Pasos 1 a 5 seguidos", clienteId: c.id, ctl: new AbortController(), pasos: [], preview: "", error: null };
+  render();
+  const entradas = {
+    diagnostico: { notas: e.notas, metricas: e.metricas },
+    investigacion: { competidores: e.competidores, mercado: "", web: e.web },
+    auditoria: { capturas: e.capturas, metricas: e.metricas, texto: "", web: e.web },
+    foda: {}, hipotesis: {},
+  };
+  let hechos = 0;
+  try {
+    for (const t of CADENA) { await correrAgente(t, S.clientes.get(c.id) || c, entradas[t]); hechos++; }
+    S.run = null; S.agente = null; S.tab = "agentes";
+    toast("Pasos 1 a 5 listos. Revisalos y aprobalos antes del plan de 90 días.");
+  } catch (err) {
+    if (err?.code === "cancelled") { S.run = null; toast(`Detenido después de ${hechos} paso(s)`); }
+    else S.run.error = `Se completaron ${hechos} de 5 pasos. En el paso ${hechos + 1} (${AGENTES[CADENA[hechos]].nombre}): ${copia(err)}`;
+  }
+  render();
+}
+
+/* ---------- Bitácora del caso ---------- */
+const TIPOS_BITACORA = ["Nota", "Llamada", "WhatsApp", "Email", "Reunión", "Pedido del cliente", "Decisión"];
+async function anotar(clienteId, tipo, texto) {
+  if (!S.db || !texto) return;
+  try {
+    await S.db.collection(`clientes/${clienteId}/bitacora`).doc().set({ fecha: ahora(), tipo, texto: String(texto).slice(0, 2000), autorId: S.yo?.id || null });
+    const cambio = { ultimaActividad: ahora() };
+    if (tipo !== "Sistema" && tipo !== "Nota" && tipo !== "Decisión") cambio.ultimoContacto = ahora();
+    await S.db.doc("clientes/" + clienteId).update(cambio);
+  } catch { /* la bitácora no debe frenar el trabajo */ }
+}
+let desuscribirBitacora = null, bitacoraDe = null;
+function seguirBitacora(clienteId) {
+  if (bitacoraDe === clienteId || !S.db) return;
+  desuscribirBitacora?.(); bitacoraDe = clienteId; S.bitacora = [];
+  desuscribirBitacora = S.db.collection(`clientes/${clienteId}/bitacora`).orderBy("fecha", "desc").limit(200).onSnapshot((snap) => {
+    S.bitacora = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    resolverNombres(S.bitacora.map((b) => b.autorId));
+    if (!ocupado() && S.tab === "caso") render();
+  }, () => {});
+}
+
+/* ---------- Personas ---------- */
+const nombre = (id) => (id ? S.nombres.get(id) || "Alguien del equipo" : "Sin asignar");
+async function resolverNombres(ids) {
+  if (!S.user) return;
+  const faltan = [...new Set(ids.filter((i) => i && !S.nombres.has(i)))];
+  if (!faltan.length) return;
+  try {
+    const ps = await S.user.profiles(faltan);
+    for (const i of faltan) S.nombres.set(i, ps[i]?.name || "Alguien del equipo");
+    if (!ocupado()) render(); else pintarLista();
+  } catch {}
+}
+
+/* ---------- Asistente del caso ---------- */
+function fuentesCaso(c) {
+  const pasos = PASOS.map((t) => { const e = mejorEntrega(c.id, t); return e ? `<paso n="${AGENTES[t].paso}" nombre="${AGENTES[t].nombre}" estado="${e.estado}" fecha="${fecha(e.creado)}">\n${e.markdown.slice(0, 3500)}\n</paso>` : `<paso n="${AGENTES[t].paso}" nombre="${AGENTES[t].nombre}">sin hacer</paso>`; }).join("\n");
+  const otras = HERRAMIENTAS.map((t) => mejorEntrega(c.id, t)).filter(Boolean).map((e) => `<entrega tipo="${AGENTES[e.tipo].nombre}" fecha="${fecha(e.creado)}" estado="${e.estado}">\n${e.markdown.slice(0, 2500)}\n</entrega>`).join("\n");
+  const bit = (bitacoraDe === c.id ? S.bitacora : []).slice(0, 80).reverse().map((b) => `- ${fechaHora(b.fecha)} · ${b.tipo} · ${nombre(b.autorId)}: ${b.texto}`).join("\n");
+  const pp = c.proximoPaso || {};
+  return `${contextoCliente(c)}
+<estado_del_caso>
+Etapa: ${c.etapa || "Prospecto"} · Responsable: ${nombre(c.responsableId)} · Próximo paso: ${pp.texto || "sin definir"}${pp.fecha ? ` (para el ${pp.fecha})` : ""}
+Último contacto con el cliente: ${c.ultimoContacto ? fechaHora(c.ultimoContacto) : "sin registrar"}
+Checklist de arranque: ${ONBOARDING.map(([k, l]) => `${l}: ${c.onboarding?.[k] ? "sí" : "no"}`).join("; ")}
+</estado_del_caso>
+<proceso>
+${pasos}
+</proceso>
+${otras ? `<otras_entregas>\n${otras}\n</otras_entregas>` : ""}
+<bitacora>
+${bit || "(vacía)"}
+</bitacora>`;
+}
+async function preguntarCaso(c, pregunta, onText, signal) {
+  const previas = (S.chat.clienteId === c.id ? S.chat.turnos : []).slice(-6).map((t) => `${t.rol === "yo" ? "Pregunta" : "Respuesta"}: ${t.texto}`).join("\n\n");
+  const prompt = `${agenciaTexto()}
+
+Tu rol: asistente de casos de ${nombreAgencia()}. Ayudás a cualquier persona del equipo, incluso a alguien que nunca vio este caso, a saber en qué está, a responder consultas del cliente y a avanzar sin quedarse estancado. ${ESTILO}
+${DATOS}
+
+Reglas:
+- Respondé SOLO con lo que está en las fuentes del caso. Después de cada afirmación citá la fuente entre corchetes: [Paso 3], [Bitácora 12/11], [Ficha], [Estado del caso], [Propuesta].
+- Si algo no está en las fuentes, decilo y explicá dónde averiguarlo o a quién preguntarle. Nunca lo supongas.
+- Si te piden una respuesta para el cliente, escribila lista para copiar (voseo, cordial) y aclaraste antes qué datos verificaste.
+- Si te preguntan cómo avanzar, proponé el próximo paso concreto con responsable y fecha sugerida.
+- Si detectás riesgos (próximo paso vencido, cliente sin contacto, pasos sin aprobar, compromisos del plan sin cumplir), mencionalos.
+
+<fuentes_del_caso>
+${fuentesCaso(c)}
+</fuentes_del_caso>
+${previas ? `\nConversación anterior:\n${previas}\n` : ""}
+Pregunta de ${S.yo?.nombre || "una persona del equipo"}: ${pregunta}`;
+  const r = await S.sample(prompt, { modelTier: "complex", cache: false, signal, onText });
+  return r.text.trim();
+}
+
+/* ---------- Word (.docx) sin dependencias ---------- */
+const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+function crc32(b) { let c = 0xffffffff; for (let i = 0; i < b.length; i++) c = CRC[(c ^ b[i]) & 0xff] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; }
+function zip(archivos) {
+  const enc = new TextEncoder(), partes = [], central = [];
+  let off = 0;
+  for (const [nombreArch, contenido] of archivos) {
+    const nb = enc.encode(nombreArch), data = enc.encode(contenido), crc = crc32(data);
+    const h = new DataView(new ArrayBuffer(30));
+    h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(6, 0x0800, true); h.setUint16(8, 0, true);
+    h.setUint32(14, crc, true); h.setUint32(18, data.length, true); h.setUint32(22, data.length, true); h.setUint16(26, nb.length, true);
+    partes.push(new Uint8Array(h.buffer), nb, data);
+    const cd = new DataView(new ArrayBuffer(46));
+    cd.setUint32(0, 0x02014b50, true); cd.setUint16(4, 20, true); cd.setUint16(6, 20, true); cd.setUint16(8, 0x0800, true);
+    cd.setUint32(16, crc, true); cd.setUint32(20, data.length, true); cd.setUint32(24, data.length, true); cd.setUint16(28, nb.length, true); cd.setUint32(42, off, true);
+    central.push(new Uint8Array(cd.buffer), nb);
+    off += 30 + nb.length + data.length;
+  }
+  const tam = central.reduce((a, p) => a + p.length, 0);
+  const fin = new DataView(new ArrayBuffer(22));
+  fin.setUint32(0, 0x06054b50, true); fin.setUint16(8, archivos.length, true); fin.setUint16(10, archivos.length, true); fin.setUint32(12, tam, true); fin.setUint32(16, off, true);
+  return new Blob([...partes, ...central, new Uint8Array(fin.buffer)], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+}
+const xml = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+function runs(t) {
+  return String(t).split(/(\*\*[^*]+\*\*)/g).filter(Boolean).map((p) => p.startsWith("**") ? `<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">${xml(p.slice(2, -2))}</w:t></w:r>` : `<w:r><w:t xml:space="preserve">${xml(p.replace(/`/g, ""))}</w:t></w:r>`).join("");
+}
+function docx(c, e) {
+  const L = String(e.markdown || "").replace(/\r/g, "").split("\n");
+  let b = "", i = 0;
+  const par = (t, estilo) => `<w:p>${estilo ? `<w:pPr><w:pStyle w:val="${estilo}"/></w:pPr>` : ""}${runs(t)}</w:p>`;
+  const celdas = (l) => l.trim().replace(/^\||\|$/g, "").split("|").map((x) => x.trim());
+  b += par(`${nombreAgencia()} · Preparado para ${c.marca} · ${fecha(e.creado)}`, "Subtitle");
+  while (i < L.length) {
+    const l = L[i];
+    const h = l.match(/^(#{1,6})\s+(.*)$/);
+    if (h) { b += par(h[2], h[1].length === 1 ? "Title" : `Heading${Math.min(h[1].length - 1, 3)}`); i++; continue; }
+    if (/^\s*\|/.test(l) && i + 1 < L.length && /^\s*\|?\s*:?-{2,}/.test(L[i + 1])) {
+      const filas = [celdas(l)]; i += 2;
+      while (i < L.length && /^\s*\|/.test(L[i])) filas.push(celdas(L[i++]));
+      const borde = '<w:top w:val="single" w:sz="4" w:color="BFC6D1"/><w:left w:val="single" w:sz="4" w:color="BFC6D1"/><w:bottom w:val="single" w:sz="4" w:color="BFC6D1"/><w:right w:val="single" w:sz="4" w:color="BFC6D1"/><w:insideH w:val="single" w:sz="4" w:color="BFC6D1"/><w:insideV w:val="single" w:sz="4" w:color="BFC6D1"/>';
+      b += `<w:tbl><w:tblPr><w:tblW w:w="5000" w:type="pct"/><w:tblBorders>${borde}</w:tblBorders></w:tblPr>${filas.map((f, k) => `<w:tr>${f.map((x) => `<w:tc><w:p>${k === 0 ? `<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">${xml(x.replace(/\*\*/g, ""))}</w:t></w:r>` : runs(x)}</w:p></w:tc>`).join("")}</w:tr>`).join("")}</w:tbl>${par("")}`;
+      continue;
+    }
+    const li = l.match(/^\s*([-*+]|\d+[.)])\s+(.*)$/);
+    if (li) { b += par((/\d/.test(li[1]) ? li[1] + " " : "• ") + li[2], "ListParagraph"); i++; continue; }
+    if (/^\s*(---|\*\*\*)\s*$/.test(l) || /^```/.test(l)) { i++; continue; }
+    b += l.trim() ? par(l.replace(/^\s*>\s?/, "")) : "";
+    i++;
+  }
+  const estilos = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:cs="Calibri"/><w:sz w:val="22"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="120" w:line="276" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>
+<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style>
+<w:style w:type="paragraph" w:styleId="Title"><w:name w:val="Title"/><w:basedOn w:val="Normal"/><w:pPr><w:spacing w:after="240"/></w:pPr><w:rPr><w:b/><w:sz w:val="40"/><w:color w:val="0E1626"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="Subtitle"><w:name w:val="Subtitle"/><w:basedOn w:val="Normal"/><w:rPr><w:color w:val="556072"/><w:sz w:val="20"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/><w:basedOn w:val="Normal"/><w:pPr><w:keepNext/><w:spacing w:before="320" w:after="120"/><w:outlineLvl w:val="0"/></w:pPr><w:rPr><w:b/><w:sz w:val="30"/><w:color w:val="2F49F5"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="Heading2"><w:name w:val="heading 2"/><w:basedOn w:val="Normal"/><w:pPr><w:keepNext/><w:spacing w:before="240" w:after="80"/><w:outlineLvl w:val="1"/></w:pPr><w:rPr><w:b/><w:sz w:val="26"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="Heading3"><w:name w:val="heading 3"/><w:basedOn w:val="Normal"/><w:pPr><w:keepNext/><w:outlineLvl w:val="2"/></w:pPr><w:rPr><w:b/><w:sz w:val="23"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="ListParagraph"><w:name w:val="List Paragraph"/><w:basedOn w:val="Normal"/><w:pPr><w:ind w:left="360"/><w:spacing w:after="60"/></w:pPr></w:style></w:styles>`;
+  return zip([
+    ["[Content_Types].xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>`],
+    ["_rels/.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`],
+    ["word/_rels/document.xml.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`],
+    ["word/styles.xml", estilos],
+    ["word/document.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${b}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134" w:header="709" w:footer="709" w:gutter="0"/></w:sectPr></w:body></w:document>`],
+  ]);
+}
+
+/* ---------- Comparar versiones ---------- */
+function diferencias(a, b) {
+  const A = String(a).split("\n").slice(0, 900), B = String(b).split("\n").slice(0, 900);
+  const n = A.length, m = B.length, T = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1));
+  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) T[i][j] = A[i] === B[j] ? T[i + 1][j + 1] + 1 : Math.max(T[i + 1][j], T[i][j + 1]);
+  const out = []; let i = 0, j = 0;
+  while (i < n && j < m) { if (A[i] === B[j]) { out.push([" ", A[i]]); i++; j++; } else if (T[i + 1][j] >= T[i][j + 1]) out.push(["-", A[i++]]); else out.push(["+", B[j++]]); }
+  while (i < n) out.push(["-", A[i++]]); while (j < m) out.push(["+", B[j++]]);
+  return out;
+}
 
 /* ===================== Datos ===================== */
 async function guardarCliente(id, datos) {
@@ -840,15 +1144,35 @@ function pintarLista() {
   }).join("");
   el.querySelectorAll("[data-cli]").forEach((b) => b.addEventListener("click", () => abrirCliente(b.dataset.cli)));
 }
-function abrirCliente(id, tab) { S.vista = "cliente"; S.clienteId = id; S.tab = tab || "ficha"; S.entregaId = null; S.agente = null; S.editando = false; guardarLocal("escala-cliente", id); render(); }
+function abrirCliente(id, tab) { seguirBitacora(id); if (S.chat.clienteId !== id) S.chat = { clienteId: id, turnos: [] }; S.vista = "cliente"; S.clienteId = id; S.tab = tab || "caso"; S.entregaId = null; S.agente = null; S.editando = false; guardarLocal("escala-cliente", id); render(); }
 
 function vistaSinDb() {
   return `<div class="card vacio"><h2>Abrí este panel desde claude.ai</h2><p>El panel guarda tus clientes y entregas en tu cuenta de Claude. Esta vista no tiene acceso a ese almacenamiento: abrilo desde claude.ai con tu sesión iniciada.</p></div>`;
 }
 
+const ETAPAS = ["Prospecto", "Propuesta enviada", "Ingreso", "En ejecución", "Renovación", "Pausado", "Baja"];
+const hoyISO = () => new Date().toISOString().slice(0, 10);
+const diasDesde = (iso) => (iso ? Math.floor((Date.now() - new Date(iso).getTime()) / 86400000) : null);
+function alertasCaso(c) {
+  const a = [];
+  const pp = c.proximoPaso || {};
+  if (!["Pausado", "Baja"].includes(c.etapa)) {
+    if (!pp.texto) a.push(["warn", "Sin próximo paso"]);
+    else if (pp.fecha && pp.fecha < hoyISO()) a.push(["bad", "Próximo paso vencido"]);
+    const d = diasDesde(c.ultimoContacto || c.creado);
+    if (d != null && d > 7) a.push(["warn", `${d} días sin contacto`]);
+    if (!c.responsableId) a.push(["warn", "Sin responsable"]);
+  }
+  return a;
+}
+function coincidencia() {
+  const js = [...S.entregas.values()].filter((e) => e.decisionEquipo && e.calidad);
+  if (!js.length) return null;
+  const ok = js.filter((e) => e.calidad.aprobado === (e.decisionEquipo === "aprobar")).length;
+  return { pct: Math.round((ok / js.length) * 100), n: js.length };
+}
 function vistaInicio() {
   const cs = [...S.clientes.values()];
-  const revisar = [...S.entregas.values()].filter((e) => e.estado === "revisar");
   const agentesOff = !S.sample ? `<div class="aviso">Los agentes necesitan Claude y esta vista no lo tiene disponible. Abrí el panel en claude.ai; la primera vez que uses un agente te va a pedir permiso.</div>` : "";
   if (!cs.length) return `${agentesOff}<div class="card vacio">
     <span class="eyebrow">Tu primer cliente</span>
@@ -856,18 +1180,29 @@ function vistaInicio() {
     <p>Creá su ficha con lo que sepas. Después los agentes recorren el proceso completo: diagnóstico, investigación, auditoría de marca, FODA, hipótesis, plan de 90 días, pauta y medición. Cada paso usa lo que dejaron los anteriores y pasa por control de calidad antes de que lo veas.</p>
     <div class="fila"><button class="btn pri" type="button" id="ini-nuevo">Crear el primer cliente</button><button class="btn" type="button" id="ini-ejemplo">Probar con un cliente ficticio</button></div>
     <p style="font-size:.85rem">Los agentes usan tu cuenta de Claude: no hace falta API key ni servidor.</p></div>`;
-  return `${agentesOff}<div><span class="eyebrow">Inicio</span><h1>Hoy</h1></div>
-    <div class="card"><h2>Para revisar (${revisar.length})</h2>${revisar.length ? revisar.map((e) => `<button class="ent" type="button" data-ir="${esc(e.id)}"><b>${esc(e.titulo)}</b><small>${esc(S.clientes.get(e.clienteId)?.marca || "")} · ${fechaHora(e.creado)} · puntaje ${e.calidad?.puntaje ?? "—"}</small></button>`).join("") : '<p class="muted">Nada pendiente: todo lo generado pasó el control de calidad o ya lo revisaste.</p>'}</div>
-    <div class="card"><h2>Clientes (${cs.length})</h2>${cs.map((c) => { const ob = ONBOARDING.filter(([k]) => c.onboarding?.[k]).length; const ents = [...S.entregas.values()].filter((e) => e.clienteId === c.id).length; return `<button class="ent" type="button" data-cli2="${esc(c.id)}"><b>${esc(c.marca)}</b><small>${esc(c.plan || "Sin plan")} · arranque ${ob}/${ONBOARDING.length} · ${ents} entrega(s)</small></button>`; }).join("")}</div>`;
+  const revisar = [...S.entregas.values()].filter((e) => e.estado === "revisar");
+  const lista = cs.filter((c) => S.filtro !== "mios" || c.responsableId === S.yo?.id)
+    .sort((a, b) => alertasCaso(b).filter((x) => x[0] === "bad").length - alertasCaso(a).filter((x) => x[0] === "bad").length || (a.proximoPaso?.fecha || "9").localeCompare(b.proximoPaso?.fecha || "9"));
+  const co = coincidencia();
+  const alerta = cs.filter((c) => alertasCaso(c).length).length;
+  return `${agentesOff}<div class="fila" style="justify-content:space-between"><div><span class="eyebrow">Inicio</span><h1>Casos</h1></div>
+    <div class="tabs" role="tablist" style="border:0"><button role="tab" type="button" data-filtro="todos" aria-selected="${S.filtro !== "mios"}">Todos (${cs.length})</button><button role="tab" type="button" data-filtro="mios" aria-selected="${S.filtro === "mios"}">Mis casos (${cs.filter((c) => c.responsableId === S.yo?.id).length})</button></div></div>
+  <div class="kpis"><div class="kpi"><b class="num">${alerta}</b><span>casos con alertas</span></div><div class="kpi"><b class="num">${revisar.length}</b><span>entregas para revisar</span></div><div class="kpi"><b class="num">${co ? co.pct + "%" : "—"}</b><span>coincidencia del control de calidad con el equipo${co ? ` (${co.n})` : ""}</span></div></div>
+  <div class="card" style="padding:0"><div class="tabla-casos"><table><thead><tr><th>Cliente</th><th>Etapa</th><th>Responsable</th><th>Proceso</th><th>Próximo paso</th><th>Alertas</th></tr></thead><tbody>
+  ${lista.map((c) => { const n = PASOS.filter((t) => mejorEntrega(c.id, t)?.estado === "aprobada").length; const pp = c.proximoPaso || {}; const al = alertasCaso(c);
+    return `<tr data-caso="${esc(c.id)}" tabindex="0"><td><b>${esc(c.marca)}</b><br><small class="muted">${esc(c.plan || "Sin plan")}</small></td><td>${esc(c.etapa || "Prospecto")}</td><td>${esc(nombre(c.responsableId))}</td><td class="num">${n}/8</td><td>${pp.texto ? `${esc(pp.texto)}${pp.fecha ? `<br><small class="muted num">${esc(pp.fecha)}</small>` : ""}` : '<span class="muted">—</span>'}</td><td>${al.length ? al.map(([k, t]) => `<span class="chip ${k}">${esc(t)}</span>`).join(" ") : '<span class="chip ok">Al día</span>'}</td></tr>`; }).join("") || `<tr><td colspan="6" class="muted">No tenés casos asignados.</td></tr>`}
+  </tbody></table></div></div>
+  ${revisar.length ? `<div class="card"><h2>Para revisar (${revisar.length})</h2>${revisar.map((e) => `<button class="ent" type="button" data-ir="${esc(e.id)}"><b>${esc(e.titulo)}</b><small>${esc(S.clientes.get(e.clienteId)?.marca || "")} · ${fechaHora(e.creado)} · puntaje ${e.calidad?.puntaje ?? "—"}</small></button>`).join("")}</div>` : ""}`;
 }
 function enlazarInicio() {
   $("#ini-nuevo")?.addEventListener("click", () => { S.vista = "nuevo"; render(); });
   $("#ini-ejemplo")?.addEventListener("click", async (ev) => {
     ev.target.disabled = true;
     const id = await guardarCliente(null, { marca: "Trama Lino (ficticio)", rubro: "Indumentaria femenina de lino", url: "https://tienda.trama-lino.example", redes: "@tramalino.ficticio", publico: "Mujeres de 28 a 45 años, AMBA y Córdoba, interesadas en moda sustentable", tono: "Cálido, cercano, con foco en la calidad del material", productos: "Vestidos y camisas de lino, línea verano", objetivo: "Subir la conversión de la tienda y crecer en Instagram para el lanzamiento de verano", plan: "Growth 360", contacto: "Lucía (ficticia)", notas: "Cliente de ejemplo para practicar. Borralo cuando quieras." }).catch(() => null);
-    if (id) { S.clientes.set(id, { id, marca: "Trama Lino (ficticio)", lecciones: [], onboarding: {}, base: {} }); abrirCliente(id); }
+    if (id) { S.clientes.set(id, { id, marca: "Trama Lino (ficticio)", lecciones: [], onboarding: {}, base: {} }); await guardarCliente(id, { etapa: "Prospecto", responsableId: S.yo?.id || null, competidores: "Linos del Sur (ficticio), Casa Lino (ficticio)" }).catch(() => {}); abrirCliente(id); }
   });
-  document.querySelectorAll("[data-cli2]").forEach((b) => b.addEventListener("click", () => abrirCliente(b.dataset.cli2)));
+  document.querySelectorAll("[data-caso]").forEach((tr) => { const ir = () => abrirCliente(tr.dataset.caso); tr.addEventListener("click", ir); tr.addEventListener("keydown", (ev) => { if (ev.key === "Enter") ir(); }); });
+  document.querySelectorAll("[data-filtro]").forEach((b) => b.addEventListener("click", () => { S.filtro = b.dataset.filtro; guardarLocal("kairos-filtro", S.filtro); render(); }));
   document.querySelectorAll("[data-ir]").forEach((b) => b.addEventListener("click", () => { const e = S.entregas.get(b.dataset.ir); S.vista = "cliente"; S.clienteId = e.clienteId; S.tab = "entregas"; S.entregaId = e.id; render(); }));
 }
 
@@ -890,7 +1225,7 @@ function enlazarFormCliente(c) {
     ev.submitter && (ev.submitter.disabled = true);
     try {
       if (c) { await guardarCliente(c.id, datos); S.editando = false; toast("Ficha guardada"); render(); }
-      else { const id = await guardarCliente(null, datos); S.clientes.set(id, { id, ...datos, lecciones: [], onboarding: {}, base: {} }); abrirCliente(id); toast("Cliente creado"); }
+      else { const id = await guardarCliente(null, { ...datos, etapa: "Prospecto", responsableId: S.yo?.id || null }); S.clientes.set(id, { id, ...datos, etapa: "Prospecto", responsableId: S.yo?.id || null, lecciones: [], onboarding: {}, base: {} }); anotar(id, "Sistema", "Se creó el caso"); abrirCliente(id); toast("Cliente creado"); }
     } catch { ev.submitter && (ev.submitter.disabled = false); }
   });
   $("#cancelar")?.addEventListener("click", () => { S.editando = false; render(); });
@@ -898,21 +1233,76 @@ function enlazarFormCliente(c) {
 
 function vistaCliente(c) {
   const ents = [...S.entregas.values()].filter((e) => e.clienteId === c.id);
-  const tabs = [["ficha", "Ficha y arranque"], ["agentes", "Agentes"], ["entregas", `Entregas (${ents.length})`]];
+  const tabs = [["caso", "Caso"], ["ficha", "Ficha y arranque"], ["agentes", "Agentes"], ["entregas", `Entregas (${ents.length})`]];
   let cuerpo = "";
   if (S.run && S.run.clienteId === c.id) cuerpo = vistaRun();
+  else if (S.tab === "caso") cuerpo = vistaCaso(c);
   else if (S.tab === "ficha") cuerpo = S.editando ? vistaFormCliente(c) : vistaFicha(c);
-  else if (S.tab === "agentes") cuerpo = S.agente ? vistaFormAgente(c) : vistaAgentes(c);
+  else if (S.tab === "agentes") cuerpo = S.agente === "_cadena" ? vistaCadena(c) : S.agente ? vistaFormAgente(c) : vistaAgentes(c);
   else cuerpo = vistaEntregas(c, ents);
-  return `<div class="fila" style="justify-content:space-between"><div><span class="eyebrow">${esc(c.plan || "Sin plan")}</span><h1>${esc(c.marca)}</h1></div></div>
+  return `<div class="fila" style="justify-content:space-between"><div><span class="eyebrow">${esc(c.etapa || "Prospecto")} · ${esc(c.plan || "Sin plan")} · ${esc(nombre(c.responsableId))}</span><h1>${esc(c.marca)}</h1></div></div>
   <div class="tabs" role="tablist">${tabs.map(([id, t]) => `<button role="tab" type="button" data-tab="${id}" aria-selected="${S.tab === id}">${t}</button>`).join("")}</div>${cuerpo}`;
 }
 function enlazarCliente(c) {
   document.querySelectorAll("[data-tab]").forEach((b) => b.addEventListener("click", () => { if (S.run && S.run.clienteId === c.id && !S.run.error) return; S.tab = b.dataset.tab; S.agente = null; S.editando = false; if (S.run?.error) S.run = null; render(); }));
   if (S.run && S.run.clienteId === c.id) return enlazarRun();
+  if (S.tab === "caso") return enlazarCaso(c);
   if (S.tab === "ficha") return S.editando ? enlazarFormCliente(c) : enlazarFicha(c);
-  if (S.tab === "agentes") return S.agente ? enlazarFormAgente(c) : enlazarAgentes();
+  if (S.tab === "agentes") return S.agente === "_cadena" ? enlazarCadena(c) : S.agente ? enlazarFormAgente(c) : enlazarAgentes();
   enlazarEntregas(c);
+}
+
+function vistaCaso(c) {
+  const pp = c.proximoPaso || {};
+  const al = alertasCaso(c);
+  const personas = [...new Map([...(S.yo?.id ? [[S.yo.id, S.yo.nombre || "Yo"]] : []), ...S.equipo.map((p) => [p.id, p.name || "Alguien del equipo"]), ...(c.responsableId ? [[c.responsableId, nombre(c.responsableId)]] : [])]).entries()];
+  const chat = S.chat.clienteId === c.id ? S.chat.turnos : [];
+  const siguiente = PASOS.find((t) => mejorEntrega(c.id, t)?.estado !== "aprobada");
+  return `${al.length ? `<div class="fila">${al.map(([k, t]) => `<span class="chip ${k}">${esc(t)}</span>`).join("")}</div>` : ""}
+  <div class="grid2">
+    <form class="card" id="form-caso"><h2>Estado del caso</h2><div class="form">
+      <label class="campo">Etapa<select id="cs-etapa">${ETAPAS.map((e) => `<option${e === (c.etapa || "Prospecto") ? " selected" : ""}>${e}</option>`).join("")}</select></label>
+      <label class="campo">Responsable<select id="cs-resp"><option value="">Sin asignar</option>${personas.map(([id, n]) => `<option value="${esc(id)}"${id === c.responsableId ? " selected" : ""}>${esc(n)}${id === S.yo?.id ? " (vos)" : ""}</option>`).join("")}</select></label>
+      <label class="campo full">Próximo paso<input type="text" id="cs-paso" value="${esc(pp.texto || "")}" placeholder="Ej.: Enviar la propuesta y confirmar reunión"></label>
+      <label class="campo">Fecha<input type="date" id="cs-fecha" value="${esc(pp.fecha || "")}"></label>
+    </div><div class="fila"><button class="btn pri" type="submit">Guardar estado</button><span class="muted" style="font-size:.85rem">Proceso: ${PASOS.filter((t) => mejorEntrega(c.id, t)?.estado === "aprobada").length}/8${siguiente ? ` · siguiente: ${AGENTES[siguiente].paso}. ${esc(AGENTES[siguiente].nombre)}` : " · completo"}</span></div></form>
+    <div class="card"><div class="fila" style="justify-content:space-between"><h2>Asistente del caso</h2><button class="btn chico" type="button" id="al-dia"${S.sample ? "" : " disabled"}>Ponerme al día</button></div>
+      <p class="muted" style="font-size:.86rem">Preguntale lo que necesites: en qué estamos, qué responderle al cliente, cómo avanzar. Contesta solo con lo que hay en el caso y dice de dónde lo saca.</p>
+      <div class="chat" id="chat">${chat.map((t) => `<div class="msg ${t.rol}">${t.rol === "ia" ? `<div class="doc">${md(t.texto)}</div><div class="fila"><button class="btn chico" type="button" data-guardar-chat="${chat.indexOf(t)}">Guardar en la bitácora</button></div>` : esc(t.texto)}</div>`).join("")}${S.chat.pensando && S.chat.clienteId === c.id ? `<div class="msg ia"><div class="doc" id="chat-vivo">${S.chat.vivo ? md(S.chat.vivo) : "Pensando…"}</div></div>` : ""}</div>
+      <form class="fila" id="form-chat"><input type="text" id="chat-q" placeholder="Ej.: El cliente pregunta cuándo ve resultados. ¿Qué le respondo?" style="flex:1;min-width:200px"${S.sample ? "" : " disabled"}><button class="btn pri" type="submit"${S.sample ? "" : " disabled"}>Preguntar</button></form></div>
+  </div>
+  <div class="card"><h2>Bitácora</h2>
+    <form class="fila" id="form-bit"><select id="bit-tipo" style="max-width:170px">${TIPOS_BITACORA.map((t) => `<option>${t}</option>`).join("")}</select><input type="text" id="bit-texto" placeholder="Qué pasó, qué pidió el cliente, qué se decidió…" style="flex:1;min-width:200px"><button class="btn" type="submit">Anotar</button></form>
+    ${S.bitacora.length ? `<ol class="bitacora">${S.bitacora.map((b) => `<li><span class="chip ${b.tipo === "Sistema" ? "neutro" : b.tipo === "Pedido del cliente" ? "warn" : "ok"}">${esc(b.tipo)}</span> <span class="muted num" style="font-size:.82rem">${fechaHora(b.fecha)} · ${esc(nombre(b.autorId))}</span><div>${esc(b.texto)}</div></li>`).join("")}</ol>` : '<p class="muted">Todavía no hay anotaciones. Registrá cada llamada, mensaje, pedido o decisión: es lo que permite que cualquiera del equipo retome el caso.</p>'}
+  </div>`;
+}
+function enlazarCaso(c) {
+  if (S.user && !S.equipo.length) S.user.search?.("").then((r) => { const hits = Array.isArray(r) ? r : r?.results || r?.hits || []; S.equipo = hits.filter((h) => h?.id).slice(0, 20); if (S.equipo.length && !ocupado()) render(); }).catch(() => {});
+  $("#form-caso").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const etapa = $("#cs-etapa").value, responsableId = $("#cs-resp").value || null, proximoPaso = { texto: $("#cs-paso").value.trim(), fecha: $("#cs-fecha").value };
+    const cambios = [];
+    if (etapa !== (c.etapa || "Prospecto")) cambios.push(`Etapa: ${c.etapa || "Prospecto"} → ${etapa}`);
+    if (responsableId) S.nombres.set(responsableId, $("#cs-resp").selectedOptions[0].textContent.replace(" (vos)", ""));
+    if (responsableId !== (c.responsableId || null)) cambios.push(`Responsable: ${nombre(responsableId)}`);
+    if (proximoPaso.texto !== (c.proximoPaso?.texto || "") || proximoPaso.fecha !== (c.proximoPaso?.fecha || "")) cambios.push(`Próximo paso: ${proximoPaso.texto || "sin definir"}${proximoPaso.fecha ? ` (${proximoPaso.fecha})` : ""}`);
+    try { await guardarCliente(c.id, { etapa, responsableId, proximoPaso }); if (cambios.length) anotar(c.id, "Decisión", cambios.join(" · ")); toast("Estado guardado"); } catch {}
+  });
+  $("#form-bit").addEventListener("submit", (ev) => { ev.preventDefault(); const t = $("#bit-texto").value.trim(); if (!t) return; anotar(c.id, $("#bit-tipo").value, t); $("#bit-texto").value = ""; toast("Anotado"); });
+  const preguntar = async (q, visible) => {
+    if (S.chat.pensando) return;
+    if (S.chat.clienteId !== c.id) S.chat = { clienteId: c.id, turnos: [] };
+    S.chat.turnos.push({ rol: "yo", texto: visible || q }); S.chat.pensando = true; S.chat.vivo = ""; render();
+    try {
+      const t = await preguntarCaso(S.clientes.get(c.id) || c, q, ({ text }) => { S.chat.vivo = text; const v = $("#chat-vivo"); if (v) v.innerHTML = md(text); });
+      S.chat.turnos.push({ rol: "ia", texto: t });
+    } catch (err) { S.chat.turnos.push({ rol: "ia", texto: copia(err) }); }
+    S.chat.pensando = false; S.chat.vivo = ""; render();
+    const ch = $("#chat"); if (ch) ch.scrollTop = ch.scrollHeight;
+  };
+  $("#form-chat").addEventListener("submit", (ev) => { ev.preventDefault(); const q = $("#chat-q").value.trim(); if (q) { $("#chat-q").value = ""; preguntar(q); } });
+  $("#al-dia").addEventListener("click", () => preguntar("Poneme al día con este caso como si lo tomara hoy por primera vez: en qué etapa está y qué se hizo, qué se le entregó al cliente y qué falta aprobar, qué pidió el cliente y qué quedó pendiente, compromisos del plan y su cumplimiento, riesgos, y los próximos 3 pasos concretos con fecha sugerida. Terminá con cómo conviene hablarle a este cliente.", "Ponerme al día"));
+  document.querySelectorAll("[data-guardar-chat]").forEach((b) => b.addEventListener("click", () => { const t = S.chat.turnos[Number(b.dataset.guardarChat)]; if (t) { anotar(c.id, "Nota", `Asistente: ${t.texto.replace(/\*\*/g, "")}`.slice(0, 2000)); toast("Guardado en la bitácora"); } }));
 }
 
 function vistaFicha(c) {
@@ -956,10 +1346,34 @@ function vistaAgentes(c) {
   return `${!S.sample ? '<div class="aviso">Los agentes necesitan Claude y esta vista no lo tiene disponible. Abrí el panel en claude.ai.</div>' : ""}
   ${!politica() ? '<div class="aviso info">Todavía no cargaste el texto oficial de la <b>política de devolución</b> (Datos de la agencia). Hasta entonces, los agentes solo dicen que existe y que sus condiciones se firman aparte.</div>' : ""}
   <div class="card"><div class="fila" style="justify-content:space-between"><h2>Proceso · ${hechos}/8 pasos aprobados</h2>${siguiente ? `<span class="muted" style="font-size:.88rem">Siguiente: ${AGENTES[siguiente].paso}. ${esc(AGENTES[siguiente].nombre)}</span>` : '<span class="chip ok">Proceso completo</span>'}</div>
+  ${S.sample ? `<div class="fila" style="margin-bottom:6px"><button class="btn pri" type="button" id="cadena">Correr pasos 1 a 5 seguidos</button><span class="muted" style="font-size:.86rem">Diagnóstico, investigación, auditoría, FODA e hipótesis en cadena (10 a 25 min). Después revisás y aprobás.</span></div>` : ""}
   <ol class="proceso">${PASOS.map((t) => { const [chip, e] = estado(t); const a = AGENTES[t]; return `<li${t === siguiente ? ' class="actual"' : ""}><div class="pn">${a.paso}</div><div class="pt"><b>${esc(a.nombre)}</b><small>${esc(a.desc)}</small><span>${chip}${e ? ` <button class="btn chico" type="button" data-ver="${esc(e.id)}">Ver</button>` : ""}</span></div><button class="btn${t === siguiente ? " pri" : ""}" type="button" data-ag="${t}"${S.sample ? "" : " disabled"}>${e ? "Rehacer" : "Ejecutar"}</button></li>`; }).join("")}</ol></div>
   <div><h2 style="margin-bottom:10px">Herramientas</h2><div class="agentes">${HERRAMIENTAS.map((id) => { const a = AGENTES[id]; return `<button class="agente" type="button" data-ag="${id}"${S.sample ? "" : " disabled"}><h3>${esc(a.nombre)}</h3><p>${esc(a.desc)}</p><span class="t">${esc(a.tiempo)}</span></button>`; }).join("")}</div></div>`;
 }
+function vistaCadena(c) {
+  const imgs = S.limits?.images;
+  return `<form class="card" id="form-cadena"><div><span class="eyebrow">Pasos 1 a 5 · 10 a 25 min</span><h2>Diagnóstico completo en cadena</h2><p class="muted">Corre diagnóstico, investigación, auditoría de marca, FODA e hipótesis, cada uno con control de calidad y usando lo que dejó el anterior. Podés dejarlo trabajando; no cierres la pestaña.</p></div>
+  <div class="form">
+    ${S.navegador ? `<label class="check full"><input type="checkbox" id="k-web" checked> Investigar en la web con el navegador de Claude (lee el sitio de la marca y busca competidores)</label>` : `<div class="aviso full">Sin investigación web en esta vista: el navegador de Claude solo está disponible en la app de escritorio y para la cuenta dueña del panel. Los agentes van a trabajar con lo que cargues.</div>`}
+    <label class="campo full">Notas de la reunión de ingreso<small>Lo que te contó el cliente.</small><textarea id="k-notas"></textarea></label>
+    <label class="campo full">Números actuales (opcional)<textarea id="k-metricas"></textarea></label>
+    <label class="campo full">Competidores<textarea id="k-comp">${esc(c.competidores || "")}</textarea></label>
+    ${imgs ? `<label class="campo full">Capturas de la marca (opcional)<small>Perfil, tienda, anuncios. Hasta ${imgs.maxCount}.</small><input type="file" id="k-capturas" accept="${esc(imgs.mediaTypes.join(","))}" multiple></label>` : ""}
+  </div>
+  <div class="fila"><button class="btn pri" type="submit">Correr los 5 pasos</button><button class="btn" type="button" id="volver-cad">Volver</button><span class="err" id="k-err"></span></div></form>`;
+}
+function enlazarCadena(c) {
+  $("#volver-cad").addEventListener("click", () => { S.agente = null; render(); });
+  $("#form-cadena").addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    const e = { notas: $("#k-notas").value.trim(), metricas: $("#k-metricas").value.trim(), competidores: $("#k-comp").value.trim(), capturas: $("#k-capturas") ? [...$("#k-capturas").files].slice(0, S.limits?.images?.maxCount || 5) : [], web: Boolean($("#k-web")?.checked) };
+    if (!e.notas && !e.metricas) { $("#k-err").textContent = "Cargá al menos las notas de la reunión o los números actuales."; return; }
+    if (!e.capturas.length && !e.metricas && !(e.web && (c.url || c.redes))) { $("#k-err").textContent = "Para la auditoría hacen falta capturas, números, o la investigación web con la URL de la marca cargada en la ficha."; return; }
+    ejecutarCadena(c, e);
+  });
+}
 function enlazarAgentes() {
+  $("#cadena")?.addEventListener("click", () => { S.agente = "_cadena"; render(); });
   document.querySelectorAll("[data-ag]").forEach((b) => b.addEventListener("click", () => { S.agente = b.dataset.ag; render(); }));
   document.querySelectorAll("[data-ver]").forEach((b) => b.addEventListener("click", () => { S.tab = "entregas"; S.entregaId = b.dataset.ver; render(); }));
 }
@@ -970,6 +1384,7 @@ function vistaFormAgente(c) {
   const campos = a.campos.map((f) => {
     const val = f.valor ? f.valor(c) : "";
     if (f.tipo === "imagenes") return imgs ? `<label class="campo full">${f.label}<small>${esc(f.ayuda || "")} Hasta ${imgs.maxCount}.</small><input type="file" id="a-${f.id}" accept="${esc(imgs.mediaTypes.join(","))}" multiple><div class="miniaturas" id="mini"></div></label>` : `<div class="aviso full">En esta vista no se pueden enviar capturas: pegá el texto de la tienda abajo.</div>`;
+    if (f.tipo === "web") return S.navegador ? `<label class="check full"><input type="checkbox" id="a-web" checked> ${esc(f.label)} con el navegador de Claude</label>` : `<div class="aviso full">Sin investigación web en esta vista (solo en la app de escritorio de Claude, para la cuenta dueña del panel). El agente trabaja con lo que cargues.</div>`;
     if (f.tipo === "textarea") return `<label class="campo full">${f.label}${f.ayuda ? `<small>${esc(f.ayuda)}</small>` : ""}<textarea id="a-${f.id}">${esc(val)}</textarea></label>`;
     if (f.tipo === "select") return `<label class="campo">${f.label}<select id="a-${f.id}">${f.opciones.map((o) => `<option>${esc(o)}</option>`).join("")}</select></label>`;
     if (f.tipo === "plan") return `<label class="campo">${f.label}<select id="a-${f.id}">${planes().map((p) => `<option${p.id === val ? " selected" : ""}>${esc(p.id)}</option>`).join("")}</select></label>`;
@@ -998,9 +1413,9 @@ function enlazarFormAgente(c) {
     const e = {};
     for (const f of a.campos) {
       const el = $("#a-" + f.id); if (!el) continue;
-      e[f.id] = f.tipo === "imagenes" ? [...el.files].slice(0, S.limits?.images?.maxCount || 5) : f.tipo === "number" ? Number(el.value) || 0 : el.value.trim();
+      e[f.id] = f.tipo === "imagenes" ? [...el.files].slice(0, S.limits?.images?.maxCount || 5) : f.tipo === "web" ? el.checked : f.tipo === "number" ? Number(el.value) || 0 : el.value.trim();
     }
-    const err = a.validar?.(e);
+    const err = a.validar?.(e, c);
     if (err) { $("#a-err").textContent = err; return; }
     ejecutar(S.agente, c, e);
   });
@@ -1008,7 +1423,7 @@ function enlazarFormAgente(c) {
 
 function vistaRun() {
   const r = S.run;
-  return `<div class="run" aria-live="polite"><div class="fila" style="justify-content:space-between"><h2>${esc(AGENTES[r.tipo].nombre)}</h2>${r.error ? "" : '<button class="btn" type="button" id="detener">Detener</button>'}</div>
+  return `<div class="run" aria-live="polite"><div class="fila" style="justify-content:space-between"><h2>${esc(r.titulo)}</h2>${r.error ? "" : '<button class="btn" type="button" id="detener">Detener</button>'}</div>
     <ul class="pasos" id="pasos"></ul>
     ${r.error ? `<p class="err">${esc(r.error)}</p><div class="fila"><button class="btn" type="button" id="cerrar-run">Volver</button></div>` : '<p class="muted" style="font-size:.88rem">Podés seguir mirando: el resultado se guarda solo en Entregas. No cierres esta pestaña mientras trabaja.</p><div class="preview" id="preview">Pensando…</div>'}</div>`;
 }
@@ -1037,9 +1452,11 @@ function vistaEntregas(c, ents) {
   return `<div class="entregas"><div style="display:grid;gap:8px">${ents.map((e) => `<button class="ent" type="button" data-ent="${esc(e.id)}" aria-current="${e.id === sel.id}"><b>${esc(e.titulo)}</b><small>${chipEstado(e)} ${fechaHora(e.creado)}${e.calidad?.puntaje != null ? ` · ${e.calidad.puntaje} pts` : ""}</small></button>`).join("")}</div>
   <div class="card" style="gap:14px">
     <div class="fila" style="justify-content:space-between"><div>${chipEstado(sel)} <span class="muted" style="font-size:.85rem">${esc(AGENTES[sel.tipo]?.nombre || sel.tipo)} · ${fechaHora(sel.creado)}${sel.editado ? " · editada a mano" : ""}</span></div>
-      <div class="fila"><button class="btn chico" type="button" id="dl-html">Descargar para el cliente</button><button class="btn chico" type="button" id="dl-md">Descargar .md</button><button class="btn chico" type="button" id="copiar">Copiar texto</button></div></div>
+      <div class="fila"><button class="btn chico" type="button" id="dl-docx">Descargar en Word</button><button class="btn chico" type="button" id="dl-html">Descargar web</button><button class="btn chico" type="button" id="dl-md">Descargar .md</button><button class="btn chico" type="button" id="copiar">Copiar texto</button></div></div>
     ${cal.puntaje != null || cal.correcciones?.length ? `<div class="calidad"><b>Control de calidad: ${cal.aprobado ? "aprobada" : "con observaciones"}${cal.puntaje != null ? ` · ${cal.puntaje}/100` : ""} · ${cal.rondas || 1} ronda(s)</b>${!cal.aprobado && cal.correcciones?.length ? `<ul>${cal.correcciones.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>` : ""}</div>` : ""}
-    ${S.editando ? `<textarea class="editor" id="editor">${esc(sel.markdown)}</textarea><div class="fila"><button class="btn pri" type="button" id="guardar-ed">Guardar cambios</button><button class="btn" type="button" id="cancelar-ed">Cancelar</button></div>`
+    ${sel.versionDe && S.entregas.get(sel.versionDe) ? `<div class="fila"><button class="btn chico" type="button" id="comparar">${S.comparar ? "Ver la entrega" : "Comparar con la versión anterior"}</button></div>` : ""}
+    ${S.comparar && sel.versionDe && S.entregas.get(sel.versionDe) ? `<div class="diff">${diferencias(S.entregas.get(sel.versionDe).markdown, sel.markdown).filter((d, i, arr) => d[0] !== " " || arr[i - 1]?.[0] !== " " || arr[i + 1]?.[0] !== " ").map(([k, t]) => `<div class="d${k === "+" ? "a" : k === "-" ? "q" : "i"}">${k === " " ? "&nbsp;" : k} ${esc(t)}</div>`).join("")}</div>` :
+    S.editando ? `<textarea class="editor" id="editor">${esc(sel.markdown)}</textarea><div class="fila"><button class="btn pri" type="button" id="guardar-ed">Guardar cambios</button><button class="btn" type="button" id="cancelar-ed">Cancelar</button></div>`
       : `<div class="doc" id="doc">${md(sel.markdown)}</div>`}
     ${S.editando ? "" : `<div class="card" style="background:var(--sunken);border:0">
       <h3>Tu decisión</h3>
@@ -1052,9 +1469,11 @@ function vistaEntregas(c, ents) {
 }
 function enlazarEntregas(c) {
   $("#ir-agentes")?.addEventListener("click", () => { S.tab = "agentes"; render(); });
-  document.querySelectorAll("[data-ent]").forEach((b) => b.addEventListener("click", () => { S.entregaId = b.dataset.ent; S.editando = false; render(); }));
+  document.querySelectorAll("[data-ent]").forEach((b) => b.addEventListener("click", () => { S.entregaId = b.dataset.ent; S.editando = false; S.comparar = false; render(); }));
   const e = S.entregas.get(S.entregaId); if (!e) return;
-  $("#aprobar")?.addEventListener("click", () => guardarEntrega(e.id, { estado: "aprobada" }).then(() => toast("Entrega aprobada")).catch(() => {}));
+  $("#aprobar")?.addEventListener("click", () => guardarEntrega(e.id, { estado: "aprobada", decisionEquipo: "aprobar", decididoPor: S.yo?.id || null }).then(() => { anotar(c.id, "Sistema", `Aprobada: "${e.titulo}"`); toast("Entrega aprobada"); }).catch(() => {}));
+  $("#comparar")?.addEventListener("click", () => { S.comparar = !S.comparar; render(); });
+  $("#dl-docx")?.addEventListener("click", () => descargar(`${slug(c.marca)}-${e.tipo}-${e.creado.slice(0, 10)}.docx`, docx(c, e)));
   $("#descartar")?.addEventListener("click", () => guardarEntrega(e.id, { estado: e.estado === "descartada" ? "revisar" : "descartada" }).catch(() => {}));
   $("#editar-ent")?.addEventListener("click", () => { S.editando = true; render(); });
   $("#cancelar-ed")?.addEventListener("click", () => { S.editando = false; render(); });
@@ -1063,7 +1482,8 @@ function enlazarEntregas(c) {
     const t = $("#cambios").value.trim();
     if (!t) { $("#ent-err").textContent = "Escribí qué hay que cambiar."; return; }
     if ($("#como-leccion").checked) await guardarCliente(c.id, { lecciones: [...(c.lecciones || []), { texto: `${AGENTES[e.tipo].nombre}: ${t}`.slice(0, 600), fecha: ahora() }].slice(-40) }).catch(() => {});
-    await guardarEntrega(e.id, { estado: "descartada" }).catch(() => {});
+    await guardarEntrega(e.id, { estado: "descartada", decisionEquipo: "cambios", decididoPor: S.yo?.id || null }).catch(() => {});
+    anotar(c.id, "Decisión", `Pedido de cambios en "${e.titulo}": ${t}`);
     const entrada = { ...(e.entrada || {}), _versionDe: e.id };
     delete entrada.capturas;
     if (e.tipo === "auditoria") entrada.texto = `${entrada.texto || ""}\n\nVersión anterior de la auditoría (corregila; no tenés las capturas de nuevo):\n${e.markdown}`.trim();
@@ -1126,8 +1546,12 @@ async function iniciar() {
   render();
   const claude = window.claude;
   if (!claude?.use) { $("#estado-con").textContent = "Sin conexión a claude.ai"; S.cargado.clientes = true; render(); return; }
-  const [db, sample, downloads] = await Promise.all([claude.use("db"), claude.use("sample"), claude.use("downloads")]);
-  S.db = db; S.sample = sample; S.downloads = downloads;
+  const [db, sample, downloads, mcp, user] = await Promise.all([claude.use("db"), claude.use("sample"), claude.use("downloads"), claude.use("mcp"), claude.use("user")]);
+  S.db = db; S.sample = sample; S.downloads = downloads; S.mcp = mcp; S.user = user;
+  S.filtro = leerLocal("kairos-filtro") || "todos";
+  if (user) user.me().then((m) => { S.yo = { id: m?.id || null, nombre: m?.name || "" }; if (S.yo.id) S.nombres.set(S.yo.id, S.yo.nombre || "Vos"); if (!ocupado()) render(); }).catch(() => {});
+  // El navegador de Claude solo aparece en la app de escritorio, para la cuenta dueña del panel.
+  if (mcp) mcp.listTools().then((r) => { S.navegador = (r?.servers || []).some((x) => x.server === NAV && (x.tools || []).length); if (!ocupado()) render(); }).catch(() => {});
   if (sample?.limits) S.limits = await sample.limits().catch(() => null);
   $("#estado-con").textContent = db ? (sample ? "Agentes listos" : "Agentes no disponibles") : "Sin almacenamiento";
   if (!db) { S.cargado.clientes = true; render(); return; }
@@ -1135,7 +1559,8 @@ async function iniciar() {
   db.collection("clientes").onSnapshot((snap) => {
     S.clientes = new Map(snap.docs.map((d) => [d.id, { id: d.id, ...d.data() }]));
     S.cargado.clientes = true; clearTimeout(lento);
-    if (!S.clienteId && S.vista === "inicio") { const ult = leerLocal("escala-cliente"); if (ult && S.clientes.has(ult)) { S.clienteId = ult; S.vista = "cliente"; } }
+    resolverNombres([...S.clientes.values()].map((c) => c.responsableId));
+    if (S.clienteId) seguirBitacora(S.clienteId);
     if (!ocupado()) render(); else pintarLista();
   }, () => { $("#estado-con").textContent = "Sin acceso a los datos"; });
   db.collection("entregas").onSnapshot((snap) => {

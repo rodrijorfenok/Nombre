@@ -15,7 +15,7 @@ export const config = {
   // Si existe el archivo JSON de la versión anterior, se migra solo la primera vez.
   legacyJsonFile: process.env.DATA_FILE || (process.env.DB_FILE ? null : new URL("../data/db.json", import.meta.url).pathname),
   agencia: {
-    nombre: process.env.AGENCIA_NOMBRE || "Escalá Growth Studio",
+    nombre: process.env.AGENCIA_NOMBRE || "Kairos Creative",
     whatsapp: process.env.AGENCIA_WHATSAPP || "",
     email: process.env.AGENCIA_EMAIL || "",
   },
