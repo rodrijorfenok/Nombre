@@ -111,6 +111,23 @@ textarea.editor{min-height:420px;font:400 .88rem/1.5 var(--f-data)}
 .bitacora li{display:grid;gap:3px;padding-bottom:10px;border-bottom:1px solid var(--line);justify-items:start}
 .diff{font:400 .82rem/1.5 var(--f-data);background:var(--sunken);border-radius:8px;padding:10px;overflow-x:auto;max-height:600px;overflow-y:auto}
 .diff .da{background:var(--ok-soft);color:var(--ok)} .diff .dq{background:var(--bad-soft);color:var(--bad);text-decoration:line-through} .diff .di{color:var(--muted)}
+.nav-princ{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.agenda{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.agenda>li{display:grid;grid-template-columns:112px minmax(0,1fr) auto;gap:12px;align-items:start;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.agenda>li.ahora{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+.agenda>li.hecha{opacity:.6}
+.agenda>li.hecha b{text-decoration:line-through}
+.agenda>li.pausa,.agenda>li.fin{grid-template-columns:112px minmax(0,1fr);background:var(--sunken);border-style:dashed}
+.agenda>li.fin{border-color:var(--ink)}
+.agenda .hora{font-weight:600;font-size:.86rem;padding-top:2px}
+.agenda .tt{display:grid;gap:6px;min-width:0}
+.agenda details summary{cursor:pointer;color:var(--accent);font-size:.86rem;font-weight:600}
+.agenda details ol{margin:6px 0 0;padding-left:1.2em;font-size:.9rem;color:var(--muted)}
+@media (max-width:600px){.agenda>li{grid-template-columns:1fr}.agenda>li.pausa,.agenda>li.fin{grid-template-columns:1fr}}
+.barra{height:10px;border-radius:999px;background:var(--sunken);overflow:hidden}
+.barra i{display:block;height:100%;background:var(--ok)}
+fieldset.horario{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:10px}
+fieldset.horario input[type=time]{padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
 .proceso{list-style:none;margin:0;padding:0;display:grid;gap:8px}
 .proceso li{display:grid;grid-template-columns:36px minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px;border:1px solid var(--line);border-radius:10px}
 .proceso li.actual{border-color:var(--accent);background:var(--accent-soft)}
@@ -164,11 +181,11 @@ textarea.editor{min-height:420px;font:400 .88rem/1.5 var(--f-data)}
 
 <div class="layout">
   <aside>
+    <div class="nav-princ"><button class="btn" id="btn-dia" type="button">Mi día</button><button class="btn" id="btn-inicio" type="button">Casos</button></div>
     <button class="btn pri" id="btn-nuevo" type="button">+ Nuevo cliente</button>
     <div class="eyebrow">Clientes</div>
     <nav class="lista-cli" id="lista-cli" aria-label="Clientes"><p class="muted">Cargando…</p></nav>
     <div style="flex:1"></div>
-    <button class="btn" id="btn-inicio" type="button">Inicio</button>
     <button class="btn" id="btn-config" type="button">Datos de la agencia</button>
   </aside>
   <main><div class="cont" id="vista"></div></main>
@@ -184,7 +201,7 @@ const S = {
   db: null, sample: null, downloads: null, limits: null,
   clientes: new Map(), entregas: new Map(), config: {},
   cargado: { clientes: false, entregas: false },
-  vista: "inicio", clienteId: null, tab: "ficha", entregaId: null, agente: null,
+  vista: "dia", dia: null, preparandoDia: false, clienteId: null, tab: "ficha", entregaId: null, agente: null,
   run: null, // { titulo, ctl, pasos:[], preview, clienteId, error }
   editando: false,
   mcp: null, user: null, yo: null, navegador: false, nombres: new Map(), equipo: [],
@@ -1127,6 +1144,7 @@ function renderVista() {
   const v = $("#vista");
   if (!S.db) { v.innerHTML = vistaSinDb(); return; }
   if (S.vista === "config") { v.innerHTML = vistaConfig(); enlazarConfig(); return; }
+  if (S.vista === "dia") { v.innerHTML = vistaDia(); enlazarDia(); return; }
   if (S.vista === "nuevo") { v.innerHTML = vistaFormCliente(null); enlazarFormCliente(null); return; }
   const c = S.clientes.get(S.clienteId);
   if (S.vista === "cliente" && c) { v.innerHTML = vistaCliente(c); enlazarCliente(c); return; }
@@ -1460,7 +1478,7 @@ function vistaEntregas(c, ents) {
       : `<div class="doc" id="doc">${md(sel.markdown)}</div>`}
     ${S.editando ? "" : `<div class="card" style="background:var(--sunken);border:0">
       <h3>Tu decisión</h3>
-      <div class="fila">${sel.estado !== "aprobada" ? '<button class="btn pri" type="button" id="aprobar">Aprobar</button>' : ""}<button class="btn" type="button" id="editar-ent">Editar a mano</button><button class="btn" type="button" id="descartar">${sel.estado === "descartada" ? "Restaurar" : "Descartar"}</button></div>
+      <div class="fila">${sel.estado !== "aprobada" ? '<button class="btn pri" type="button" id="aprobar">Aprobar</button>' : sel.enviada ? `<span class="chip ok">Enviada al cliente el ${fecha(sel.enviada)}</span>` : '<button class="btn pri" type="button" id="enviada">Marcar como enviada al cliente</button>'}<button class="btn" type="button" id="editar-ent">Editar a mano</button><button class="btn" type="button" id="descartar">${sel.estado === "descartada" ? "Restaurar" : "Descartar"}</button></div>
       <label class="campo">Pedir cambios<small>Escribí qué cambiar: el agente rehace la entrega con tu pedido.</small><textarea id="cambios" placeholder="Ej.: Los ganchos tienen que mencionar que el lino no se arruga."></textarea></label>
       <label class="check"><input type="checkbox" id="como-leccion" checked> Guardarlo como lección de ${esc(c.marca)} para las próximas entregas</label>
       <div class="fila"><button class="btn" type="button" id="pedir-cambios"${S.sample ? "" : " disabled"}>Rehacer con estos cambios</button><span class="err" id="ent-err"></span></div>
@@ -1472,6 +1490,7 @@ function enlazarEntregas(c) {
   document.querySelectorAll("[data-ent]").forEach((b) => b.addEventListener("click", () => { S.entregaId = b.dataset.ent; S.editando = false; S.comparar = false; render(); }));
   const e = S.entregas.get(S.entregaId); if (!e) return;
   $("#aprobar")?.addEventListener("click", () => guardarEntrega(e.id, { estado: "aprobada", decisionEquipo: "aprobar", decididoPor: S.yo?.id || null }).then(() => { anotar(c.id, "Sistema", `Aprobada: "${e.titulo}"`); toast("Entrega aprobada"); }).catch(() => {}));
+  $("#enviada")?.addEventListener("click", () => guardarEntrega(e.id, { enviada: ahora() }).then(() => { anotar(c.id, "Email", `Se envió al cliente: "${e.titulo}"`); toast("Marcada como enviada"); }).catch(() => {}));
   $("#comparar")?.addEventListener("click", () => { S.comparar = !S.comparar; render(); });
   $("#dl-docx")?.addEventListener("click", () => descargar(`${slug(c.marca)}-${e.tipo}-${e.creado.slice(0, 10)}.docx`, docx(c, e)));
   $("#descartar")?.addEventListener("click", () => guardarEntrega(e.id, { estado: e.estado === "descartada" ? "revisar" : "descartada" }).catch(() => {}));
@@ -1522,14 +1541,258 @@ function vistaConfig() {
     <label class="campo">Email<input type="text" id="c-email" value="${esc(c.email || "")}"></label>
     ${PLANES_BASE.map((x, i) => `<label class="campo">Precio ${esc(x.id)} (USD)<input type="number" id="c-p${i}" value="${esc(p[x.id] || x.precio)}"></label>`).join("")}
     <label class="campo full">Política de devolución (texto oficial)<small>Los agentes la citan palabra por palabra y nunca la amplían. Conviene que defina: qué resultado se mide (métrica, línea base y meta), en qué plazo, qué significa "seguir el plan al pie de la letra" (los compromisos del plan de 90 días), qué se devuelve (por ejemplo, los honorarios de un período, nunca la inversión en pauta) y cómo se pide. Revisala con un abogado o contador antes de usarla.</small><textarea id="c-politica" placeholder="Escribí acá el texto exacto de tu política.">${esc(c.politica || "")}</textarea></label>
+    <fieldset class="campo full horario"><legend>Horario de trabajo (arma el plan de Mi día)</legend>
+      <div class="fila">${[1, 2, 3, 4, 5, 6, 0].map((d) => `<label class="check"><input type="checkbox" data-dia="${d}"${horario().dias.includes(d) ? " checked" : ""}> ${DIAS[d]}</label>`).join("")}</div>
+      <div class="fila">Mañana <input type="time" id="h-m1" value="${esc(horario().bloques[0][0])}"> a <input type="time" id="h-m2" value="${esc(horario().bloques[0][1])}"> · Tarde <input type="time" id="h-t1" value="${esc(horario().bloques[1]?.[0] || "")}"> a <input type="time" id="h-t2" value="${esc(horario().bloques[1]?.[1] || "")}"></div>
+    </fieldset>
     <label class="campo">Rondas de autocorrección<small>Cuántas veces se corrige sola una entrega que no pasa el control de calidad.</small><select id="c-rondas">${[0, 1, 2].map((n) => `<option${Number(c.rondas ?? 1) === n ? " selected" : ""}>${n}</option>`).join("")}</select></label>
   </div><div class="fila"><button class="btn pri" type="submit">Guardar</button></div></form>`;
 }
 function enlazarConfig() {
   $("#form-conf").addEventListener("submit", async (ev) => {
     ev.preventDefault();
-    const datos = { nombre: $("#c-nombre").value.trim(), ciudad: $("#c-ciudad").value.trim(), whatsapp: $("#c-whatsapp").value.trim(), email: $("#c-email").value.trim(), rondas: Number($("#c-rondas").value), politica: $("#c-politica").value.trim(), precios: Object.fromEntries(PLANES_BASE.map((x, i) => [x.id, Number($("#c-p" + i).value) || x.precio])), actualizado: ahora() };
-    try { await S.db.doc("config/agencia").set(datos); toast("Datos guardados"); } catch { toast("No se pudo guardar."); }
+    const datos = { nombre: $("#c-nombre").value.trim(), ciudad: $("#c-ciudad").value.trim(), whatsapp: $("#c-whatsapp").value.trim(), email: $("#c-email").value.trim(), rondas: Number($("#c-rondas").value), politica: $("#c-politica").value.trim(),
+      horario: { dias: [...document.querySelectorAll("[data-dia]")].filter((x) => x.checked).map((x) => Number(x.dataset.dia)), bloques: [[$("#h-m1").value, $("#h-m2").value], ...($("#h-t1").value && $("#h-t2").value ? [[$("#h-t1").value, $("#h-t2").value]] : [])].filter(([a, b]) => a && b && a < b) }, precios: Object.fromEntries(PLANES_BASE.map((x, i) => [x.id, Number($("#c-p" + i).value) || x.precio])), actualizado: ahora() };
+    if (!datos.horario.dias.length || !datos.horario.bloques.length) { toast("Revisá el horario: al menos un día y un bloque con inicio anterior al fin."); return; }
+    try { await S.db.doc("config/agencia").set(datos); S.dia = null; toast("Datos guardados"); } catch { toast("No se pudo guardar."); }
+  });
+}
+
+/* ===================== Mi día ===================== */
+// Arma el plan de cada jornada con los datos reales de los casos: qué hacer, en qué orden,
+// a qué hora y hasta dónde llegar. No usa a Claude: es instantáneo y no consume nada.
+const DIAS = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+const aMin = (t) => { const [h, m] = String(t).split(":").map(Number); return h * 60 + (m || 0); };
+const aHora = (n) => `${String(Math.floor(n / 60)).padStart(2, "0")}:${String(n % 60).padStart(2, "0")}`;
+const fechaLocal = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const deFecha = (f) => { const [a, m, d] = f.split("-").map(Number); return new Date(a, m - 1, d, 12); };
+function horario() {
+  const h = S.config.horario || {};
+  return { dias: Array.isArray(h.dias) && h.dias.length ? h.dias : [1, 2, 3, 4, 5, 6], bloques: Array.isArray(h.bloques) && h.bloques.length ? h.bloques : [["08:00", "12:00"], ["13:00", "15:00"]] };
+}
+function diaLaboral(d, paso) { const x = new Date(d); for (let i = 0; i < 8; i++) { x.setDate(x.getDate() + paso); if (horario().dias.includes(x.getDay())) return x; } return x; }
+const FOCO = {
+  1: ["Medición", "Lunes de números: métricas de la semana y paso 8 de cada cliente en ejecución."],
+  2: ["Contenido", "Martes de contenido: calendario, guiones y piezas de la semana."],
+  3: ["Pauta", "Miércoles de pauta: revisar campañas y aplicar las reglas de control de inversión."],
+  4: ["Crecimiento", "Jueves de crecimiento: avanzar el proceso de los clientes nuevos, prospección y propuestas."],
+  5: ["Resultados al cliente", "Viernes de entregas: resumen semanal y entregas aprobadas a cada cliente."],
+  6: ["Planificación", "Sábado de planificación: el próximo paso de cada caso y la semana que viene."],
+  0: ["Descanso", "Hoy no se trabaja."],
+};
+const COMO = {
+  arranque: ["Abrí Inicio y mirá las alertas de cada caso.", "Leé la bitácora de los casos con movimiento y los mensajes de clientes (WhatsApp, email).", "Si un cliente escribió, anotalo en su bitácora como Pedido del cliente."],
+  cierre: ["En cada caso que tocaste hoy, anotá en la bitácora lo que pasó.", "Dejá el próximo paso con fecha en la pestaña Caso.", "Marcá las tareas hechas: lo que no se terminó aparece mañana arriba de todo."],
+  vencido: ["Abrí el caso y leé el próximo paso vencido.", "Si no sabés cómo seguir, preguntale al Asistente del caso: \"¿Cómo avanzamos con esto?\".", "Hacelo o reprogramalo con una fecha nueva, y anotá la decisión."],
+  hoy: ["Abrí el caso y hacé el próximo paso.", "Anotá el resultado en la bitácora y definí el siguiente."],
+  revisar: ["Abrí la entrega y leela entera.", "Mirá las observaciones del control de calidad.", "Aprobala, editala a mano o usá Pedir cambios (queda como lección del cliente)."],
+  enviar: ["Descargala en Word desde la entrega.", "Mandásela al cliente (usá la herramienta Mensaje para el cliente → Presentar una entrega).", "Tocá Marcar como enviada."],
+  contacto: ["Usá la herramienta Mensaje para el cliente (Seguimiento) o llamalo.", "Anotá el contacto en la bitácora: así se actualiza el último contacto."],
+  paso: ["Abrí Agentes y ejecutá el paso indicado.", "Mientras trabaja, no cierres la pestaña; podés hacer tareas cortas en otra.", "Cuando termine, revisá la entrega y aprobala o pedí cambios."],
+  ingreso: ["Abrí Ficha y arranque.", "Completá lo que falte del checklist (pedí accesos con la herramienta Mensaje → Pedido de accesos).", "Anotá los números de partida."],
+  definir: ["Abrí la pestaña Caso.", "Asigná responsable y escribí el próximo paso con fecha."],
+  medicion: ["Pedile al cliente las métricas de la semana (Mensaje → Pedido de métricas) o sacalas de los accesos.", "Corré el paso 8 · Medición con las métricas.", "Revisá el reporte y envialo el viernes."],
+  contenido: ["Revisá el calendario del mes (o generalo con la herramienta Calendario detallado).", "Prepará o encargá las piezas de esta semana.", "Anotá en la bitácora qué quedó listo."],
+  pauta: ["Exportá los resultados de Meta/TikTok Ads de la semana.", "Corré el paso 7 · Pauta con esos resultados.", "Aplicá en la plataforma las reglas de control (escalar, mantener o cortar) y anotalo."],
+  resumen: ["Usá Mensaje para el cliente → Presentar una entrega con el reporte de la semana.", "Adjuntá las entregas aprobadas en Word.", "Anotá el envío en la bitácora."],
+  comentarios: ["Copiá los comentarios y DMs nuevos de sus redes.", "Usá la herramienta Respuestas a comentarios y DMs.", "Respondé y derivá lo marcado como DERIVAR."],
+  propuesta: ["Abrí el caso y revisá la propuesta enviada o generala con la herramienta Propuesta comercial.", "Hacé el seguimiento (Mensaje → Seguimiento de propuesta) y anotalo."],
+  prospeccion: ["Respondé consultas nuevas y cargá cada interesado como cliente en etapa Prospecto.", "Para los más avanzados, generá la propuesta comercial.", "Contactá marcas nuevas con el cuestionario de ingreso."],
+  planificar: ["Recorré Inicio: cada caso tiene que tener responsable, próximo paso y fecha.", "Revisá las lecciones nuevas de la semana en la ficha de cada cliente.", "Anotá en la bitácora lo que se decida para la semana."],
+  general: ["Hacé la tarea y anotá lo que salga en la bitácora correspondiente."],
+  libre: ["Si hay tareas en \"No entra hoy\", seguí por esas en orden.", "Si no: prospección (cargá interesados como Prospecto), contenido para las redes de la agencia o practicá con el cliente ficticio.", "No adelantes trabajo de un cliente sin anotarlo en su bitácora."],
+};
+const ACTIVOS = (c) => !["Pausado", "Baja"].includes(c.etapa);
+function tareasDelDia(fecha, previas = []) {
+  const dow = deFecha(fecha).getDay();
+  const T = [];
+  const add = (t) => T.push({ hecha: false, ...t });
+  const cs = [...S.clientes.values()].filter(ACTIVOS);
+  const ents = [...S.entregas.values()];
+  for (const c of cs) {
+    const pp = c.proximoPaso || {};
+    const marca = c.marca;
+    if (pp.texto && pp.fecha && pp.fecha < fecha) add({ clave: `vencido:${c.id}`, tipo: "vencido", prio: 1, min: 20, clienteId: c.id, titulo: `Resolver el próximo paso vencido: ${pp.texto}`, ir: { tab: "caso" } });
+    else if (pp.texto && pp.fecha === fecha) add({ clave: `hoy:${c.id}`, tipo: "hoy", prio: 1.5, min: 30, clienteId: c.id, titulo: pp.texto, ir: { tab: "caso" } });
+    for (const e of ents.filter((x) => x.clienteId === c.id && x.estado === "revisar")) add({ clave: `revisar:${e.id}`, tipo: "revisar", prio: 2, min: 20, clienteId: c.id, titulo: `Revisar "${e.titulo}"`, ir: { tab: "entregas", entregaId: e.id } });
+    for (const e of ents.filter((x) => x.clienteId === c.id && x.estado === "aprobada" && !x.enviada && x.tipo !== "mensaje")) add({ clave: `enviar:${e.id}`, tipo: "enviar", prio: 3, min: 10, clienteId: c.id, titulo: `Enviar al cliente "${e.titulo}"`, ir: { tab: "entregas", entregaId: e.id } });
+    const sin = diasDesde(c.ultimoContacto || c.creado);
+    if (sin != null && sin > 7) add({ clave: `contacto:${c.id}`, tipo: "contacto", prio: 4, min: 10, clienteId: c.id, titulo: `Contactar a ${marca}: ${sin} días sin contacto`, ir: { tab: "agentes", agente: "mensaje" } });
+    if (c.etapa === "En ejecución" && c.redes) add({ clave: `comentarios:${c.id}`, tipo: "comentarios", prio: 4.5, min: 15, clienteId: c.id, titulo: `Responder comentarios y DMs de ${marca}`, ir: { tab: "agentes", agente: "comentarios" } });
+    if (c.etapa === "En ejecución") {
+      if (dow === 1) add({ clave: `medicion:${c.id}`, tipo: "medicion", prio: 5, min: 35, clienteId: c.id, titulo: `Métricas de la semana y paso 8 · Medición de ${marca}`, ir: { tab: "agentes", agente: "medicion" } });
+      if (dow === 2) add({ clave: `contenido:${c.id}`, tipo: "contenido", prio: 5, min: 60, clienteId: c.id, titulo: `Contenido de la semana de ${marca}`, ir: { tab: "agentes", agente: "calendario" } });
+      if (dow === 3 && (c.plan === "Growth 360" || mejorEntrega(c.id, "pauta"))) add({ clave: `pauta:${c.id}`, tipo: "pauta", prio: 5, min: 40, clienteId: c.id, titulo: `Revisar la pauta de ${marca} y aplicar las reglas de control`, ir: { tab: "agentes", agente: "pauta" } });
+      if (dow === 5) add({ clave: `resumen:${c.id}`, tipo: "resumen", prio: 5, min: 20, clienteId: c.id, titulo: `Enviar el resumen semanal a ${marca}`, ir: { tab: "agentes", agente: "mensaje" } });
+    }
+    if (dow === 4 && ["Prospecto", "Propuesta enviada"].includes(c.etapa || "Prospecto")) add({ clave: `propuesta:${c.id}`, tipo: "propuesta", prio: 5, min: 30, clienteId: c.id, titulo: `Avanzar la propuesta de ${marca}`, ir: { tab: "caso" } });
+    if (["Ingreso", "En ejecución"].includes(c.etapa)) {
+      const sig = PASOS.find((t) => mejorEntrega(c.id, t)?.estado !== "aprobada");
+      if (sig && mejorEntrega(c.id, sig)?.estado !== "revisar") {
+        const min = { diagnostico: 30, investigacion: 35, auditoria: 40, foda: 20, hipotesis: 25, plan90: 40, pauta: 40, medicion: 30 }[sig];
+        add({ clave: `paso:${c.id}:${sig}`, tipo: "paso", prio: 6, min, clienteId: c.id, titulo: `Paso ${AGENTES[sig].paso} · ${AGENTES[sig].nombre} de ${marca}`, ir: { tab: "agentes", agente: sig } });
+      }
+    }
+    if (c.etapa === "Ingreso") {
+      const falta = ONBOARDING.filter(([k]) => !c.onboarding?.[k]).map(([, l]) => l);
+      if (falta.length) add({ clave: `ingreso:${c.id}`, tipo: "ingreso", prio: 7, min: 15, clienteId: c.id, titulo: `Arranque de ${marca}: ${falta.slice(0, 2).join(", ")}${falta.length > 2 ? ` y ${falta.length - 2} más` : ""}`, ir: { tab: "ficha" } });
+    }
+    if (!c.responsableId || !pp.texto) add({ clave: `definir:${c.id}`, tipo: "definir", prio: 8, min: 5, clienteId: c.id, titulo: `Definir ${!c.responsableId ? "responsable y " : ""}próximo paso de ${marca}`, ir: { tab: "caso" } });
+  }
+  if (dow === 4) add({ clave: "prospeccion", tipo: "prospeccion", prio: 9, min: 60, titulo: "Prospección: responder consultas, cargar interesados y preparar propuestas", ir: { vista: "inicio" } });
+  if (dow === 6) { add({ clave: "planificar", tipo: "planificar", prio: 5, min: 45, titulo: "Planificar la semana que viene en todos los casos", ir: { vista: "inicio" } }); add({ clave: "lecciones", tipo: "planificar", prio: 9, min: 20, titulo: "Repasar las lecciones y los pedidos de cambios de la semana", ir: { vista: "inicio" } }); }
+  if (!cs.length) {
+    if (!politica()) add({ clave: "politica", tipo: "general", prio: 2, min: 30, titulo: "Cargar los datos de la agencia y el texto de la política de devolución", ir: { vista: "config" } });
+    add({ clave: "practica", tipo: "paso", prio: 4, min: 60, titulo: "Practicar con el cliente ficticio: correr los pasos 1 a 5 y revisar las entregas", ir: { vista: "inicio" } });
+    add({ clave: "prospeccion", tipo: "prospeccion", prio: 5, min: 90, titulo: "Prospección: contactar marcas y cargar cada interesado como cliente", ir: { vista: "inicio" } });
+  }
+  // Lo que quedó sin hacer el día laboral anterior va primero.
+  for (const p of previas) if (!p.hecha && !p.fija && !T.some((t) => t.clave === p.clave)) T.push({ ...p, hecha: false, deAyer: true, prio: Math.max(0.5, p.prio - 0.5) });
+  return T.sort((a, b) => a.prio - b.prio);
+}
+function armarAgenda(tareas) {
+  const h = horario();
+  const bloques = h.bloques.map(([a, b]) => ({ ini: aMin(a), fin: aMin(b), cursor: aMin(a) }));
+  const fijas = [];
+  const primero = bloques[0], ultimo = bloques[bloques.length - 1];
+  fijas.push({ clave: "fija:arranque", tipo: "arranque", fija: true, titulo: "Arranque: casos, alertas y mensajes de clientes", ini: primero.cursor, fin: primero.cursor + 20 });
+  primero.cursor += 20;
+  ultimo.fin -= 20;
+  fijas.push({ clave: "fija:cierre", tipo: "cierre", fija: true, titulo: "Cierre: bitácora y próximo paso de cada caso tocado", ini: ultimo.fin, fin: ultimo.fin + 20 });
+  const agenda = [], sobran = [];
+  for (const t of tareas) {
+    const b = bloques.find((x) => x.cursor + t.min <= x.fin);
+    if (!b) { sobran.push(t); continue; }
+    agenda.push({ ...t, ini: b.cursor, fin: b.cursor + t.min });
+    b.cursor += t.min;
+  }
+  // El tiempo que sobra no queda vacío: se indica qué adelantar hasta el fin de la jornada.
+  for (const b of bloques) if (b.fin - b.cursor >= 20) agenda.push({ clave: `libre:${b.cursor}`, tipo: "libre", fija: true, titulo: sobran.length ? "Tiempo para adelantar lo que no entraba (lista de abajo)" : "Tiempo para adelantar: prospección, contenido de la agencia o practicar con el panel", ini: b.cursor, fin: b.fin });
+  return { items: [...fijas, ...agenda].sort((a, b) => a.ini - b.ini), sobran, bloques: h.bloques };
+}
+const claveDia = (fecha) => `${fecha}_${S.yo?.id || "equipo"}`;
+async function cargarDia(fecha, { rearmar = false } = {}) {
+  const ref = S.db.doc("dias/" + claveDia(fecha));
+  const snap = await ref.get();
+  const guardado = snap.exists ? snap.data() : null;
+  if (guardado && !rearmar) return guardado;
+  const anterior = fechaLocal(diaLaboral(deFecha(fecha), -1));
+  const prev = (await S.db.doc("dias/" + claveDia(anterior)).get()).data()?.tareas || [];
+  const nuevas = tareasDelDia(fecha, prev);
+  const hechas = new Map((guardado?.tareas || []).map((t) => [t.clave, t.hecha]));
+  // Al rearmar se conservan las tareas ya marcadas como hechas.
+  const conservar = (guardado?.tareas || []).filter((t) => t.hecha && !nuevas.some((n) => n.clave === t.clave));
+  const tareas = [...conservar, ...nuevas.map((t) => ({ ...t, hecha: hechas.get(t.clave) || false }))];
+  const doc = { fecha, tareas, armado: ahora() };
+  await ref.set(doc);
+  return doc;
+}
+let colaDia = Promise.resolve();
+function guardarDia() {
+  const d = S.dia; if (!d) return;
+  colaDia = colaDia.then(() => S.db.doc("dias/" + claveDia(d.fecha)).update({ tareas: d.tareas })).catch(() => toast("No se pudo guardar el avance del día."));
+}
+function rutina() {
+  const h = horario(), bl = h.bloques;
+  const dias = h.dias.slice().sort().map((d) => DIAS[d]).join(", ");
+  const ini = aMin(bl[0][0]), fin = aMin(bl[bl.length - 1][1]);
+  return `# Rutina de trabajo · ${nombreAgencia()}
+
+Días: ${dias}. Horario: ${bl.map(([x, y]) => `${x} a ${y}`).join(" y ")}.
+
+## Todos los días
+- ${aHora(ini)} a ${aHora(ini + 20)} · Arranque: alertas de los casos, mensajes de clientes y bitácora.
+- Bloques de trabajo: las tareas de la pestaña Mi día, en el orden en que aparecen.
+${bl.length > 1 ? `- ${bl[0][1]} a ${bl[1][0]} · Almuerzo.` : ""}
+- ${aHora(fin - 20)} a ${aHora(fin)} · Cierre: anotar en la bitácora y dejar el próximo paso con fecha en cada caso tocado.
+
+## Foco de cada día
+- Lunes · Medición: métricas de la semana y paso 8 de cada cliente en ejecución.
+- Martes · Contenido: calendario, guiones y piezas de la semana.
+- Miércoles · Pauta: resultados de campañas y reglas de control de inversión.
+- Jueves · Crecimiento: avanzar el proceso de clientes nuevos, prospección y propuestas.
+- Viernes · Resultados al cliente: resumen semanal y entregas aprobadas.
+- Sábado · Planificación: próximo paso de cada caso y la semana que viene.
+
+## Reglas
+1. Primero lo vencido, después lo que el cliente espera (revisar y enviar), después lo nuevo.
+2. Todo contacto con un cliente se anota en su bitácora.
+3. Ningún caso termina el día sin responsable ni próximo paso con fecha.
+4. Si no sabés cómo seguir, preguntale al Asistente del caso antes de quedarte trabado.
+5. A las ${aHora(fin)} se termina: lo que no entró queda arriba de todo mañana.`;
+}
+
+function vistaDia() {
+  const d = S.dia;
+  const hoy = new Date();
+  const fecha = fechaLocal(hoy);
+  if (!S.db) return vistaSinDb();
+  const laboral = horario().dias.includes(hoy.getDay());
+  if (!d || d.fecha !== (laboral ? fecha : fechaLocal(diaLaboral(hoy, 1)))) return `<div class="card vacio"><p class="muted">Armando tu día…</p></div>`;
+  const ag = armarAgenda(d.tareas.filter((t) => !t.fija));
+  const fd = deFecha(d.fecha);
+  const [foco, focoTxt] = FOCO[fd.getDay()];
+  const ahoraMin = hoy.getHours() * 60 + hoy.getMinutes();
+  const bloques = ag.bloques.map(([a, b]) => [aMin(a), aMin(b)]);
+  const inicio = bloques[0][0], final = bloques[bloques.length - 1][1];
+  const esHoy = d.fecha === fecha;
+  const hechasMin = ag.items.filter((t) => !t.fija && t.hecha).reduce((a, t) => a + t.min, 0);
+  const totalMin = ag.items.filter((t) => !t.fija).reduce((a, t) => a + t.min, 0);
+  let estado = "";
+  if (!laboral) estado = `<div class="aviso info">Hoy no se trabaja. Esto es lo que te espera el ${DIAS[fd.getDay()]}.</div>`;
+  else if (ahoraMin < inicio) estado = `<div class="aviso info">La jornada empieza a las ${aHora(inicio)}. Arrancá por el primer bloque.</div>`;
+  else if (ahoraMin >= final) estado = `<div class="aviso">La jornada terminó a las ${aHora(final)}. Lo que no se hizo pasa a mañana, arriba de todo.</div>`;
+  else if (bloques.some(([a, b], i) => i > 0 && ahoraMin < a && ahoraMin >= bloques[i - 1][1])) estado = `<div class="aviso info">Almuerzo. Volvés a las ${aHora(bloques.find(([a]) => a > ahoraMin)[0])}.</div>`;
+  const actual = esHoy && laboral ? ag.items.find((t) => !t.hecha && ahoraMin < t.fin) : null;
+  const filas = [];
+  let corte = false;
+  for (const t of ag.items) {
+    if (!corte && bloques.length > 1 && t.ini >= bloques[1][0]) { filas.push(`<li class="pausa"><span class="hora num">${aHora(bloques[0][1])}–${aHora(bloques[1][0])}</span><span>Almuerzo</span></li>`); corte = true; }
+    const c = t.clienteId ? S.clientes.get(t.clienteId) : null;
+    const pasos = COMO[t.tipo] || COMO.general;
+    filas.push(`<li class="tarea${t.hecha ? " hecha" : ""}${actual === t ? " ahora" : ""}"><span class="hora num">${aHora(t.ini)}–${aHora(t.fin)}</span>
+      <div class="tt">${t.fija ? `<b>${esc(t.titulo)}</b>` : `<label class="check"><input type="checkbox" data-hecha="${esc(t.clave)}"${t.hecha ? " checked" : ""}> <b>${esc(t.titulo)}</b></label>`}
+        <div class="fila" style="gap:6px">${c ? `<span class="chip neutro">${esc(c.marca)}</span>` : ""}${t.deAyer ? '<span class="chip warn">Quedó de ayer</span>' : ""}${actual === t ? '<span class="chip ok">Ahora</span>' : ""}<span class="muted" style="font-size:.82rem">${t.fin - t.ini} min</span></div>
+        <details><summary>Cómo hacerlo</summary><ol>${pasos.map((p) => `<li>${esc(p)}</li>`).join("")}</ol></details></div>
+      ${t.ir ? `<button class="btn chico" type="button" data-ir-tarea="${esc(t.clave)}">Ir</button>` : ""}</li>`);
+  }
+  filas.push(`<li class="fin"><span class="hora num">${aHora(final)}</span><span><b>Fin de la jornada.</b> Lo que sigue queda para mañana.</span></li>`);
+  return `<div class="fila" style="justify-content:space-between;align-items:flex-end"><div><span class="eyebrow">Mi día · ${esc(S.yo?.nombre || "equipo")}</span><h1>${laboral ? "Hoy" : "Próxima jornada"}, ${DIAS[fd.getDay()]} ${fd.getDate()}</h1><p class="muted">Foco: <b>${esc(foco)}</b>. ${esc(focoTxt)}</p></div>
+    <div class="fila"><button class="btn" type="button" id="rearmar">Rearmar con lo nuevo</button><button class="btn" type="button" id="dl-dia">Descargar en Word</button></div></div>
+  ${estado}
+  <div class="card"><div class="fila" style="justify-content:space-between"><b>Avance del día</b><span class="num muted">${hechasMin} de ${totalMin} min · ${ag.items.filter((t) => !t.fija && t.hecha).length}/${ag.items.filter((t) => !t.fija).length} tareas</span></div><div class="barra"><i style="width:${totalMin ? Math.round((hechasMin / totalMin) * 100) : 0}%"></i></div></div>
+  <ol class="agenda">${filas.join("")}</ol>
+  ${ag.sobran.length ? `<div class="card"><h2>No entra hoy (${ag.sobran.length})</h2><p class="muted" style="font-size:.88rem">Si terminás antes, seguí por acá en este orden. Si no, mañana aparecen arriba.</p><ul style="margin:0;padding-left:1.1em;display:grid;gap:6px">${ag.sobran.map((t) => `<li>${esc(t.titulo)}${t.clienteId ? ` · <span class="muted">${esc(S.clientes.get(t.clienteId)?.marca || "")}</span>` : ""} · ${t.min} min</li>`).join("")}</ul></div>` : ""}
+  <details class="card"><summary><b>Rutina semanal</b></summary><div class="doc">${md(rutina())}</div><div class="fila"><button class="btn chico" type="button" id="dl-rutina">Descargar la rutina en Word</button></div></details>`;
+}
+async function prepararDia(opciones) {
+  if (S.preparandoDia) return;
+  S.preparandoDia = true;
+  await (S.yoListo || Promise.resolve());
+  const hoy = new Date();
+  const fecha = horario().dias.includes(hoy.getDay()) ? fechaLocal(hoy) : fechaLocal(diaLaboral(hoy, 1));
+  try { S.dia = await cargarDia(fecha, opciones); } catch { toast("No se pudo armar el día."); }
+  S.preparandoDia = false;
+  if (S.vista === "dia" && !ocupado()) render();
+}
+function enlazarDia() {
+  if (!S.dia || S.dia.fecha !== (horario().dias.includes(new Date().getDay()) ? fechaLocal() : fechaLocal(diaLaboral(new Date(), 1)))) { if (S.cargado.clientes && S.cargado.entregas) prepararDia(); return; }
+  document.querySelectorAll("[data-hecha]").forEach((cb) => cb.addEventListener("change", () => {
+    const t = S.dia.tareas.find((x) => x.clave === cb.dataset.hecha); if (!t) return;
+    t.hecha = cb.checked; guardarDia(); render();
+  }));
+  document.querySelectorAll("[data-ir-tarea]").forEach((b) => b.addEventListener("click", () => {
+    const t = S.dia.tareas.find((x) => x.clave === b.dataset.irTarea) || {};
+    const ir = t.ir || {};
+    if (ir.vista) { S.vista = ir.vista; render(); return; }
+    if (t.clienteId) { abrirCliente(t.clienteId, ir.tab); if (ir.agente) S.agente = ir.agente; if (ir.entregaId) S.entregaId = ir.entregaId; render(); }
+  }));
+  $("#rearmar")?.addEventListener("click", () => prepararDia({ rearmar: true }).then(() => toast("Día rearmado con lo nuevo")));
+  $("#dl-rutina")?.addEventListener("click", () => descargar("rutina-semanal.docx", docx({ marca: "el equipo" }, { markdown: rutina(), creado: ahora() })));
+  $("#dl-dia")?.addEventListener("click", () => {
+    const ag = armarAgenda(S.dia.tareas.filter((t) => !t.fija));
+    const mdDia = `# Plan del día · ${S.dia.fecha}\n\n| Horario | Tarea | Cliente | Hecha |\n|---|---|---|---|\n${ag.items.map((t) => `| ${aHora(t.ini)}–${aHora(t.fin)} | ${t.titulo.replace(/\|/g, "/")} | ${S.clientes.get(t.clienteId)?.marca || ""} | ${t.hecha ? "Sí" : ""} |`).join("\n")}\n\n## No entra hoy\n${ag.sobran.map((t) => `- ${t.titulo} (${t.min} min)`).join("\n") || "- Nada"}`;
+    descargar(`plan-del-dia-${S.dia.fecha}.docx`, docx({ marca: S.yo?.nombre || "el equipo" }, { markdown: mdDia, creado: ahora() }));
   });
 }
 
@@ -1538,6 +1801,7 @@ function enlazarConfig() {
 // solo refrescan la lista lateral: así no se borra lo que estás escribiendo.
 const ocupado = () => Boolean(S.run || S.editando || S.agente || S.vista === "nuevo" || S.vista === "config");
 $("#btn-nuevo").addEventListener("click", () => { if (S.run && !S.run.error) return toast("Esperá a que termine el agente."); S.vista = "nuevo"; render(); });
+$("#btn-dia").addEventListener("click", () => { if (S.run && !S.run.error) return toast("Esperá a que termine el agente."); S.vista = "dia"; render(); });
 $("#btn-inicio").addEventListener("click", () => { if (S.run && !S.run.error) return toast("Esperá a que termine el agente."); S.vista = "inicio"; render(); });
 $("#btn-config").addEventListener("click", () => { if (S.run && !S.run.error) return toast("Esperá a que termine el agente."); S.vista = "config"; render(); });
 window.addEventListener("beforeunload", (ev) => { if (S.run && !S.run.error) { ev.preventDefault(); ev.returnValue = ""; } });
@@ -1549,7 +1813,7 @@ async function iniciar() {
   const [db, sample, downloads, mcp, user] = await Promise.all([claude.use("db"), claude.use("sample"), claude.use("downloads"), claude.use("mcp"), claude.use("user")]);
   S.db = db; S.sample = sample; S.downloads = downloads; S.mcp = mcp; S.user = user;
   S.filtro = leerLocal("kairos-filtro") || "todos";
-  if (user) user.me().then((m) => { S.yo = { id: m?.id || null, nombre: m?.name || "" }; if (S.yo.id) S.nombres.set(S.yo.id, S.yo.nombre || "Vos"); if (!ocupado()) render(); }).catch(() => {});
+  S.yoListo = !user ? Promise.resolve() : user.me().then((m) => { S.yo = { id: m?.id || null, nombre: m?.name || "" }; if (S.yo.id) S.nombres.set(S.yo.id, S.yo.nombre || "Vos"); if (!ocupado()) render(); }).catch(() => {});
   // El navegador de Claude solo aparece en la app de escritorio, para la cuenta dueña del panel.
   if (mcp) mcp.listTools().then((r) => { S.navegador = (r?.servers || []).some((x) => x.server === NAV && (x.tools || []).length); if (!ocupado()) render(); }).catch(() => {});
   if (sample?.limits) S.limits = await sample.limits().catch(() => null);
@@ -1566,6 +1830,7 @@ async function iniciar() {
   db.collection("entregas").onSnapshot((snap) => {
     S.entregas = new Map(snap.docs.map((d) => [d.id, { id: d.id, ...d.data() }]));
     S.cargado.entregas = true;
+    if (S.vista === "dia" && !S.dia && S.cargado.clientes) prepararDia();
     if (!ocupado()) render(); else pintarLista();
   }, () => {});
   db.doc("config/agencia").onSnapshot((d) => {
