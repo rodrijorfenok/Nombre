@@ -30,7 +30,7 @@ async function esperarJobs(filtro, ms = 5000) {
 
 test("sirve el sitio y el panel", async () => {
   assert.match(await (await fetch(`${base}/`)).text(), /Kairos Creative/);
-  assert.match(await (await fetch(`${base}/panel/`)).text(), /Panel Escalá/);
+  assert.match(await (await fetch(`${base}/panel/`)).text(), /Panel Kairos/);
 });
 
 test("el panel exige token", async () => {

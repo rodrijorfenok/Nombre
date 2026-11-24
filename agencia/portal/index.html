@@ -5,18 +5,51 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
 <meta name="referrer" content="no-referrer">
-<title>Tus entregas · Escalá</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&family=Figtree:wght@400;500;600;700&display=swap">
+<title>Tus entregas · Kairos Creative</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
 <script src="/panel/vendor/marked.min.js"></script>
 <script src="/panel/vendor/purify.min.js"></script>
 <style>
 /* Layout: lista de entregas a la izquierda, lectura a la derecha; una columna en el celular */
+/* Identidad Kairos (mismos tokens que el panel en claude.ai): Helvetica Neue, cinco azules (#101820 · #354B60 · #7394AC · #B8D0DE · #F0F5F7),
+   fondo con resplandor helado y superficies de vidrio con borde fino. Oscuro primero; variante clara helada. */
 :root{
-  --bg:#F2F4F7; --surface:#FFFFFF; --ink:#0E1626; --muted:#556072; --line:#D9DEE7; --accent:#2F49F5; --accent-ink:#FFFFFF; --accent-soft:#E3E7FF; --ok:#0F9D6E;
-  --f-display:"Bricolage Grotesque", system-ui, sans-serif; --f-body:"Figtree", system-ui, sans-serif;
+  --k-noche:#101820; --k-acero:#354B60; --k-niebla:#7394AC; --k-hielo:#B8D0DE; --k-nieve:#F0F5F7;
+  --bg:#0C141B; --surface:rgba(240,245,247,.055); --sunken:rgba(240,245,247,.035); --solid:#15212C;
+  --ink:#F0F5F7; --muted:#9DB4C4; --line:rgba(184,208,222,.16); --line-fuerte:rgba(184,208,222,.32);
+  --accent:#B8D0DE; --accent-ink:#101820; --accent-soft:rgba(115,148,172,.2);
+  --pri-a:#F0F5F7; --pri-b:#B8D0DE; --pri-ink:#101820; --brillo:rgba(184,208,222,.45);
+  --titulo-a:#F0F5F7; --titulo-b:#9EC0D6;
+  --glow-1:rgba(184,208,222,.34); --glow-2:rgba(115,148,172,.42); --glow-3:rgba(53,75,96,.55);
+  --sombra:0 18px 40px -22px rgba(0,0,0,.7); --filo:inset 0 1px 0 rgba(240,245,247,.07);
+  --ok:#7FD8B4; --ok-soft:rgba(127,216,180,.13); --warn:#F2C887; --warn-soft:rgba(242,200,135,.13); --bad:#FF9B93; --bad-soft:rgba(255,155,147,.14);
+  --f-display:"Helvetica Neue","Inter",Helvetica,Arial,sans-serif;
+  --f-body:"Helvetica Neue","Inter",Helvetica,Arial,sans-serif;
+  --f-data:"Helvetica Neue","Inter",Helvetica,Arial,sans-serif;
+  --f-code:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  --r:18px; color-scheme:dark;
 }
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#0B1020;--surface:#121a2e;--ink:#EEF1F8;--muted:#9AA5BA;--line:#243049;--accent:#7C8DFF;--accent-ink:#0B1020;--accent-soft:#1D2550;--ok:#34D399;color-scheme:dark}}
-:root[data-theme="dark"]{--bg:#0B1020;--surface:#121a2e;--ink:#EEF1F8;--muted:#9AA5BA;--line:#243049;--accent:#7C8DFF;--accent-ink:#0B1020;--accent-soft:#1D2550;--ok:#34D399;color-scheme:dark}
+@media (prefers-color-scheme: light){:root:not([data-theme="dark"]){
+  --bg:#EAF1F5; --surface:rgba(255,255,255,.62); --sunken:rgba(53,75,96,.05); --solid:#FFFFFF;
+  --ink:#101820; --muted:#466075; --line:rgba(53,75,96,.14); --line-fuerte:rgba(53,75,96,.3);
+  --accent:#354B60; --accent-ink:#F0F5F7; --accent-soft:rgba(115,148,172,.18);
+  --pri-a:#354B60; --pri-b:#101820; --pri-ink:#F0F5F7; --brillo:rgba(53,75,96,.35);
+  --titulo-a:#101820; --titulo-b:#466A86;
+  --glow-1:rgba(255,255,255,.95); --glow-2:rgba(184,208,222,.75); --glow-3:rgba(115,148,172,.35);
+  --sombra:0 18px 40px -24px rgba(16,24,32,.35); --filo:inset 0 1px 0 rgba(255,255,255,.8);
+  --ok:#0E6B4C; --ok-soft:rgba(14,107,76,.1); --warn:#8A4A07; --warn-soft:rgba(178,104,16,.12); --bad:#A8271F; --bad-soft:rgba(168,39,31,.1);
+  color-scheme:light}}
+:root[data-theme="light"]{
+  --bg:#EAF1F5; --surface:rgba(255,255,255,.62); --sunken:rgba(53,75,96,.05); --solid:#FFFFFF;
+  --ink:#101820; --muted:#466075; --line:rgba(53,75,96,.14); --line-fuerte:rgba(53,75,96,.3);
+  --accent:#354B60; --accent-ink:#F0F5F7; --accent-soft:rgba(115,148,172,.18);
+  --pri-a:#354B60; --pri-b:#101820; --pri-ink:#F0F5F7; --brillo:rgba(53,75,96,.35);
+  --titulo-a:#101820; --titulo-b:#466A86;
+  --glow-1:rgba(255,255,255,.95); --glow-2:rgba(184,208,222,.75); --glow-3:rgba(115,148,172,.35);
+  --sombra:0 18px 40px -24px rgba(16,24,32,.35); --filo:inset 0 1px 0 rgba(255,255,255,.8);
+  --ok:#0E6B4C; --ok-soft:rgba(14,107,76,.1); --warn:#8A4A07; --warn-soft:rgba(178,104,16,.12); --bad:#A8271F; --bad-soft:rgba(168,39,31,.1);
+  color-scheme:light}
+
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.6 var(--f-body)}
@@ -46,10 +79,43 @@ button.btn{font:600 .95rem var(--f-body);padding:11px 16px;border-radius:999px;b
 .muted{color:var(--muted)}
 .ok{color:var(--ok);font-weight:600}
 .empty{padding:40px;text-align:center;color:var(--muted)}
+
+/* ===== Capa de identidad Kairos ===== */
+body{background:radial-gradient(60% 55% at 0% 70%,var(--glow-1),transparent 62%),radial-gradient(55% 45% at 30% 108%,var(--glow-2),transparent 65%),radial-gradient(60% 60% at 100% 0%,var(--glow-3),transparent 70%),var(--bg);background-attachment:fixed;font-family:var(--f-body);letter-spacing:-.003em;min-height:100vh}
+h1,h2,h3,header.top b,header h1,.viewer h2,.md h1,.md h2,.kpi b{font-family:var(--f-display)!important;font-weight:500!important;letter-spacing:-.025em}
+header.top,body>header{background:color-mix(in srgb,var(--bg) 55%,transparent);color:var(--ink);backdrop-filter:blur(22px) saturate(150%);-webkit-backdrop-filter:blur(22px) saturate(150%);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+body>header h1{background:linear-gradient(100deg,var(--titulo-a) 35%,var(--titulo-b));-webkit-background-clip:text;background-clip:text;color:transparent}
+body>header small{color:var(--muted);opacity:1;letter-spacing:.14em;text-transform:uppercase;font-size:.72rem}
+.tag{font:500 .7rem/1 var(--f-body);letter-spacing:.12em;border-radius:999px;padding:7px 11px;background:var(--surface);border:1px solid var(--line);color:var(--muted)}
+.card,.kpi,.item,.lector,.box{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);backdrop-filter:blur(20px) saturate(140%);-webkit-backdrop-filter:blur(20px) saturate(140%);box-shadow:var(--filo),var(--sombra)}
+.item{transition:transform .25s cubic-bezier(.2,.7,.2,1),border-color .2s}
+.item:hover{transform:translateY(-2px);border-color:var(--line-fuerte)}
+.item[aria-current="true"]{border-color:var(--accent);box-shadow:var(--filo),0 0 0 4px var(--accent-soft)}
+.kpi b{font-size:clamp(1.6rem,1.3rem + 1vw,2.1rem)!important;background:linear-gradient(100deg,var(--titulo-a),var(--titulo-b));-webkit-background-clip:text;background-clip:text;color:transparent;font-variant-numeric:tabular-nums}
+.btn,button.btn{font:500 .92rem/1 var(--f-body);border-radius:999px;border:1px solid var(--line-fuerte);background:var(--surface);color:var(--ink);padding:10px 16px;box-shadow:var(--filo);transition:transform .2s cubic-bezier(.2,.7,.2,1),box-shadow .25s,border-color .2s}
+.btn:hover:not(:disabled){transform:translateY(-1px);border-color:var(--accent);box-shadow:var(--filo),0 10px 26px -14px var(--brillo)}
+.btn.primary,.coment button.btn{background:linear-gradient(135deg,var(--pri-a),var(--pri-b));color:var(--pri-ink);border-color:transparent;box-shadow:0 8px 26px -12px var(--brillo),inset 0 1px 0 rgba(255,255,255,.45)}
+nav.tabs{border-bottom:0;gap:6px;padding:4px;background:var(--sunken);border:1px solid var(--line);border-radius:999px;width:max-content;max-width:100%}
+nav.tabs button{border-radius:999px;border-bottom:0;font-weight:500;padding:8px 16px}
+nav.tabs button[aria-selected="true"]{background:var(--surface);color:var(--ink);box-shadow:inset 0 0 0 1px var(--line-fuerte),var(--filo)}
+input,select,textarea{border-radius:12px;border:1px solid var(--line);background:var(--sunken);color:var(--ink);transition:border-color .2s,box-shadow .2s}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 4px var(--accent-soft)}
+select option{background:var(--solid);color:var(--ink)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+th{font:500 .68rem var(--f-body)!important;letter-spacing:.14em;color:var(--muted)}
+th,td,.md td,.md th{border-color:var(--line)}
+tbody tr{transition:background .2s} tbody tr:hover td{background:var(--accent-soft)}
+.chip{font:500 .72rem/1 var(--f-body);padding:5px 10px}
+.num{font-family:var(--f-body);font-variant-numeric:tabular-nums}
+.md pre,.md code{font-family:var(--f-code)}
+.coment{border-color:var(--line)}
+::selection{background:var(--accent-soft)}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){.card,.kpi,.item,.lector,.box,header.top,body>header{background:var(--solid)}}
+@media (prefers-reduced-motion: reduce){.btn,.item{transition:none}.btn:hover,.item:hover{transform:none}}
 </style>
 </head>
 <body>
-<header><div class="wrap"><small id="agencia">Escalá Growth Studio</small><h1 id="marca">Tus entregas</h1></div></header>
+<header><div class="wrap"><small id="agencia">Kairos Creative</small><h1 id="marca">Tus entregas</h1></div></header>
 <main><div class="wrap">
   <nav class="lista" id="lista" aria-label="Entregas"></nav>
   <article class="lector" id="lector"><div class="empty">Cargando…</div></article>

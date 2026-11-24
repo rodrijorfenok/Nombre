@@ -102,12 +102,12 @@ const DATOS = {
       puntaje: rechazar ? 55 : 92,
     };
   },
-  seguimiento: () => ({ mensaje: "¡Hola! Te escribo de Escalá para retomar lo que hablamos. ¿Te queda bien una llamada de 15 minutos esta semana? (DEMO)", canal: "whatsapp" }),
+  seguimiento: () => ({ mensaje: "¡Hola! Te escribo de Kairos Creative para retomar lo que hablamos. ¿Te queda bien una llamada de 15 minutos esta semana? (DEMO)", canal: "whatsapp" }),
   comercial: () => ({
     puntaje: 72, temperatura: "tibio", plan_recomendado: "Tienda que convierte",
     motivo: "DEMO: ya vende online y su problema es la conversión.",
     proximo_paso: "Enviar la auditoría y proponer una llamada de 20 minutos.",
-    mensaje_sugerido: "¡Hola! Soy del equipo de Escalá. Vimos tu tienda y tenemos 3 ideas concretas para que convierta más. ¿Te va una llamada corta esta semana? (DEMO)",
+    mensaje_sugerido: "¡Hola! Soy del equipo de Kairos Creative. Vimos tu tienda y tenemos 3 ideas concretas para que convierta más. ¿Te va una llamada corta esta semana? (DEMO)",
   }),
 };
 
@@ -136,5 +136,5 @@ export async function runChat({ history, tools }) {
     if (link) await tool("solicitar_auditoria").run({ link: link[0] });
     return { text: `¡Gracias! Ya guardé tu contacto${link ? " y pedí la auditoría de tu tienda" : ""}. El equipo te escribe en 48 h hábiles. (DEMO)` };
   }
-  return { text: "¡Hola! Soy el asistente de Escalá (modo DEMO). Contame qué vendés y dónde, y te digo qué plan te conviene. Si querés que te contactemos, dejame tu email o WhatsApp." };
+  return { text: "¡Hola! Soy el asistente de Kairos Creative (modo DEMO). Contame qué vendés y dónde, y te digo qué plan te conviene. Si querés que te contactemos, dejame tu email o WhatsApp." };
 }

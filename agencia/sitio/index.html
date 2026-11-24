@@ -8,26 +8,42 @@
 <meta name="description" content="Agencia de marketing digital: crecimiento en redes sociales y optimización de conversión para tiendas online.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
 <style>
-/* Layout: columna editorial de 1120px; el embudo es el hilo conductor (alcance → visita → carrito → compra) */
+/* Identidad Kairos: Helvetica Neue, cinco azules (#101820 · #354B60 · #7394AC · #B8D0DE · #F0F5F7),
+   fondo noche con resplandor helado, vidrio con borde fino. Oscuro primero; variante clara helada.
+   Layout: columna editorial de 1120px; el embudo es el hilo conductor (alcance → visita → carrito → compra) */
 :root{
-  --bg:#F2F4F7; --surface:#FFFFFF; --ink:#0E1626; --muted:#556072; --line:#D9DEE7;
-  --accent:#2F49F5; --accent-ink:#FFFFFF; --accent-soft:#E3E7FF;
-  --grow:#0F9D6E; --grow-soft:#DDF4EA; --warn:#C2410C;
-  --f-display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
-  --f-body:"Figtree", "Segoe UI", system-ui, sans-serif;
-  --f-data:"JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
-  --r:14px;
+  --k-noche:#101820; --k-acero:#354B60; --k-niebla:#7394AC; --k-hielo:#B8D0DE; --k-nieve:#F0F5F7;
+  --bg:#0C141B; --surface:rgba(240,245,247,.055); --solid:#15212C; --ink:#F0F5F7; --muted:#A3B9C8; --line:rgba(184,208,222,.16); --line-fuerte:rgba(184,208,222,.32);
+  --accent:#B8D0DE; --accent-ink:#101820; --accent-soft:rgba(115,148,172,.2);
+  --pri-a:#F0F5F7; --pri-b:#B8D0DE; --pri-ink:#101820; --brillo:rgba(184,208,222,.45);
+  --titulo-a:#F0F5F7; --titulo-b:#8FB4CC;
+  --glow-1:rgba(184,208,222,.42); --glow-2:rgba(115,148,172,.45); --glow-3:rgba(53,75,96,.6);
+  --sombra:0 24px 60px -30px rgba(0,0,0,.75); --filo:inset 0 1px 0 rgba(240,245,247,.08);
+  --grow:#86DDB8; --grow-soft:rgba(134,221,184,.12); --warn:#F2C887;
+  --f-display:"Helvetica Neue","Inter",Helvetica,Arial,sans-serif;
+  --f-body:"Helvetica Neue","Inter",Helvetica,Arial,sans-serif;
+  --f-data:"Helvetica Neue","Inter",Helvetica,Arial,sans-serif;
+  --f-code:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  --r:22px; color-scheme:dark;
 }
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#0B1020; --surface:#121a2e; --ink:#EEF1F8; --muted:#9AA5BA; --line:#243049;
-  --accent:#7C8DFF; --accent-ink:#0B1020; --accent-soft:#1D2550;
-  --grow:#34D399; --grow-soft:#12352b; --warn:#FB923C; color-scheme:dark}}
-:root[data-theme="dark"]{
-  --bg:#0B1020; --surface:#121a2e; --ink:#EEF1F8; --muted:#9AA5BA; --line:#243049;
-  --accent:#7C8DFF; --accent-ink:#0B1020; --accent-soft:#1D2550;
-  --grow:#34D399; --grow-soft:#12352b; --warn:#FB923C; color-scheme:dark}
+@media (prefers-color-scheme: light){:root:not([data-theme="dark"]){
+  --bg:#EAF1F5; --surface:rgba(255,255,255,.6); --solid:#FFFFFF; --ink:#101820; --muted:#466075; --line:rgba(53,75,96,.14); --line-fuerte:rgba(53,75,96,.3);
+  --accent:#354B60; --accent-ink:#F0F5F7; --accent-soft:rgba(115,148,172,.18);
+  --pri-a:#354B60; --pri-b:#101820; --pri-ink:#F0F5F7; --brillo:rgba(53,75,96,.35);
+  --titulo-a:#101820; --titulo-b:#4C708C;
+  --glow-1:rgba(255,255,255,.95); --glow-2:rgba(184,208,222,.8); --glow-3:rgba(115,148,172,.35);
+  --sombra:0 24px 60px -34px rgba(16,24,32,.4); --filo:inset 0 1px 0 rgba(255,255,255,.85);
+  --grow:#0E6B4C; --grow-soft:rgba(14,107,76,.1); --warn:#8A4A07; color-scheme:light}}
+:root[data-theme="light"]{
+  --bg:#EAF1F5; --surface:rgba(255,255,255,.6); --solid:#FFFFFF; --ink:#101820; --muted:#466075; --line:rgba(53,75,96,.14); --line-fuerte:rgba(53,75,96,.3);
+  --accent:#354B60; --accent-ink:#F0F5F7; --accent-soft:rgba(115,148,172,.18);
+  --pri-a:#354B60; --pri-b:#101820; --pri-ink:#F0F5F7; --brillo:rgba(53,75,96,.35);
+  --titulo-a:#101820; --titulo-b:#4C708C;
+  --glow-1:rgba(255,255,255,.95); --glow-2:rgba(184,208,222,.8); --glow-3:rgba(115,148,172,.35);
+  --sombra:0 24px 60px -34px rgba(16,24,32,.4); --filo:inset 0 1px 0 rgba(255,255,255,.85);
+  --grow:#0E6B4C; --grow-soft:rgba(14,107,76,.1); --warn:#8A4A07; color-scheme:light}
 
 *{box-sizing:border-box}
 [hidden]{display:none!important}
@@ -190,6 +206,80 @@ form textarea{min-height:96px;resize:vertical}
 .chat input{flex:1;min-width:0;font:400 .95rem var(--f-body);padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink)}
 footer{padding-block:40px;border-top:1px solid var(--line);color:var(--muted);font-size:.9rem}
 footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:16px}
+
+/* ===== Capa de identidad Kairos ===== */
+body{background:radial-gradient(70% 60% at -5% 38%,var(--glow-1),transparent 60%),radial-gradient(55% 50% at 30% 0%,var(--glow-3),transparent 70%),radial-gradient(60% 45% at 15% 100%,var(--glow-2),transparent 65%),var(--bg);background-attachment:fixed;font:400 17px/1.6 var(--f-body);letter-spacing:-.004em}
+h1,h2,h3{font-weight:500;letter-spacing:-.035em}
+h1{font-size:clamp(2.6rem,6.4vw,5rem);line-height:1.02;background:linear-gradient(100deg,var(--titulo-a) 40%,var(--titulo-b));-webkit-background-clip:text;background-clip:text;color:transparent;padding-bottom:.08em}
+.hero h1 em{font-style:normal;background:linear-gradient(100deg,var(--titulo-b),var(--accent));-webkit-background-clip:text;background-clip:text;color:transparent}
+.chat{background:color-mix(in srgb,var(--solid) 90%,transparent)}
+h2{font-size:clamp(1.9rem,3.8vw,2.9rem);line-height:1.08}
+h3{font-weight:500;letter-spacing:-.02em}
+.eyebrow{font:500 .76rem/1 var(--f-body);letter-spacing:.18em;color:var(--muted)}
+.lead{color:var(--muted)}
+header.top{background:color-mix(in srgb,var(--bg) 55%,transparent);backdrop-filter:blur(22px) saturate(150%);-webkit-backdrop-filter:blur(22px) saturate(150%);border-bottom:1px solid var(--line)}
+.logo{font:500 1.22rem/1 var(--f-display);letter-spacing:-.025em}
+.btn{font:500 1rem/1 var(--f-body);border:1px solid var(--line-fuerte);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:var(--filo);transition:transform .25s cubic-bezier(.2,.7,.2,1),box-shadow .3s,border-color .2s}
+.btn:hover{transform:translateY(-2px)}
+.btn-primary{background:linear-gradient(135deg,var(--pri-a),var(--pri-b));color:var(--pri-ink);border-color:transparent;box-shadow:0 12px 32px -14px var(--brillo),inset 0 1px 0 rgba(255,255,255,.5);position:relative;overflow:hidden}
+.btn-primary::after{content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.5) 50%,transparent 70%);transform:translateX(-120%);transition:transform .8s cubic-bezier(.2,.7,.2,1);pointer-events:none}
+.btn-primary:hover::after{transform:translateX(120%)}
+.btn-primary:hover{box-shadow:0 18px 40px -14px var(--brillo),inset 0 1px 0 rgba(255,255,255,.5)}
+.btn-ghost{background:var(--surface);color:var(--ink)}
+.btn-ghost:hover{border-color:var(--accent)}
+.funnel,.pillar,.plan,details,form.lead-form,.calc-in,.chat,.addon{background:var(--surface);border:1px solid var(--line);backdrop-filter:blur(22px) saturate(140%);-webkit-backdrop-filter:blur(22px) saturate(140%);box-shadow:var(--filo),var(--sombra)}
+.funnel{border-radius:28px}
+.pillar,.plan{transition:transform .3s cubic-bezier(.2,.7,.2,1),border-color .25s,box-shadow .3s}
+.pillar:hover,.plan:hover{transform:translateY(-4px);border-color:var(--line-fuerte);box-shadow:var(--filo),0 30px 60px -30px var(--brillo)}
+.plan.featured{border:1px solid var(--accent);box-shadow:var(--filo),0 0 0 4px var(--accent-soft),0 30px 70px -30px var(--brillo)}
+.plan .badge{background:linear-gradient(135deg,var(--pri-a),var(--pri-b));color:var(--pri-ink);font:500 .74rem/1 var(--f-body);letter-spacing:.1em;text-transform:uppercase}
+.price b{font:500 2.6rem/1 var(--f-display);letter-spacing:-.04em}
+.pillar .tag,.step .when,.kpi{font-family:var(--f-body);font-weight:500;letter-spacing:.12em}
+.pillar li::before{background:linear-gradient(90deg,var(--k-niebla),var(--k-hielo))}
+.kpi{border-radius:999px;padding:6px 11px;background:var(--accent-soft);border:1px solid var(--line)}
+section.alt{background:color-mix(in srgb,var(--surface) 60%,transparent);border-color:var(--line)}
+.steps{border-top:1px solid var(--line-fuerte)}
+.step .when{color:var(--muted)}
+.toggle{background:var(--surface);border-color:var(--line)}
+.toggle button[aria-pressed="true"]{background:linear-gradient(135deg,var(--pri-a),var(--pri-b));color:var(--pri-ink)}
+.bar{height:26px;background:color-mix(in srgb,var(--ink) 7%,transparent);border-radius:999px}
+.bar i{background:linear-gradient(90deg,var(--k-acero),var(--k-niebla),var(--k-hielo));border-radius:999px;box-shadow:0 0 22px -4px var(--brillo)}
+.stage:last-of-type .bar i{background:linear-gradient(90deg,var(--k-niebla),var(--k-hielo),var(--k-nieve))}
+.funnel-foot .big,.out-total .big{font-weight:500;letter-spacing:-.035em}
+.delta{font-family:var(--f-body);font-variant-numeric:tabular-nums}
+.diferencial,.calc-out{background:radial-gradient(90% 120% at 0% 100%,rgba(184,208,222,.5),transparent 60%),linear-gradient(125deg,#354B60,#101820 70%);color:#F0F5F7;border:1px solid rgba(184,208,222,.22);box-shadow:inset 0 1px 0 rgba(240,245,247,.12),var(--sombra)}
+.diferencial p{color:rgba(240,245,247,.78)}
+.diferencial .eyebrow,.calc-out .eyebrow{color:#B8D0DE}
+.calc-out .hint{color:rgba(240,245,247,.62)}
+.out-row{border-bottom-color:rgba(240,245,247,.14)}
+.out-total .big{color:#F0F5F7}
+.calc-out .btn-primary,.diferencial .btn-primary{background:linear-gradient(135deg,#F0F5F7,#B8D0DE);color:#101820}
+.calc-out .btn-ghost,.diferencial .btn-ghost{color:#F0F5F7;border-color:rgba(184,208,222,.35);background:rgba(240,245,247,.06)}
+.diferencial h3,.calc-out h3{color:#F0F5F7}
+.field label output{font-family:var(--f-body);font-variant-numeric:tabular-nums;color:var(--ink)}
+.field input[type=number],form input,form select,form textarea,.chat input{background:color-mix(in srgb,var(--ink) 5%,transparent);border:1px solid var(--line);border-radius:14px;transition:border-color .2s,box-shadow .2s}
+.field input[type=number]{font:500 1.05rem var(--f-body)}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 4px var(--accent-soft)}
+select option{background:var(--solid);color:var(--ink)}
+.field input[type=range]{accent-color:var(--k-niebla)}
+details{border-radius:18px}
+summary::after{font:400 1.4rem/1 var(--f-body);color:var(--muted)}
+.result{background:var(--grow-soft);border:1px solid color-mix(in srgb,var(--grow) 30%,transparent)}
+.result pre{font-family:var(--f-code)}
+.chat{border-radius:24px}
+.chat header{background:linear-gradient(125deg,#354B60,#101820);color:#F0F5F7}
+.msg.bot{background:color-mix(in srgb,var(--ink) 7%,transparent);border:1px solid var(--line)}
+.msg.user{background:linear-gradient(135deg,var(--pri-a),var(--pri-b));color:var(--pri-ink)}
+.chat-btn{box-shadow:0 16px 40px -12px var(--brillo)}
+.addon{border-style:solid}
+footer{border-color:var(--line)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:999px}
+::selection{background:var(--accent-soft)}
+.hero-copy>*,.funnel{animation:entrar .8s cubic-bezier(.2,.7,.2,1) both}
+.hero-copy>*:nth-child(2){animation-delay:.08s}.hero-copy>*:nth-child(3){animation-delay:.16s}.hero-copy>*:nth-child(4){animation-delay:.24s}.hero-copy>*:nth-child(5){animation-delay:.3s}.funnel{animation-delay:.25s}
+@keyframes entrar{from{opacity:.001;transform:translateY(14px);filter:blur(6px)}to{opacity:1;transform:none;filter:none}}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){.funnel,.pillar,.plan,details,form.lead-form,.calc-in,.chat,.addon,header.top{background:var(--solid)}}
+@media (prefers-reduced-motion: reduce){.hero-copy>*,.funnel{animation:none}.pillar:hover,.plan:hover,.btn:hover{transform:none}}
 </style>
 </head>
 <body>
@@ -197,7 +287,7 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:16px}
 <header class="top">
   <div class="wrap">
     <a class="logo" href="#inicio" aria-label="Kairos Creative, ir al inicio">
-      <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><rect width="30" height="30" rx="8" style="fill:var(--ink)"/><rect x="6" y="18" width="4" height="6" rx="1" style="fill:var(--bg)"/><rect x="13" y="13" width="4" height="11" rx="1" style="fill:var(--bg)"/><rect x="20" y="6" width="4" height="18" rx="1" style="fill:var(--grow)"/></svg>
+      <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><defs><linearGradient id="k-logo1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F0F5F7"/><stop offset=".55" stop-color="#B8D0DE"/><stop offset="1" stop-color="#7394AC"/></linearGradient></defs><rect width="30" height="30" rx="9" fill="url(#k-logo1)"/><rect x="6" y="18" width="4" height="6" rx="2" fill="#101820"/><rect x="13" y="13" width="4" height="11" rx="2" fill="#101820"/><rect x="20" y="6" width="4" height="18" rx="2" fill="#101820"/></svg>
       Kairos Creative
     </a>
     <nav class="links" aria-label="Secciones">

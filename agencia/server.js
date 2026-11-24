@@ -1,4 +1,4 @@
-// Servidor de Escalá: sirve el sitio y el panel, expone la API de los agentes y
+// Servidor de Kairos Creative: sirve el sitio y el panel, expone la API de los agentes y
 // arranca la agenda autónoma.
 import express from "express";
 import crypto from "node:crypto";
