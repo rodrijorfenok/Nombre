@@ -137,6 +137,21 @@ test("copias de seguridad: la agenda guarda una por día", async () => {
   assert.equal(fs.readdirSync(path.join(dir, "backups")).length, 1, "no duplica en el mismo día");
 });
 
+test("copias de seguridad: la copia se puede restaurar y tiene los mismos datos", async () => {
+  const { DatabaseSync } = await import("node:sqlite");
+  const archivo = path.join(dir, "backups", fs.readdirSync(path.join(dir, "backups"))[0]);
+  const copia = new DatabaseSync(archivo, { readOnly: true });
+  try {
+    assert.equal(copia.prepare("PRAGMA integrity_check").get().integrity_check, "ok");
+    for (const col of ["leads", "jobs", "clientes"]) {
+      const n = copia.prepare(`SELECT COUNT(*) AS n FROM ${col}`).get().n;
+      assert.equal(n, store.count(col), `la copia tiene todos los ${col}`);
+    }
+    const c = store.list("clientes")[0];
+    if (c) assert.equal(JSON.parse(copia.prepare("SELECT data FROM clientes WHERE id = ?").get(c.id).data).marca, c.marca);
+  } finally { copia.close(); }
+});
+
 test("salud: endpoint para monitoreo externo", async () => {
   const { body } = await get("/api/salud", {});
   assert.equal(body.ok, true);

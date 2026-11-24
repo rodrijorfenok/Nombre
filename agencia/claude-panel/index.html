@@ -112,6 +112,18 @@ textarea.editor{min-height:420px;font:400 .88rem/1.5 var(--f-data)}
 .diff{font:400 .82rem/1.5 var(--f-data);background:var(--sunken);border-radius:8px;padding:10px;overflow-x:auto;max-height:600px;overflow-y:auto}
 .diff .da{background:var(--ok-soft);color:var(--ok)} .diff .dq{background:var(--bad-soft);color:var(--bad);text-decoration:line-through} .diff .di{color:var(--muted)}
 .nav-princ{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.nav-princ .btn[aria-current="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.pipe{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+@media (max-width:1000px){.pipe{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:600px){.pipe{grid-template-columns:1fr}}
+.col-pipe{display:grid;gap:8px;align-content:start;background:var(--sunken);border-radius:10px;padding:10px}
+.col-pipe h3{margin:0;font-size:.95rem}
+.col-pipe .ent{background:var(--surface)}
+.col-pipe .ent small{display:block}
+.in-chico{width:96px;max-width:100%}
+.lista-chica{margin:0;padding-left:1.1em;display:grid;gap:5px;font-size:.9rem}
+small.sube{color:var(--ok);font-weight:600} small.baja{color:var(--bad);font-weight:600}
+.full-col{grid-column:1/-1}
 .agenda{list-style:none;margin:0;padding:0;display:grid;gap:8px}
 .agenda>li{display:grid;grid-template-columns:112px minmax(0,1fr) auto;gap:12px;align-items:start;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
 .agenda>li.ahora{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
@@ -181,7 +193,7 @@ fieldset.horario input[type=time]{padding:6px 8px;border:1px solid var(--line);b
 
 <div class="layout">
   <aside>
-    <div class="nav-princ"><button class="btn" id="btn-dia" type="button">Mi día</button><button class="btn" id="btn-inicio" type="button">Casos</button></div>
+    <div class="nav-princ"><button class="btn" id="btn-dia" data-nav="dia" type="button">Mi día</button><button class="btn" id="btn-inicio" data-nav="inicio" type="button">Casos</button><button class="btn" id="btn-comercial" data-nav="comercial" type="button">Comercial</button><button class="btn" id="btn-finanzas" data-nav="finanzas" type="button">Cobros</button><button class="btn" id="btn-calidad" data-nav="calidad" type="button">Calidad</button></div>
     <button class="btn pri" id="btn-nuevo" type="button">+ Nuevo cliente</button>
     <div class="eyebrow">Clientes</div>
     <nav class="lista-cli" id="lista-cli" aria-label="Clientes"><p class="muted">Cargando…</p></nav>
@@ -289,7 +301,7 @@ const CAMPOS_CLIENTE = [
   ["marca", "Marca", "text", true], ["contacto", "Contacto (nombre, email o WhatsApp)", "text"], ["rubro", "Rubro", "text", true],
   ["url", "Tienda o sitio (URL)", "text"], ["redes", "Redes (Instagram, TikTok…)", "text"], ["plan", "Plan", "plan"],
   ["publico", "Público", "textarea"], ["tono", "Tono e identidad de marca", "textarea"], ["productos", "Productos o servicios destacados", "textarea"],
-  ["competidores", "Competidores conocidos (nombres y links)", "textarea"], ["objetivo", "Objetivo principal", "textarea"], ["notas", "Notas internas (no las ven los agentes)", "textarea"],
+  ["competidores", "Competidores conocidos (nombres y links)", "textarea"], ["objetivo", "Objetivo principal", "textarea"], ["origen", "Cómo llegó (referido, Instagram, web…)", "text"], ["notas", "Notas internas (no las ven los agentes)", "textarea"],
 ];
 const ONBOARDING = [
   ["propuesta", "Propuesta aceptada"], ["politica", "Política de devolución firmada por ambas partes"], ["pago", "Primer pago recibido"],
@@ -302,7 +314,8 @@ function contextoCliente(c) {
   const brief = ["marca", "rubro", "url", "redes", "publico", "tono", "productos", "competidores", "objetivo", "plan"].filter((k) => c[k]).map((k) => `- ${k}: ${c[k]}`).join("\n");
   const base = c.base && Object.values(c.base).some(Boolean) ? "\nNúmeros de partida del cliente:\n" + BASE.filter(([k]) => c.base[k]).map(([k, n]) => `- ${n}: ${c.base[k]}`).join("\n") : "";
   const lec = (c.lecciones || []).slice(-15).map((l) => `- ${l.texto}`).join("\n");
-  return `<cliente>\n${brief}${base}${lec ? `\n\nLecciones de entregas anteriores (respetalas; son pedidos del equipo):\n${lec}` : ""}\n</cliente>`;
+  const hist = (c.historial || []).slice(-6).map((h) => `- ${h.periodo}: ${BASE.filter(([k]) => h.valores?.[k]).map(([k, n]) => `${n} ${h.valores[k]}`).join(" · ")}`).join("\n");
+  return `<cliente>\n${brief}${base}${hist ? `\n\nEvolución mensual de los números (cargada por el equipo):\n${hist}` : ""}${lec ? `\n\nLecciones de entregas anteriores (respetalas; son pedidos del equipo):\n${lec}` : ""}\n</cliente>`;
 }
 
 /** Lo que dejaron los pasos anteriores: la última versión aprobada (o la más reciente) de cada uno. */
@@ -882,7 +895,7 @@ async function correrAgente(tipo, c, entrada) {
   const ctl = S.run.ctl;
   const x = {
     memo: {}, correcciones: "",
-    pedido: entrada._pedido ? `\n\n<pedido_del_equipo>\nRehacé la entrega aplicando este pedido del equipo, sin perder lo que estaba bien:\n${entrada._pedido}\n</pedido_del_equipo>` : "",
+    pedido: (S.config.instrucciones?.[tipo] ? `\n\n<instrucciones_de_la_agencia>\nRespetá también estas instrucciones de la agencia para este tipo de entrega:\n${S.config.instrucciones[tipo]}\n</instrucciones_de_la_agencia>` : "") + (entrada._pedido ? `\n\n<pedido_del_equipo>\nRehacé la entrega aplicando este pedido del equipo, sin perder lo que estaba bien:\n${entrada._pedido}\n</pedido_del_equipo>` : ""),
     web: entrada.web && S.navegador ? null : false,
     paso(t) { S.run.pasos.forEach((p) => (p.hecho = true)); S.run.pasos.push({ t, hecho: false }); S.run.preview = ""; pintarRun(); },
     async pedir(prompt, { json = false, images, web = false } = {}) {
@@ -915,6 +928,7 @@ async function correrAgente(tipo, c, entrada) {
     calidad: { aprobado: v.aprobado, puntaje: v.puntaje, rondas: hist.length, correcciones: v.correcciones.slice(0, 8), historial: hist },
     entrada: datos, creado: ahora(), autorId: S.yo?.id || null, versionDe: entrada._versionDe || null,
   };
+  if (entrada._prueba) { doc.prueba = true; doc.estado = "revisar"; doc.titulo = `Prueba de instrucción · ${doc.titulo}`; }
   await ref.set(doc);
   S.entregas.set(ref.id, { id: ref.id, ...doc });
   anotar(c.id, "Sistema", `Se generó "${doc.titulo}" · calidad ${v.puntaje}/100${v.aprobado ? "" : " (con observaciones)"}`);
@@ -957,7 +971,7 @@ async function ejecutarCadena(c, e) {
 }
 
 /* ---------- Bitácora del caso ---------- */
-const TIPOS_BITACORA = ["Nota", "Llamada", "WhatsApp", "Email", "Reunión", "Pedido del cliente", "Decisión"];
+const TIPOS_BITACORA = ["Nota", "Llamada", "WhatsApp", "Email", "Reunión", "Pedido del cliente", "Decisión", "Traspaso"];
 async function anotar(clienteId, tipo, texto) {
   if (!S.db || !texto) return;
   try {
@@ -1141,10 +1155,14 @@ function render() {
 }
 function renderVista() {
   pintarLista();
+  document.querySelectorAll("[data-nav]").forEach((b) => b.setAttribute("aria-current", String(b.dataset.nav === S.vista)));
   const v = $("#vista");
   if (!S.db) { v.innerHTML = vistaSinDb(); return; }
   if (S.vista === "config") { v.innerHTML = vistaConfig(); enlazarConfig(); return; }
   if (S.vista === "dia") { v.innerHTML = vistaDia(); enlazarDia(); return; }
+  if (S.vista === "comercial") { v.innerHTML = vistaComercial(); enlazarComercial(); return; }
+  if (S.vista === "finanzas") { v.innerHTML = vistaFinanzas(); enlazarFinanzas(); return; }
+  if (S.vista === "calidad") { v.innerHTML = vistaCalidad(); enlazarCalidad(); return; }
   if (S.vista === "nuevo") { v.innerHTML = vistaFormCliente(null); enlazarFormCliente(null); return; }
   const c = S.clientes.get(S.clienteId);
   if (S.vista === "cliente" && c) { v.innerHTML = vistaCliente(c); enlazarCliente(c); return; }
@@ -1158,7 +1176,7 @@ function pintarLista() {
   if (!cs.length) { el.innerHTML = '<p class="muted" style="font-size:.88rem">Todavía no hay clientes.</p>'; return; }
   el.innerHTML = cs.map((c) => {
     const pend = [...S.entregas.values()].filter((e) => e.clienteId === c.id && e.estado === "revisar").length;
-    return `<button class="cli" type="button" data-cli="${esc(c.id)}" aria-current="${S.vista === "cliente" && S.clienteId === c.id}"><span>${esc(c.marca)}</span>${pend ? `<b title="Entregas para revisar">${pend}</b>` : ""}</button>`;
+    return `<button class="cli" type="button" data-cli="${esc(c.id)}" aria-current="${S.vista === "cliente" && S.clienteId === c.id}"><span>${esc(c.marca)}${c.practica ? ' <small class="muted">· práctica</small>' : ""}</span>${pend ? `<b title="Entregas para revisar">${pend}</b>` : ""}</button>`;
   }).join("");
   el.querySelectorAll("[data-cli]").forEach((b) => b.addEventListener("click", () => abrirCliente(b.dataset.cli)));
 }
@@ -1176,10 +1194,13 @@ function alertasCaso(c) {
   const pp = c.proximoPaso || {};
   if (!["Pausado", "Baja"].includes(c.etapa)) {
     if (!pp.texto) a.push(["warn", "Sin próximo paso"]);
-    else if (pp.fecha && pp.fecha < hoyISO()) a.push(["bad", "Próximo paso vencido"]);
+    else if (pp.fecha && pp.fecha < hoyISO()) a.push(["bad", diasVencido(c) > escalarDias() ? `Escalar: vencido hace ${diasVencido(c)} días` : "Próximo paso vencido"]);
     const d = diasDesde(c.ultimoContacto || c.creado);
     if (d != null && d > 7) a.push(["warn", `${d} días sin contacto`]);
     if (!c.responsableId) a.push(["warn", "Sin responsable"]);
+    const quieto = diasDesde(c.ultimaActividad || c.creado);
+    if (c.etapa === "En ejecución" && quieto != null && quieto > 14) a.push(["warn", `${quieto} días sin avances`]);
+    const cb = estadoCobro(c); if (cb?.estado === "vencido") a.push(["bad", "Cobro vencido"]);
   }
   return a;
 }
@@ -1196,29 +1217,29 @@ function vistaInicio() {
     <span class="eyebrow">Tu primer cliente</span>
     <h1>Cargá a tu cliente y poné en marcha los 8 agentes</h1>
     <p>Creá su ficha con lo que sepas. Después los agentes recorren el proceso completo: diagnóstico, investigación, auditoría de marca, FODA, hipótesis, plan de 90 días, pauta y medición. Cada paso usa lo que dejaron los anteriores y pasa por control de calidad antes de que lo veas.</p>
-    <div class="fila"><button class="btn pri" type="button" id="ini-nuevo">Crear el primer cliente</button><button class="btn" type="button" id="ini-ejemplo">Probar con un cliente ficticio</button></div>
+    <div class="fila"><button class="btn pri" type="button" id="ini-nuevo">Crear el primer cliente</button><button class="btn" type="button" id="ini-ejemplo">Practicar con un caso ficticio</button></div>
     <p style="font-size:.85rem">Los agentes usan tu cuenta de Claude: no hace falta API key ni servidor.</p></div>`;
   const revisar = [...S.entregas.values()].filter((e) => e.estado === "revisar");
   const lista = cs.filter((c) => S.filtro !== "mios" || c.responsableId === S.yo?.id)
     .sort((a, b) => alertasCaso(b).filter((x) => x[0] === "bad").length - alertasCaso(a).filter((x) => x[0] === "bad").length || (a.proximoPaso?.fecha || "9").localeCompare(b.proximoPaso?.fecha || "9"));
   const co = coincidencia();
   const alerta = cs.filter((c) => alertasCaso(c).length).length;
+  const esc8 = paraEscalar();
+  const textoAlertas = `Alertas de ${nombreAgencia()} · ${fecha(ahora())}\n` + cs.filter((c) => !c.practica && alertasCaso(c).length).map((c) => `- ${c.marca}: ${alertasCaso(c).map((x) => x[1]).join(", ")}`).join("\n");
   return `${agentesOff}<div class="fila" style="justify-content:space-between"><div><span class="eyebrow">Inicio</span><h1>Casos</h1></div>
+    <div class="fila"><a class="btn chico" href="${esc(waLink(textoAlertas))}" target="_blank" rel="noopener">Mandarme las alertas por WhatsApp</a><button class="btn chico" type="button" id="ini-ejemplo">+ Caso de práctica</button></div>
     <div class="tabs" role="tablist" style="border:0"><button role="tab" type="button" data-filtro="todos" aria-selected="${S.filtro !== "mios"}">Todos (${cs.length})</button><button role="tab" type="button" data-filtro="mios" aria-selected="${S.filtro === "mios"}">Mis casos (${cs.filter((c) => c.responsableId === S.yo?.id).length})</button></div></div>
   <div class="kpis"><div class="kpi"><b class="num">${alerta}</b><span>casos con alertas</span></div><div class="kpi"><b class="num">${revisar.length}</b><span>entregas para revisar</span></div><div class="kpi"><b class="num">${co ? co.pct + "%" : "—"}</b><span>coincidencia del control de calidad con el equipo${co ? ` (${co.n})` : ""}</span></div></div>
   <div class="card" style="padding:0"><div class="tabla-casos"><table><thead><tr><th>Cliente</th><th>Etapa</th><th>Responsable</th><th>Proceso</th><th>Próximo paso</th><th>Alertas</th></tr></thead><tbody>
   ${lista.map((c) => { const n = PASOS.filter((t) => mejorEntrega(c.id, t)?.estado === "aprobada").length; const pp = c.proximoPaso || {}; const al = alertasCaso(c);
-    return `<tr data-caso="${esc(c.id)}" tabindex="0"><td><b>${esc(c.marca)}</b><br><small class="muted">${esc(c.plan || "Sin plan")}</small></td><td>${esc(c.etapa || "Prospecto")}</td><td>${esc(nombre(c.responsableId))}</td><td class="num">${n}/8</td><td>${pp.texto ? `${esc(pp.texto)}${pp.fecha ? `<br><small class="muted num">${esc(pp.fecha)}</small>` : ""}` : '<span class="muted">—</span>'}</td><td>${al.length ? al.map(([k, t]) => `<span class="chip ${k}">${esc(t)}</span>`).join(" ") : '<span class="chip ok">Al día</span>'}</td></tr>`; }).join("") || `<tr><td colspan="6" class="muted">No tenés casos asignados.</td></tr>`}
+    return `<tr data-caso="${esc(c.id)}" tabindex="0"><td><b>${esc(c.marca)}</b>${c.practica ? ' <span class="chip neutro">Práctica</span>' : ""}<br><small class="muted">${esc(c.plan || "Sin plan")}</small></td><td>${esc(c.etapa || "Prospecto")}</td><td>${esc(nombre(c.responsableId))}</td><td class="num">${n}/8</td><td>${pp.texto ? `${esc(pp.texto)}${pp.fecha ? `<br><small class="muted num">${esc(pp.fecha)}</small>` : ""}` : '<span class="muted">—</span>'}</td><td>${al.length ? al.map(([k, t]) => `<span class="chip ${k}">${esc(t)}</span>`).join(" ") : '<span class="chip ok">Al día</span>'}</td></tr>`; }).join("") || `<tr><td colspan="6" class="muted">No tenés casos asignados.</td></tr>`}
   </tbody></table></div></div>
+  ${esc8.length ? `<div class="card"><h2>Para escalar (${esc8.length})</h2><p class="muted" style="font-size:.88rem">Casos con el próximo paso vencido hace más de ${escalarDias()} días. Hablá con el responsable hoy y destrabalo o reasignalo (con nota de traspaso).</p>${esc8.map((c) => `<button class="ent" type="button" data-caso="${esc(c.id)}"><b>${esc(c.marca)} · ${diasVencido(c)} días</b><small>${esc(nombre(c.responsableId))} · ${esc(c.proximoPaso?.texto || "")}</small></button>`).join("")}</div>` : ""}
   ${revisar.length ? `<div class="card"><h2>Para revisar (${revisar.length})</h2>${revisar.map((e) => `<button class="ent" type="button" data-ir="${esc(e.id)}"><b>${esc(e.titulo)}</b><small>${esc(S.clientes.get(e.clienteId)?.marca || "")} · ${fechaHora(e.creado)} · puntaje ${e.calidad?.puntaje ?? "—"}</small></button>`).join("")}</div>` : ""}`;
 }
 function enlazarInicio() {
   $("#ini-nuevo")?.addEventListener("click", () => { S.vista = "nuevo"; render(); });
-  $("#ini-ejemplo")?.addEventListener("click", async (ev) => {
-    ev.target.disabled = true;
-    const id = await guardarCliente(null, { marca: "Trama Lino (ficticio)", rubro: "Indumentaria femenina de lino", url: "https://tienda.trama-lino.example", redes: "@tramalino.ficticio", publico: "Mujeres de 28 a 45 años, AMBA y Córdoba, interesadas en moda sustentable", tono: "Cálido, cercano, con foco en la calidad del material", productos: "Vestidos y camisas de lino, línea verano", objetivo: "Subir la conversión de la tienda y crecer en Instagram para el lanzamiento de verano", plan: "Growth 360", contacto: "Lucía (ficticia)", notas: "Cliente de ejemplo para practicar. Borralo cuando quieras." }).catch(() => null);
-    if (id) { S.clientes.set(id, { id, marca: "Trama Lino (ficticio)", lecciones: [], onboarding: {}, base: {} }); await guardarCliente(id, { etapa: "Prospecto", responsableId: S.yo?.id || null, competidores: "Linos del Sur (ficticio), Casa Lino (ficticio)" }).catch(() => {}); abrirCliente(id); }
-  });
+  $("#ini-ejemplo")?.addEventListener("click", (ev) => { ev.target.disabled = true; crearPractica(); });
   document.querySelectorAll("[data-caso]").forEach((tr) => { const ir = () => abrirCliente(tr.dataset.caso); tr.addEventListener("click", ir); tr.addEventListener("keydown", (ev) => { if (ev.key === "Enter") ir(); }); });
   document.querySelectorAll("[data-filtro]").forEach((b) => b.addEventListener("click", () => { S.filtro = b.dataset.filtro; guardarLocal("kairos-filtro", S.filtro); render(); }));
   document.querySelectorAll("[data-ir]").forEach((b) => b.addEventListener("click", () => { const e = S.entregas.get(b.dataset.ir); S.vista = "cliente"; S.clienteId = e.clienteId; S.tab = "entregas"; S.entregaId = e.id; render(); }));
@@ -1283,7 +1304,9 @@ function vistaCaso(c) {
       <label class="campo">Responsable<select id="cs-resp"><option value="">Sin asignar</option>${personas.map(([id, n]) => `<option value="${esc(id)}"${id === c.responsableId ? " selected" : ""}>${esc(n)}${id === S.yo?.id ? " (vos)" : ""}</option>`).join("")}</select></label>
       <label class="campo full">Próximo paso<input type="text" id="cs-paso" value="${esc(pp.texto || "")}" placeholder="Ej.: Enviar la propuesta y confirmar reunión"></label>
       <label class="campo">Fecha<input type="date" id="cs-fecha" value="${esc(pp.fecha || "")}"></label>
-    </div><div class="fila"><button class="btn pri" type="submit">Guardar estado</button><span class="muted" style="font-size:.85rem">Proceso: ${PASOS.filter((t) => mejorEntrega(c.id, t)?.estado === "aprobada").length}/8${siguiente ? ` · siguiente: ${AGENTES[siguiente].paso}. ${esc(AGENTES[siguiente].nombre)}` : " · completo"}</span></div></form>
+      <label class="campo">Motivo (si pasa a Baja)<select id="cs-motivo"><option value="">—</option>${MOTIVOS_BAJA.map((m) => `<option${m === c.motivoBaja ? " selected" : ""}>${m}</option>`).join("")}</select></label>
+      <label class="campo full">Nota de traspaso<small>Obligatoria si cambiás de responsable: qué se hizo, qué falta, qué espera el cliente y qué cuidar.</small><textarea id="cs-traspaso" placeholder="Ej.: Se envió la auditoría el martes; falta que apruebe. Prefiere WhatsApp a la mañana. Ojo: pidió no hablar de precios hasta la reunión."></textarea></label>
+    </div><div class="fila"><button class="btn pri" type="submit">Guardar estado</button><button class="btn chico" type="button" id="traspaso-ia"${S.sample ? "" : " disabled"}>Redactar la nota con el asistente</button><button class="btn chico" type="button" id="informe-estado">Informe de estado para el cliente (Word)</button><span class="err" id="cs-err"></span></div><div class="fila"><span class="muted" style="font-size:.85rem">Proceso: ${PASOS.filter((t) => mejorEntrega(c.id, t)?.estado === "aprobada").length}/8${siguiente ? ` · siguiente: ${AGENTES[siguiente].paso}. ${esc(AGENTES[siguiente].nombre)}` : " · completo"}</span></div></form>
     <div class="card"><div class="fila" style="justify-content:space-between"><h2>Asistente del caso</h2><button class="btn chico" type="button" id="al-dia"${S.sample ? "" : " disabled"}>Ponerme al día</button></div>
       <p class="muted" style="font-size:.86rem">Preguntale lo que necesites: en qué estamos, qué responderle al cliente, cómo avanzar. Contesta solo con lo que hay en el caso y dice de dónde lo saca.</p>
       <div class="chat" id="chat">${chat.map((t) => `<div class="msg ${t.rol}">${t.rol === "ia" ? `<div class="doc">${md(t.texto)}</div><div class="fila"><button class="btn chico" type="button" data-guardar-chat="${chat.indexOf(t)}">Guardar en la bitácora</button></div>` : esc(t.texto)}</div>`).join("")}${S.chat.pensando && S.chat.clienteId === c.id ? `<div class="msg ia"><div class="doc" id="chat-vivo">${S.chat.vivo ? md(S.chat.vivo) : "Pensando…"}</div></div>` : ""}</div>
@@ -1299,12 +1322,21 @@ function enlazarCaso(c) {
   $("#form-caso").addEventListener("submit", async (ev) => {
     ev.preventDefault();
     const etapa = $("#cs-etapa").value, responsableId = $("#cs-resp").value || null, proximoPaso = { texto: $("#cs-paso").value.trim(), fecha: $("#cs-fecha").value };
-    const cambios = [];
-    if (etapa !== (c.etapa || "Prospecto")) cambios.push(`Etapa: ${c.etapa || "Prospecto"} → ${etapa}`);
+    const cambios = [], extra = {};
+    const nota = $("#cs-traspaso").value.trim(), motivo = $("#cs-motivo").value;
+    if (responsableId !== (c.responsableId || null) && c.responsableId && !nota) { $("#cs-err").textContent = "Escribí la nota de traspaso para el nuevo responsable."; $("#cs-traspaso").focus(); return; }
+    if (etapa === "Baja" && c.etapa !== "Baja" && !motivo) { $("#cs-err").textContent = "Elegí el motivo de la baja."; return; }
+    $("#cs-err").textContent = "";
+    if (etapa !== (c.etapa || "Prospecto")) {
+      cambios.push(`Etapa: ${c.etapa || "Prospecto"} → ${etapa}`);
+      extra.etapaDesde = ahora();
+      if (etapa === "Baja") { extra.perdidoEn = c.etapa || "Prospecto"; extra.motivoBaja = motivo; cambios.push(`Motivo: ${motivo}`); }
+      if (PREVENTA.includes(c.etapa || "Prospecto") && !PREVENTA.includes(etapa) && etapa !== "Baja") extra.ganado = ahora();
+    }
     if (responsableId) S.nombres.set(responsableId, $("#cs-resp").selectedOptions[0].textContent.replace(" (vos)", ""));
     if (responsableId !== (c.responsableId || null)) cambios.push(`Responsable: ${nombre(responsableId)}`);
     if (proximoPaso.texto !== (c.proximoPaso?.texto || "") || proximoPaso.fecha !== (c.proximoPaso?.fecha || "")) cambios.push(`Próximo paso: ${proximoPaso.texto || "sin definir"}${proximoPaso.fecha ? ` (${proximoPaso.fecha})` : ""}`);
-    try { await guardarCliente(c.id, { etapa, responsableId, proximoPaso }); if (cambios.length) anotar(c.id, "Decisión", cambios.join(" · ")); toast("Estado guardado"); } catch {}
+    try { await guardarCliente(c.id, { etapa, responsableId, proximoPaso, ...extra }); if (cambios.length) anotar(c.id, "Decisión", cambios.join(" · ")); if (nota) anotar(c.id, "Traspaso", `Para ${nombre(responsableId)}: ${nota}`); $("#cs-traspaso").value = ""; toast("Estado guardado"); } catch {}
   });
   $("#form-bit").addEventListener("submit", (ev) => { ev.preventDefault(); const t = $("#bit-texto").value.trim(); if (!t) return; anotar(c.id, $("#bit-tipo").value, t); $("#bit-texto").value = ""; toast("Anotado"); });
   const preguntar = async (q, visible) => {
@@ -1319,6 +1351,13 @@ function enlazarCaso(c) {
     const ch = $("#chat"); if (ch) ch.scrollTop = ch.scrollHeight;
   };
   $("#form-chat").addEventListener("submit", (ev) => { ev.preventDefault(); const q = $("#chat-q").value.trim(); if (q) { $("#chat-q").value = ""; preguntar(q); } });
+  $("#informe-estado").addEventListener("click", () => { const cc = S.clientes.get(c.id) || c; descargar(`${slug(cc.marca)}-estado-${fechaLocal()}.docx`, docx(cc, { markdown: informeEstado(cc), creado: ahora() })); anotar(c.id, "Sistema", "Se descargó el informe de estado para el cliente"); });
+  $("#traspaso-ia").addEventListener("click", async (ev) => {
+    const b = ev.target; b.disabled = true; b.textContent = "Redactando…";
+    try { const t = await preguntarCaso(S.clientes.get(c.id) || c, "Redactá una nota de traspaso breve (máximo 8 líneas, sin títulos) para otra persona del equipo que toma este caso hoy: en qué etapa está y qué se hizo, qué se le entregó y qué falta que apruebe, qué pidió el cliente y quedó pendiente, compromisos con fecha, cómo le gusta que le hablen y el próximo paso concreto. Solo con lo que figura en el caso."); $("#cs-traspaso").value = t.replace(/\*\*/g, "").replace(/\s*\[[^\]]{1,40}\]/g, "").trim().slice(0, 1800); }
+    catch (err) { toast(copia(err)); }
+    b.disabled = false; b.textContent = "Redactar la nota con el asistente";
+  });
   $("#al-dia").addEventListener("click", () => preguntar("Poneme al día con este caso como si lo tomara hoy por primera vez: en qué etapa está y qué se hizo, qué se le entregó al cliente y qué falta aprobar, qué pidió el cliente y qué quedó pendiente, compromisos del plan y su cumplimiento, riesgos, y los próximos 3 pasos concretos con fecha sugerida. Terminá con cómo conviene hablarle a este cliente.", "Ponerme al día"));
   document.querySelectorAll("[data-guardar-chat]").forEach((b) => b.addEventListener("click", () => { const t = S.chat.turnos[Number(b.dataset.guardarChat)]; if (t) { anotar(c.id, "Nota", `Asistente: ${t.texto.replace(/\*\*/g, "")}`.slice(0, 2000)); toast("Guardado en la bitácora"); } }));
 }
@@ -1337,9 +1376,11 @@ function vistaFicha(c) {
       ${(c.lecciones || []).length ? `<ul style="margin:0;padding-left:1.1em;display:grid;gap:6px">${c.lecciones.map((l, i) => `<li>${esc(l.texto)} <button class="btn chico" type="button" data-borrar-lec="${i}" aria-label="Borrar lección">Quitar</button></li>`).join("")}</ul>` : ""}
       <div class="fila"><input type="text" id="nueva-lec" placeholder="Ej.: Nunca usar la palabra barato; la marca es premium." style="flex:1;min-width:200px"><button class="btn" type="button" id="agregar-lec">Agregar</button></div></div>
   </div>
+  ${vistaEvolucion(c)}
   <div class="card"><h2>Zona de cuidado</h2><div class="fila"><button class="btn peligro" type="button" id="borrar-cli">Borrar cliente y sus entregas</button><span id="conf-borrar"></span></div></div>`;
 }
 function enlazarFicha(c) {
+  enlazarEvolucion(c);
   $("#editar").addEventListener("click", () => { S.editando = true; render(); });
   document.querySelectorAll("[data-ob]").forEach((cb) => cb.addEventListener("change", () => guardarCliente(c.id, { onboarding: { ...(c.onboarding || {}), [cb.dataset.ob]: cb.checked } }).catch(() => {})));
   $("#guardar-base").addEventListener("click", () => guardarCliente(c.id, { base: Object.fromEntries(BASE.map(([k]) => [k, $("#b-" + k).value.trim()])) }).then(() => toast("Números guardados")).catch(() => {}));
@@ -1400,7 +1441,7 @@ function vistaFormAgente(c) {
   const a = AGENTES[S.agente];
   const imgs = S.limits?.images;
   const campos = a.campos.map((f) => {
-    const val = f.valor ? f.valor(c) : "";
+    const val = S.prefill && S.prefill[f.id] != null ? S.prefill[f.id] : f.valor ? f.valor(c) : "";
     if (f.tipo === "imagenes") return imgs ? `<label class="campo full">${f.label}<small>${esc(f.ayuda || "")} Hasta ${imgs.maxCount}.</small><input type="file" id="a-${f.id}" accept="${esc(imgs.mediaTypes.join(","))}" multiple><div class="miniaturas" id="mini"></div></label>` : `<div class="aviso full">En esta vista no se pueden enviar capturas: pegá el texto de la tienda abajo.</div>`;
     if (f.tipo === "web") return S.navegador ? `<label class="check full"><input type="checkbox" id="a-web" checked> ${esc(f.label)} con el navegador de Claude</label>` : `<div class="aviso full">Sin investigación web en esta vista (solo en la app de escritorio de Claude, para la cuenta dueña del panel). El agente trabaja con lo que cargues.</div>`;
     if (f.tipo === "textarea") return `<label class="campo full">${f.label}${f.ayuda ? `<small>${esc(f.ayuda)}</small>` : ""}<textarea id="a-${f.id}">${esc(val)}</textarea></label>`;
@@ -1417,7 +1458,7 @@ function vistaFormAgente(c) {
 }
 function enlazarFormAgente(c) {
   const a = AGENTES[S.agente];
-  $("#volver-ag").addEventListener("click", () => { S.agente = null; render(); });
+  $("#volver-ag").addEventListener("click", () => { S.agente = null; S.prefill = null; render(); });
   const fi = $("#a-capturas");
   if (fi) fi.addEventListener("change", () => {
     const max = S.limits?.images?.maxCount || 5;
@@ -1435,6 +1476,7 @@ function enlazarFormAgente(c) {
     }
     const err = a.validar?.(e, c);
     if (err) { $("#a-err").textContent = err; return; }
+    S.prefill = null;
     ejecutar(S.agente, c, e);
   });
 }
@@ -1472,13 +1514,15 @@ function vistaEntregas(c, ents) {
     <div class="fila" style="justify-content:space-between"><div>${chipEstado(sel)} <span class="muted" style="font-size:.85rem">${esc(AGENTES[sel.tipo]?.nombre || sel.tipo)} · ${fechaHora(sel.creado)}${sel.editado ? " · editada a mano" : ""}</span></div>
       <div class="fila"><button class="btn chico" type="button" id="dl-docx">Descargar en Word</button><button class="btn chico" type="button" id="dl-html">Descargar web</button><button class="btn chico" type="button" id="dl-md">Descargar .md</button><button class="btn chico" type="button" id="copiar">Copiar texto</button></div></div>
     ${cal.puntaje != null || cal.correcciones?.length ? `<div class="calidad"><b>Control de calidad: ${cal.aprobado ? "aprobada" : "con observaciones"}${cal.puntaje != null ? ` · ${cal.puntaje}/100` : ""} · ${cal.rondas || 1} ronda(s)</b>${!cal.aprobado && cal.correcciones?.length ? `<ul>${cal.correcciones.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>` : ""}</div>` : ""}
+    ${["propuesta", "legales"].includes(sel.tipo) && !S.config.legalRevisada ? '<div class="aviso">La política de devolución y el contrato todavía no figuran como revisados por un abogado o contador (Datos de la agencia). Revisalos antes de mandar esto a un cliente.</div>' : ""}
+    ${sel.prueba ? '<div class="aviso info">Versión de prueba de una instrucción nueva (pantalla Calidad). No se cuenta como entrega del cliente.</div>' : ""}
     ${sel.versionDe && S.entregas.get(sel.versionDe) ? `<div class="fila"><button class="btn chico" type="button" id="comparar">${S.comparar ? "Ver la entrega" : "Comparar con la versión anterior"}</button></div>` : ""}
     ${S.comparar && sel.versionDe && S.entregas.get(sel.versionDe) ? `<div class="diff">${diferencias(S.entregas.get(sel.versionDe).markdown, sel.markdown).filter((d, i, arr) => d[0] !== " " || arr[i - 1]?.[0] !== " " || arr[i + 1]?.[0] !== " ").map(([k, t]) => `<div class="d${k === "+" ? "a" : k === "-" ? "q" : "i"}">${k === " " ? "&nbsp;" : k} ${esc(t)}</div>`).join("")}</div>` :
     S.editando ? `<textarea class="editor" id="editor">${esc(sel.markdown)}</textarea><div class="fila"><button class="btn pri" type="button" id="guardar-ed">Guardar cambios</button><button class="btn" type="button" id="cancelar-ed">Cancelar</button></div>`
       : `<div class="doc" id="doc">${md(sel.markdown)}</div>`}
     ${S.editando ? "" : `<div class="card" style="background:var(--sunken);border:0">
       <h3>Tu decisión</h3>
-      <div class="fila">${sel.estado !== "aprobada" ? '<button class="btn pri" type="button" id="aprobar">Aprobar</button>' : sel.enviada ? `<span class="chip ok">Enviada al cliente el ${fecha(sel.enviada)}</span>` : '<button class="btn pri" type="button" id="enviada">Marcar como enviada al cliente</button>'}<button class="btn" type="button" id="editar-ent">Editar a mano</button><button class="btn" type="button" id="descartar">${sel.estado === "descartada" ? "Restaurar" : "Descartar"}</button></div>
+      <div class="fila">${sel.estado !== "aprobada" ? '<button class="btn pri" type="button" id="aprobar">Aprobar</button>' : sel.enviada ? `<span class="chip ok">Enviada al cliente el ${fecha(sel.enviada)}</span>${sel.respuestaCliente ? `<span class="chip ${sel.respuestaCliente.tipo === "aprobo" ? "ok" : "warn"}">${sel.respuestaCliente.tipo === "aprobo" ? "El cliente la aprobó" : "El cliente pidió cambios"}</span>` : '<button class="btn" type="button" id="cli-aprobo">El cliente la aprobó</button><button class="btn" type="button" id="cli-cambios">El cliente pidió cambios</button>'}` : '<button class="btn pri" type="button" id="enviada">Marcar como enviada al cliente</button>'}<button class="btn" type="button" id="editar-ent">Editar a mano</button><button class="btn" type="button" id="descartar">${sel.estado === "descartada" ? "Restaurar" : "Descartar"}</button></div>
       <label class="campo">Pedir cambios<small>Escribí qué cambiar: el agente rehace la entrega con tu pedido.</small><textarea id="cambios" placeholder="Ej.: Los ganchos tienen que mencionar que el lino no se arruga."></textarea></label>
       <label class="check"><input type="checkbox" id="como-leccion" checked> Guardarlo como lección de ${esc(c.marca)} para las próximas entregas</label>
       <div class="fila"><button class="btn" type="button" id="pedir-cambios"${S.sample ? "" : " disabled"}>Rehacer con estos cambios</button><span class="err" id="ent-err"></span></div>
@@ -1491,6 +1535,8 @@ function enlazarEntregas(c) {
   const e = S.entregas.get(S.entregaId); if (!e) return;
   $("#aprobar")?.addEventListener("click", () => guardarEntrega(e.id, { estado: "aprobada", decisionEquipo: "aprobar", decididoPor: S.yo?.id || null }).then(() => { anotar(c.id, "Sistema", `Aprobada: "${e.titulo}"`); toast("Entrega aprobada"); }).catch(() => {}));
   $("#enviada")?.addEventListener("click", () => guardarEntrega(e.id, { enviada: ahora() }).then(() => { anotar(c.id, "Email", `Se envió al cliente: "${e.titulo}"`); toast("Marcada como enviada"); }).catch(() => {}));
+  $("#cli-aprobo")?.addEventListener("click", () => guardarEntrega(e.id, { respuestaCliente: { tipo: "aprobo", fecha: ahora() } }).then(() => { anotar(c.id, "Pedido del cliente", `El cliente aprobó "${e.titulo}"`); toast("Registrado"); }).catch(() => {}));
+  $("#cli-cambios")?.addEventListener("click", () => guardarEntrega(e.id, { respuestaCliente: { tipo: "cambios", fecha: ahora() } }).then(() => { anotar(c.id, "Pedido del cliente", `El cliente pidió cambios en "${e.titulo}"`); toast("Escribí abajo qué pidió y tocá Rehacer"); setTimeout(() => $("#cambios")?.focus(), 50); }).catch(() => {}));
   $("#comparar")?.addEventListener("click", () => { S.comparar = !S.comparar; render(); });
   $("#dl-docx")?.addEventListener("click", () => descargar(`${slug(c.marca)}-${e.tipo}-${e.creado.slice(0, 10)}.docx`, docx(c, e)));
   $("#descartar")?.addEventListener("click", () => guardarEntrega(e.id, { estado: e.estado === "descartada" ? "revisar" : "descartada" }).catch(() => {}));
@@ -1501,8 +1547,10 @@ function enlazarEntregas(c) {
     const t = $("#cambios").value.trim();
     if (!t) { $("#ent-err").textContent = "Escribí qué hay que cambiar."; return; }
     if ($("#como-leccion").checked) await guardarCliente(c.id, { lecciones: [...(c.lecciones || []), { texto: `${AGENTES[e.tipo].nombre}: ${t}`.slice(0, 600), fecha: ahora() }].slice(-40) }).catch(() => {});
-    await guardarEntrega(e.id, { estado: "descartada", decisionEquipo: "cambios", decididoPor: S.yo?.id || null }).catch(() => {});
-    anotar(c.id, "Decisión", `Pedido de cambios en "${e.titulo}": ${t}`);
+    // Si el equipo ya la había aprobado y el que pide cambios es el cliente, no cuenta como desacuerdo con el control de calidad.
+    const delCliente = e.decisionEquipo === "aprobar" && e.respuestaCliente?.tipo === "cambios";
+    await guardarEntrega(e.id, { estado: "descartada", ...(delCliente ? { pedidoCliente: t.slice(0, 600) } : { decisionEquipo: "cambios", decididoPor: S.yo?.id || null }), pedidoCambios: t.slice(0, 600) }).catch(() => {});
+    anotar(c.id, delCliente ? "Pedido del cliente" : "Decisión", `Pedido de cambios en "${e.titulo}": ${t}`);
     const entrada = { ...(e.entrada || {}), _versionDe: e.id };
     delete entrada.capturas;
     if (e.tipo === "auditoria") entrada.texto = `${entrada.texto || ""}\n\nVersión anterior de la auditoría (corregila; no tenés las capturas de nuevo):\n${e.markdown}`.trim();
@@ -1545,8 +1593,16 @@ function vistaConfig() {
       <div class="fila">${[1, 2, 3, 4, 5, 6, 0].map((d) => `<label class="check"><input type="checkbox" data-dia="${d}"${horario().dias.includes(d) ? " checked" : ""}> ${DIAS[d]}</label>`).join("")}</div>
       <div class="fila">Mañana <input type="time" id="h-m1" value="${esc(horario().bloques[0][0])}"> a <input type="time" id="h-m2" value="${esc(horario().bloques[0][1])}"> · Tarde <input type="time" id="h-t1" value="${esc(horario().bloques[1]?.[0] || "")}"> a <input type="time" id="h-t2" value="${esc(horario().bloques[1]?.[1] || "")}"></div>
     </fieldset>
+    <label class="campo">WhatsApp para recibir avisos<small>Tu número con código de país (ej.: 5491122334455). Lo usan los botones "Mandarme…".</small><input type="text" id="c-wa-avisos" value="${esc(c.whatsappAvisos || "")}"></label>
+    <label class="campo">Costo por hora de trabajo (USD)<small>Para calcular el margen por cliente con las horas de Mi día.</small><input type="number" id="c-costo-hora" value="${esc(c.costoHora || "")}"></label>
+    <label class="campo">Escalar un caso después de (días vencido)<input type="number" id="c-escalar" min="1" value="${escalarDias()}"></label>
+    <label class="campo">Recordar al cliente que apruebe después de (días)<input type="number" id="c-recordar" min="1" value="${diasRecordatorio()}"></label>
+    <label class="campo full">Extras del cotizador<small>Uno por línea: nombre | precio en USD | mensual o único.${c.extras == null ? " Los de abajo son de ejemplo." : ""}</small><textarea id="c-extras">${esc(c.extras ?? EXTRAS_BASE)}</textarea></label>
+    <fieldset class="campo full"><legend>Revisión legal</legend><label class="check"><input type="checkbox" id="c-legal"${c.legalRevisada ? " checked" : ""}> Un abogado o contador revisó la política de devolución y el contrato</label>${c.legalRevisada ? `<small>Marcado el ${fecha(c.legalRevisada)}.</small>` : "<small>Hasta marcarlo, el panel avisa en cada propuesta y documento legal.</small>"}</fieldset>
     <label class="campo">Rondas de autocorrección<small>Cuántas veces se corrige sola una entrega que no pasa el control de calidad.</small><select id="c-rondas">${[0, 1, 2].map((n) => `<option${Number(c.rondas ?? 1) === n ? " selected" : ""}>${n}</option>`).join("")}</select></label>
-  </div><div class="fila"><button class="btn pri" type="submit">Guardar</button></div></form>`;
+  </div><div class="fila"><button class="btn pri" type="submit">Guardar</button></div></form>
+  ${vistaRespaldo()}
+  <div class="card"><h2>Navegador de Claude</h2><p class="muted" style="font-size:.88rem">Los agentes de investigación y auditoría leen la web con el navegador de la app de escritorio de Claude. Probalo una vez antes del primer cliente.</p><div class="fila"><button class="btn" type="button" id="probar-nav">Probar el navegador</button><span id="nav-res" class="muted"></span></div></div>`;
 }
 function enlazarConfig() {
   $("#form-conf").addEventListener("submit", async (ev) => {
@@ -1554,7 +1610,15 @@ function enlazarConfig() {
     const datos = { nombre: $("#c-nombre").value.trim(), ciudad: $("#c-ciudad").value.trim(), whatsapp: $("#c-whatsapp").value.trim(), email: $("#c-email").value.trim(), rondas: Number($("#c-rondas").value), politica: $("#c-politica").value.trim(),
       horario: { dias: [...document.querySelectorAll("[data-dia]")].filter((x) => x.checked).map((x) => Number(x.dataset.dia)), bloques: [[$("#h-m1").value, $("#h-m2").value], ...($("#h-t1").value && $("#h-t2").value ? [[$("#h-t1").value, $("#h-t2").value]] : [])].filter(([a, b]) => a && b && a < b) }, precios: Object.fromEntries(PLANES_BASE.map((x, i) => [x.id, Number($("#c-p" + i).value) || x.precio])), actualizado: ahora() };
     if (!datos.horario.dias.length || !datos.horario.bloques.length) { toast("Revisá el horario: al menos un día y un bloque con inicio anterior al fin."); return; }
-    try { await S.db.doc("config/agencia").set(datos); S.dia = null; toast("Datos guardados"); } catch { toast("No se pudo guardar."); }
+    Object.assign(datos, { whatsappAvisos: $("#c-wa-avisos").value.trim(), costoHora: Number($("#c-costo-hora").value) || 0, escalarDias: Math.max(1, Number($("#c-escalar").value) || 3), diasRecordatorio: Math.max(1, Number($("#c-recordar").value) || 3), extras: $("#c-extras").value.trim(), legalRevisada: $("#c-legal").checked ? (S.config.legalRevisada || ahora()) : "" });
+    try { await guardarConfig(datos); S.dia = null; toast("Datos guardados"); } catch { toast("No se pudo guardar."); }
+  });
+  enlazarRespaldo();
+  $("#probar-nav").addEventListener("click", async (ev) => {
+    ev.target.disabled = true; $("#nav-res").textContent = "Probando…";
+    const r = await probarNavegador();
+    $("#nav-res").textContent = r.ok ? "✓ " + r.t : r.t; $("#nav-res").className = r.ok ? "" : "err";
+    ev.target.disabled = false;
   });
 }
 
@@ -1600,21 +1664,28 @@ const COMO = {
   prospeccion: ["Respondé consultas nuevas y cargá cada interesado como cliente en etapa Prospecto.", "Para los más avanzados, generá la propuesta comercial.", "Contactá marcas nuevas con el cuestionario de ingreso."],
   planificar: ["Recorré Inicio: cada caso tiene que tener responsable, próximo paso y fecha.", "Revisá las lecciones nuevas de la semana en la ficha de cada cliente.", "Anotá en la bitácora lo que se decida para la semana."],
   general: ["Hacé la tarea y anotá lo que salga en la bitácora correspondiente."],
+  cobro: ["Abrí Cobros y confirmá el monto pendiente.", "Escribile al cliente con la herramienta Mensaje para el cliente (Otro → recordatorio de pago), cordial y concreto.", "Cuando pague, tocá Registrar pago."],
+  recordar: ["Abrí la entrega y verificá qué se le mandó.", "Escribile al cliente para que la apruebe o te pida cambios (Mensaje → Seguimiento).", "Cuando responda, marcá El cliente la aprobó o El cliente pidió cambios."],
+  copia: ["Abrí Datos de la agencia → Copia de seguridad.", "Tocá Descargar copia completa y guardala fuera de claude.ai (Drive, disco).", "Una vez por mes, elegí la copia con Elegir una copia… para verificar que esté completa."],
+  legal: ["Descargá en Word la política de devolución y el contrato (herramienta Legales).", "Mandáselos a un abogado o contador con las dudas marcadas como [completar].", "Cuando estén revisados, cargá el texto final y marcá la revisión legal en Datos de la agencia."],
   libre: ["Si hay tareas en \"No entra hoy\", seguí por esas en orden.", "Si no: prospección (cargá interesados como Prospecto), contenido para las redes de la agencia o practicá con el cliente ficticio.", "No adelantes trabajo de un cliente sin anotarlo en su bitácora."],
 };
-const ACTIVOS = (c) => !["Pausado", "Baja"].includes(c.etapa);
+const ACTIVOS = (c) => !["Pausado", "Baja"].includes(c.etapa) && !c.practica;
 function tareasDelDia(fecha, previas = []) {
   const dow = deFecha(fecha).getDay();
   const T = [];
-  const add = (t) => T.push({ hecha: false, ...t });
+  const add = (t) => T.push({ hecha: false, ...t, min: minAprendido(t.tipoTiempo || t.tipo, t.min), minBase: t.min });
   const cs = [...S.clientes.values()].filter(ACTIVOS);
   const ents = [...S.entregas.values()];
   for (const c of cs) {
     const pp = c.proximoPaso || {};
     const marca = c.marca;
-    if (pp.texto && pp.fecha && pp.fecha < fecha) add({ clave: `vencido:${c.id}`, tipo: "vencido", prio: 1, min: 20, clienteId: c.id, titulo: `Resolver el próximo paso vencido: ${pp.texto}`, ir: { tab: "caso" } });
+    if (pp.texto && pp.fecha && pp.fecha < fecha) add({ clave: `vencido:${c.id}`, tipo: "vencido", prio: 1, min: 20, clienteId: c.id, titulo: `${diasVencido(c) > escalarDias() ? `Destrabar (escalado, ${diasVencido(c)} días)` : "Resolver el próximo paso vencido"}: ${pp.texto}`, ir: { tab: "caso" } });
     else if (pp.texto && pp.fecha === fecha) add({ clave: `hoy:${c.id}`, tipo: "hoy", prio: 1.5, min: 30, clienteId: c.id, titulo: pp.texto, ir: { tab: "caso" } });
-    for (const e of ents.filter((x) => x.clienteId === c.id && x.estado === "revisar")) add({ clave: `revisar:${e.id}`, tipo: "revisar", prio: 2, min: 20, clienteId: c.id, titulo: `Revisar "${e.titulo}"`, ir: { tab: "entregas", entregaId: e.id } });
+    const cb = estadoCobro(c);
+    if (cb?.estado === "vencido") add({ clave: `cobro:${c.id}:${cb.mes}`, tipo: "cobro", prio: 2.5, min: 10, clienteId: c.id, titulo: `Cobrar a ${marca}: ${dinero(cb.monto - cb.pagado)} (vencía el ${Number(cb.vence.slice(8))})`, ir: { vista: "finanzas" } });
+    for (const e of ents.filter((x) => x.clienteId === c.id && x.enviada && !x.respuestaCliente && diasDesde(x.enviada) >= diasRecordatorio())) add({ clave: `recordar:${e.id}`, tipo: "recordar", prio: 3.5, min: 10, clienteId: c.id, titulo: `Pedirle a ${marca} que responda "${e.titulo}" (enviada hace ${diasDesde(e.enviada)} días)`, ir: { tab: "entregas", entregaId: e.id } });
+    for (const e of ents.filter((x) => x.clienteId === c.id && x.estado === "revisar" && !x.prueba)) add({ clave: `revisar:${e.id}`, tipo: "revisar", prio: 2, min: 20, clienteId: c.id, titulo: `Revisar "${e.titulo}"`, ir: { tab: "entregas", entregaId: e.id } });
     for (const e of ents.filter((x) => x.clienteId === c.id && x.estado === "aprobada" && !x.enviada && x.tipo !== "mensaje")) add({ clave: `enviar:${e.id}`, tipo: "enviar", prio: 3, min: 10, clienteId: c.id, titulo: `Enviar al cliente "${e.titulo}"`, ir: { tab: "entregas", entregaId: e.id } });
     const sin = diasDesde(c.ultimoContacto || c.creado);
     if (sin != null && sin > 7) add({ clave: `contacto:${c.id}`, tipo: "contacto", prio: 4, min: 10, clienteId: c.id, titulo: `Contactar a ${marca}: ${sin} días sin contacto`, ir: { tab: "agentes", agente: "mensaje" } });
@@ -1630,7 +1701,7 @@ function tareasDelDia(fecha, previas = []) {
       const sig = PASOS.find((t) => mejorEntrega(c.id, t)?.estado !== "aprobada");
       if (sig && mejorEntrega(c.id, sig)?.estado !== "revisar") {
         const min = { diagnostico: 30, investigacion: 35, auditoria: 40, foda: 20, hipotesis: 25, plan90: 40, pauta: 40, medicion: 30 }[sig];
-        add({ clave: `paso:${c.id}:${sig}`, tipo: "paso", prio: 6, min, clienteId: c.id, titulo: `Paso ${AGENTES[sig].paso} · ${AGENTES[sig].nombre} de ${marca}`, ir: { tab: "agentes", agente: sig } });
+        add({ clave: `paso:${c.id}:${sig}`, tipo: "paso", tipoTiempo: `paso:${sig}`, prio: 6, min, clienteId: c.id, titulo: `Paso ${AGENTES[sig].paso} · ${AGENTES[sig].nombre} de ${marca}`, ir: { tab: "agentes", agente: sig } });
       }
     }
     if (c.etapa === "Ingreso") {
@@ -1641,13 +1712,15 @@ function tareasDelDia(fecha, previas = []) {
   }
   if (dow === 4) add({ clave: "prospeccion", tipo: "prospeccion", prio: 9, min: 60, titulo: "Prospección: responder consultas, cargar interesados y preparar propuestas", ir: { vista: "inicio" } });
   if (dow === 6) { add({ clave: "planificar", tipo: "planificar", prio: 5, min: 45, titulo: "Planificar la semana que viene en todos los casos", ir: { vista: "inicio" } }); add({ clave: "lecciones", tipo: "planificar", prio: 9, min: 20, titulo: "Repasar las lecciones y los pedidos de cambios de la semana", ir: { vista: "inicio" } }); }
+  if (S.cargado.clientes && cs.length && (!S.config.ultimaCopia || diasDesde(S.config.ultimaCopia) >= 7) && (dow === 6 || diasDesde(S.config.ultimaCopia) >= 10 || !S.config.ultimaCopia)) add({ clave: "copia", tipo: "copia", prio: 6.5, min: 5, titulo: "Descargar y verificar la copia de seguridad semanal", ir: { vista: "config" } });
+  if (!S.config.legalRevisada && (!cs.length || dow === 4)) add({ clave: "legal", tipo: "legal", prio: 3, min: 20, titulo: "Coordinar la revisión de la política de devolución y el contrato con un abogado o contador", ir: { vista: "config" } });
   if (!cs.length) {
     if (!politica()) add({ clave: "politica", tipo: "general", prio: 2, min: 30, titulo: "Cargar los datos de la agencia y el texto de la política de devolución", ir: { vista: "config" } });
     add({ clave: "practica", tipo: "paso", prio: 4, min: 60, titulo: "Practicar con el cliente ficticio: correr los pasos 1 a 5 y revisar las entregas", ir: { vista: "inicio" } });
     add({ clave: "prospeccion", tipo: "prospeccion", prio: 5, min: 90, titulo: "Prospección: contactar marcas y cargar cada interesado como cliente", ir: { vista: "inicio" } });
   }
   // Lo que quedó sin hacer el día laboral anterior va primero.
-  for (const p of previas) if (!p.hecha && !p.fija && !T.some((t) => t.clave === p.clave)) T.push({ ...p, hecha: false, deAyer: true, prio: Math.max(0.5, p.prio - 0.5) });
+  for (const p of previas) if (!p.hecha && !p.fija && !T.some((t) => t.clave === p.clave)) { const { inicio, real, registrado, ...resto } = p; T.push({ ...resto, hecha: false, deAyer: true, prio: Math.max(0.5, p.prio - 0.5) }); }
   return T.sort((a, b) => a.prio - b.prio);
 }
 function armarAgenda(tareas) {
@@ -1680,9 +1753,10 @@ async function cargarDia(fecha, { rearmar = false } = {}) {
   const prev = (await S.db.doc("dias/" + claveDia(anterior)).get()).data()?.tareas || [];
   const nuevas = tareasDelDia(fecha, prev);
   const hechas = new Map((guardado?.tareas || []).map((t) => [t.clave, t.hecha]));
+  const prevT = new Map((guardado?.tareas || []).map((t) => [t.clave, t]));
   // Al rearmar se conservan las tareas ya marcadas como hechas.
   const conservar = (guardado?.tareas || []).filter((t) => t.hecha && !nuevas.some((n) => n.clave === t.clave));
-  const tareas = [...conservar, ...nuevas.map((t) => ({ ...t, hecha: hechas.get(t.clave) || false }))];
+  const tareas = [...conservar, ...nuevas.map((t) => { const p = prevT.get(t.clave) || {}; return { ...t, hecha: hechas.get(t.clave) || false, ...(p.inicio ? { inicio: p.inicio } : {}), ...(p.real != null ? { real: p.real } : {}), ...(p.registrado ? { registrado: true } : {}) }; })];
   const doc = { fecha, tareas, armado: ahora() };
   await ref.set(doc);
   return doc;
@@ -1752,14 +1826,16 @@ function vistaDia() {
     const pasos = COMO[t.tipo] || COMO.general;
     filas.push(`<li class="tarea${t.hecha ? " hecha" : ""}${actual === t ? " ahora" : ""}"><span class="hora num">${aHora(t.ini)}–${aHora(t.fin)}</span>
       <div class="tt">${t.fija ? `<b>${esc(t.titulo)}</b>` : `<label class="check"><input type="checkbox" data-hecha="${esc(t.clave)}"${t.hecha ? " checked" : ""}> <b>${esc(t.titulo)}</b></label>`}
-        <div class="fila" style="gap:6px">${c ? `<span class="chip neutro">${esc(c.marca)}</span>` : ""}${t.deAyer ? '<span class="chip warn">Quedó de ayer</span>' : ""}${actual === t ? '<span class="chip ok">Ahora</span>' : ""}<span class="muted" style="font-size:.82rem">${t.fin - t.ini} min</span></div>
+        <div class="fila" style="gap:6px">${!t.fija && !t.hecha ? (t.inicio ? `<span class="chip ok">En curso desde ${esc(fechaHora(t.inicio).split(", ").pop())}</span>` : `<button class="btn chico" type="button" data-empezar="${esc(t.clave)}">Empezar</button>`) : ""}${t.hecha && t.real != null ? `<span class="muted" style="font-size:.82rem">Tardó ${t.real} min</span>` : ""}${c ? `<span class="chip neutro">${esc(c.marca)}</span>` : ""}${t.deAyer ? '<span class="chip warn">Quedó de ayer</span>' : ""}${actual === t ? '<span class="chip ok">Ahora</span>' : ""}<span class="muted" style="font-size:.82rem">${t.fin - t.ini} min</span></div>
         <details><summary>Cómo hacerlo</summary><ol>${pasos.map((p) => `<li>${esc(p)}</li>`).join("")}</ol></details></div>
       ${t.ir ? `<button class="btn chico" type="button" data-ir-tarea="${esc(t.clave)}">Ir</button>` : ""}</li>`);
   }
   filas.push(`<li class="fin"><span class="hora num">${aHora(final)}</span><span><b>Fin de la jornada.</b> Lo que sigue queda para mañana.</span></li>`);
   return `<div class="fila" style="justify-content:space-between;align-items:flex-end"><div><span class="eyebrow">Mi día · ${esc(S.yo?.nombre || "equipo")}</span><h1>${laboral ? "Hoy" : "Próxima jornada"}, ${DIAS[fd.getDay()]} ${fd.getDate()}</h1><p class="muted">Foco: <b>${esc(foco)}</b>. ${esc(focoTxt)}</p></div>
-    <div class="fila"><button class="btn" type="button" id="rearmar">Rearmar con lo nuevo</button><button class="btn" type="button" id="dl-dia">Descargar en Word</button></div></div>
+    <div class="fila"><button class="btn" type="button" id="ver-cierre">${S.verCierre ? "Ocultar el cierre" : "Resumen de cierre"}</button><button class="btn" type="button" id="rearmar">Rearmar con lo nuevo</button><button class="btn" type="button" id="dl-dia">Descargar en Word</button></div></div>
   ${estado}
+  ${esHoy && laboral && ahoraMin >= final - 20 && ahoraMin < final && !S.verCierre ? '<div class="aviso info">Es la hora del cierre: tocá <b>Resumen de cierre</b>, revisalo y mandátelo por WhatsApp.</div>' : ""}
+  ${S.verCierre ? `<div class="card" id="cierre"><div class="doc">${md(resumenCierre())}</div><div class="fila"><button class="btn chico" type="button" id="cierre-copiar">Copiar</button><a class="btn chico pri" href="${esc(waLink(textoPlano(resumenCierre())))}" target="_blank" rel="noopener">Mandármelo por WhatsApp</a><button class="btn chico" type="button" id="cierre-word">Descargar en Word</button></div></div>` : ""}
   <div class="card"><div class="fila" style="justify-content:space-between"><b>Avance del día</b><span class="num muted">${hechasMin} de ${totalMin} min · ${ag.items.filter((t) => !t.fija && t.hecha).length}/${ag.items.filter((t) => !t.fija).length} tareas</span></div><div class="barra"><i style="width:${totalMin ? Math.round((hechasMin / totalMin) * 100) : 0}%"></i></div></div>
   <ol class="agenda">${filas.join("")}</ol>
   ${ag.sobran.length ? `<div class="card"><h2>No entra hoy (${ag.sobran.length})</h2><p class="muted" style="font-size:.88rem">Si terminás antes, seguí por acá en este orden. Si no, mañana aparecen arriba.</p><ul style="margin:0;padding-left:1.1em;display:grid;gap:6px">${ag.sobran.map((t) => `<li>${esc(t.titulo)}${t.clienteId ? ` · <span class="muted">${esc(S.clientes.get(t.clienteId)?.marca || "")}</span>` : ""} · ${t.min} min</li>`).join("")}</ul></div>` : ""}
@@ -1779,7 +1855,9 @@ function enlazarDia() {
   if (!S.dia || S.dia.fecha !== (horario().dias.includes(new Date().getDay()) ? fechaLocal() : fechaLocal(diaLaboral(new Date(), 1)))) { if (S.cargado.clientes && S.cargado.entregas) prepararDia(); return; }
   document.querySelectorAll("[data-hecha]").forEach((cb) => cb.addEventListener("change", () => {
     const t = S.dia.tareas.find((x) => x.clave === cb.dataset.hecha); if (!t) return;
-    t.hecha = cb.checked; guardarDia(); render();
+    t.hecha = cb.checked;
+    if (t.hecha) { t.hechaEn = ahora(); if (t.inicio) t.real = Math.max(1, Math.min(240, Math.round((Date.now() - Date.parse(t.inicio)) / 60000))); if (!t.registrado) { t.registrado = true; registrarTiempo(t); } }
+    guardarDia(); render();
   }));
   document.querySelectorAll("[data-ir-tarea]").forEach((b) => b.addEventListener("click", () => {
     const t = S.dia.tareas.find((x) => x.clave === b.dataset.irTarea) || {};
@@ -1787,6 +1865,13 @@ function enlazarDia() {
     if (ir.vista) { S.vista = ir.vista; render(); return; }
     if (t.clienteId) { abrirCliente(t.clienteId, ir.tab); if (ir.agente) S.agente = ir.agente; if (ir.entregaId) S.entregaId = ir.entregaId; render(); }
   }));
+  document.querySelectorAll("[data-empezar]").forEach((b) => b.addEventListener("click", () => {
+    const t = S.dia.tareas.find((x) => x.clave === b.dataset.empezar); if (!t) return;
+    t.inicio = ahora(); guardarDia(); render();
+  }));
+  $("#ver-cierre")?.addEventListener("click", () => { S.verCierre = !S.verCierre; if (S.verCierre) S.db.doc("dias/" + claveDia(S.dia.fecha)).update({ cierre: resumenCierre(), cierreHora: ahora() }).catch(() => {}); render(); });
+  $("#cierre-copiar")?.addEventListener("click", () => { try { navigator.clipboard.writeText(textoPlano(resumenCierre())).then(() => toast("Resumen copiado"), () => toast("No se pudo copiar")); } catch { toast("No se pudo copiar"); } });
+  $("#cierre-word")?.addEventListener("click", () => descargar(`cierre-${S.dia.fecha}.docx`, docx({ marca: S.yo?.nombre || "el equipo" }, { markdown: resumenCierre(), creado: ahora() })));
   $("#rearmar")?.addEventListener("click", () => prepararDia({ rearmar: true }).then(() => toast("Día rearmado con lo nuevo")));
   $("#dl-rutina")?.addEventListener("click", () => descargar("rutina-semanal.docx", docx({ marca: "el equipo" }, { markdown: rutina(), creado: ahora() })));
   $("#dl-dia")?.addEventListener("click", () => {
@@ -1794,6 +1879,474 @@ function enlazarDia() {
     const mdDia = `# Plan del día · ${S.dia.fecha}\n\n| Horario | Tarea | Cliente | Hecha |\n|---|---|---|---|\n${ag.items.map((t) => `| ${aHora(t.ini)}–${aHora(t.fin)} | ${t.titulo.replace(/\|/g, "/")} | ${S.clientes.get(t.clienteId)?.marca || ""} | ${t.hecha ? "Sí" : ""} |`).join("\n")}\n\n## No entra hoy\n${ag.sobran.map((t) => `- ${t.titulo} (${t.min} min)`).join("\n") || "- Nada"}`;
     descargar(`plan-del-dia-${S.dia.fecha}.docx`, docx({ marca: S.yo?.nombre || "el equipo" }, { markdown: mdDia, creado: ahora() }));
   });
+}
+
+/* ===================== Configuración compartida ===================== */
+async function guardarConfig(parcial) {
+  const datos = { ...S.config, ...parcial, actualizado: ahora() };
+  await S.db.doc("config/agencia").set(datos);
+  S.config = datos;
+}
+const escalarDias = () => Number(S.config.escalarDias ?? 3);
+const diasRecordatorio = () => Number(S.config.diasRecordatorio ?? 3);
+function diasVencido(c) { const f = c.proximoPaso?.fecha; return f && f < hoyISO() ? Math.max(1, Math.floor((Date.now() - deFecha(f).getTime()) / 86400000)) : 0; }
+const soloDigitos = (s) => String(s || "").replace(/\D/g, "");
+/** Link para mandarse un aviso por WhatsApp (al número de avisos, o elegir contacto). */
+const waLink = (texto, numero = S.config.whatsappAvisos) => `https://wa.me/${soloDigitos(numero)}?text=${encodeURIComponent(texto)}`;
+const textoPlano = (m) => String(m).replace(/^#+\s*/gm, "").replace(/\*\*/g, "").replace(/^\|.*\|$/gm, (l) => l.replace(/^\||\|$/g, "").split("|").map((x) => x.trim()).join(" · ")).replace(/^( · )?-+( · -+)*$/gm, "").replace(/\n{3,}/g, "\n\n").trim();
+const num = (s) => { if (s == null || s === "") return null; let t = String(s).replace(/[^\d,.-]/g, ""); if (/,\d{1,2}$/.test(t)) t = t.replace(/\./g, "").replace(",", "."); else t = t.replace(/,/g, ""); const n = parseFloat(t); return Number.isFinite(n) ? n : null; };
+const dinero = (n) => `USD ${Math.round(Number(n) || 0).toLocaleString("es-AR")}`;
+const normal = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
+
+/* ===================== Tiempos reales ===================== */
+// Cada tarea que se marca con "Empezar" y después como hecha deja su duración real.
+// Con 3 o más registros de un tipo de tarea, Mi día usa el promedio real en vez de la estimación.
+const mesISO = (d = new Date()) => fechaLocal(d).slice(0, 7);
+function minAprendido(tipo, def) {
+  const x = S.tiempos?.porTipo?.[tipo];
+  if (!x || x.n < 3) return def;
+  return Math.max(5, Math.min(180, Math.round(x.total / x.n / 5) * 5));
+}
+let colaTiempos = Promise.resolve();
+function registrarTiempo(t) {
+  colaTiempos = colaTiempos.then(async () => {
+    const ref = S.db.doc("tiempos/agencia");
+    const snap = await ref.get();
+    const d = snap.exists ? snap.data() : {};
+    const porTipo = d.porTipo || {}, porCliente = d.porCliente || {};
+    const tipo = t.tipoTiempo || t.tipo;
+    if (t.real != null) { const x = porTipo[tipo] || { n: 0, total: 0 }; porTipo[tipo] = { n: x.n + 1, total: x.total + t.real }; }
+    if (t.clienteId) { const m = mesISO(); porCliente[m] = porCliente[m] || {}; porCliente[m][t.clienteId] = (porCliente[m][t.clienteId] || 0) + (t.real ?? t.min); }
+    await ref.set({ porTipo, porCliente, actualizado: ahora() });
+  }).catch(() => {});
+  return colaTiempos;
+}
+const minutosCliente = (id, mes = mesISO()) => Number(S.tiempos?.porCliente?.[mes]?.[id] || 0);
+
+/* ===================== Resumen de cierre ===================== */
+function resumenCierre() {
+  const d = S.dia;
+  const tareas = d.tareas.filter((t) => !t.fija);
+  const hechas = tareas.filter((t) => t.hecha), pend = tareas.filter((t) => !t.hecha);
+  const esDe = (iso) => iso && fechaLocal(new Date(iso)) === d.fecha;
+  const ents = [...S.entregas.values()].filter((e) => !e.prueba);
+  const generadas = ents.filter((e) => esDe(e.creado)), enviadas = ents.filter((e) => esDe(e.enviada));
+  const tocados = [...S.clientes.values()].filter((c) => !c.practica && esDe(c.ultimaActividad));
+  const graves = [...S.clientes.values()].filter((c) => !c.practica && ACTIVOS(c) && alertasCaso(c).some((a) => a[0] === "bad"));
+  const real = hechas.filter((t) => t.real != null);
+  const lineaT = (t) => `- ${t.titulo}${t.clienteId ? ` (${S.clientes.get(t.clienteId)?.marca || ""})` : ""}${t.real != null ? ` · ${t.real} min (estimado ${t.min})` : ""}`;
+  return `# Cierre del día · ${DIAS[deFecha(d.fecha).getDay()]} ${d.fecha}
+
+**${S.yo?.nombre || "Equipo"}** · ${hechas.length} de ${tareas.length} tareas hechas${real.length ? ` · ${real.reduce((a, t) => a + t.real, 0)} min medidos` : ""}
+
+## Hecho
+${hechas.map(lineaT).join("\n") || "- Nada marcado como hecho."}
+
+## Pasa a mañana
+${pend.map(lineaT).join("\n") || "- Nada: el día quedó al día."}
+
+## Movimiento de hoy
+- Casos con actividad: ${tocados.map((c) => c.marca).join(", ") || "ninguno"}
+- Entregas generadas: ${generadas.length}${generadas.length ? ` (${generadas.map((e) => e.titulo).join("; ")})` : ""}
+- Entregas enviadas al cliente: ${enviadas.length}${enviadas.length ? ` (${enviadas.map((e) => e.titulo).join("; ")})` : ""}
+
+## Para mirar mañana temprano
+${graves.map((c) => `- ${c.marca}: ${alertasCaso(c).map((a) => a[1]).join(", ")}`).join("\n") || "- Sin alertas graves."}`;
+}
+
+/* ===================== Escalamiento ===================== */
+function paraEscalar() {
+  return [...S.clientes.values()].filter((c) => !c.practica && ACTIVOS(c) && diasVencido(c) > escalarDias());
+}
+
+/* ===================== Práctica ===================== */
+async function crearPractica() {
+  const datos = { marca: "Trama Lino (práctica)", rubro: "Indumentaria femenina de lino", url: "https://tienda.trama-lino.example", redes: "@tramalino.ficticio", publico: "Mujeres de 28 a 45 años, AMBA y Córdoba, interesadas en moda sustentable", tono: "Cálido, cercano, con foco en la calidad del material", productos: "Vestidos y camisas de lino, línea verano", objetivo: "Subir la conversión de la tienda y crecer en Instagram para el lanzamiento de verano", plan: "Growth 360", contacto: "Lucía (ficticia)", origen: "Práctica", notas: "Caso de práctica para entrenar al equipo. No cuenta para Mi día, cobros ni números comerciales. Borralo cuando quieras.", competidores: "Linos del Sur (ficticio), Casa Lino (ficticio)", etapa: "Prospecto", practica: true, responsableId: S.yo?.id || null };
+  const id = await guardarCliente(null, datos).catch(() => null);
+  if (!id) return;
+  S.clientes.set(id, { id, ...datos, lecciones: [], onboarding: {}, base: {} });
+  anotar(id, "Sistema", "Se creó el caso de práctica");
+  abrirCliente(id);
+  toast("Caso de práctica creado: probá todo sin miedo");
+}
+
+/* ===================== Informe de estado para el cliente ===================== */
+function informeEstado(c) {
+  const ents = [...S.entregas.values()].filter((e) => e.clienteId === c.id && !e.prueba);
+  const enviadas = ents.filter((e) => e.enviada).sort((a, b) => a.enviada.localeCompare(b.enviada));
+  const esperando = enviadas.filter((e) => !e.respuestaCliente);
+  const h = (c.historial || []).slice(-1)[0];
+  const fila = ([k, l]) => { const b = num(c.base?.[k]), a = num(h?.valores?.[k]); if (a == null) return null; return `| ${l} | ${b ?? "—"} | ${a} | ${b ? `${a >= b ? "+" : ""}${Math.round(((a - b) / b) * 100)}%` : "—"} |`; };
+  const numeros = h ? BASE.map(fila).filter(Boolean) : [];
+  return `# Estado del proyecto · ${c.marca}
+
+Actualizado el ${fecha(ahora())}. Etapa actual: **${c.etapa || "Prospecto"}**.
+
+## El proceso
+${PASOS.map((t) => { const e = mejorEntrega(c.id, t); const est = !e ? "pendiente" : e.estado === "aprobada" ? (e.enviada ? "listo y enviado" : "listo") : "en preparación"; return `- ${AGENTES[t].paso}. ${AGENTES[t].nombre}: ${est}`; }).join("\n")}
+
+## Lo que ya te enviamos
+${enviadas.map((e) => `- ${e.titulo} · ${fecha(e.enviada)}${e.respuestaCliente ? ` · ${e.respuestaCliente.tipo === "aprobo" ? "aprobado" : "con cambios pedidos"}` : " · esperando tu respuesta"}`).join("\n") || "- Todavía nada."}
+${esperando.length ? `\n## Necesitamos tu respuesta\n${esperando.map((e) => `- ${e.titulo} (enviado el ${fecha(e.enviada)})`).join("\n")}\n` : ""}
+## Próximo paso
+${c.proximoPaso?.texto ? `${c.proximoPaso.texto}${c.proximoPaso.fecha ? ` · ${fecha(deFecha(c.proximoPaso.fecha).toISOString())}` : ""}` : "Lo coordinamos en el próximo contacto."}
+${numeros.length ? `\n## Números (${h.periodo} contra el punto de partida)\n| Métrica | Al empezar | ${h.periodo} | Cambio |\n|---|---|---|---|\n${numeros.join("\n")}\n` : ""}`;
+}
+
+/* ===================== Evolución de los números ===================== */
+function guardarPeriodo(c, periodo, valores) {
+  const hist = (c.historial || []).filter((x) => x.periodo !== periodo);
+  hist.push({ periodo, valores, fecha: ahora() });
+  hist.sort((a, b) => a.periodo.localeCompare(b.periodo));
+  return guardarCliente(c.id, { historial: hist.slice(-36) });
+}
+function leerCSV(texto) {
+  const filas = String(texto).trim().split(/\r?\n/).filter((l) => l.trim());
+  if (filas.length < 2) return { periodos: [], error: "Pegá al menos una fila de títulos y una de datos." };
+  const sep = [";", "\t", ","].find((s) => filas[0].includes(s)) || ",";
+  const cab = filas[0].split(sep).map(normal);
+  const iPer = cab.findIndex((h) => ["periodo", "mes", "fecha", "month", "date"].includes(h));
+  if (iPer < 0) return { periodos: [], error: "Falta una columna periodo, mes o fecha." };
+  const mapa = cab.map((h) => (BASE.find(([k, l]) => normal(k) === h || normal(l) === h) || [])[0]);
+  if (!mapa.some(Boolean)) return { periodos: [], error: `Ninguna columna coincide con las métricas (${BASE.map(([k]) => k).join(", ")}).` };
+  const periodos = filas.slice(1).map((l) => {
+    const v = l.split(sep);
+    let p = (v[iPer] || "").trim();
+    const m = p.match(/(\d{4})[-/](\d{1,2})/) || p.match(/(\d{1,2})[-/](\d{4})/);
+    if (m) p = m[1].length === 4 ? `${m[1]}-${m[2].padStart(2, "0")}` : `${m[2]}-${m[1].padStart(2, "0")}`;
+    const valores = {}; mapa.forEach((k, i) => { if (k && v[i]?.trim()) valores[k] = v[i].trim(); });
+    return /^\d{4}-\d{2}$/.test(p) && Object.keys(valores).length ? { periodo: p, valores } : null;
+  }).filter(Boolean);
+  return { periodos, error: periodos.length ? null : "No se pudo leer ninguna fila (el período tiene que ser tipo 2026-11)." };
+}
+function vistaEvolucion(c) {
+  const h = c.historial || [];
+  const claves = BASE.filter(([k]) => h.some((x) => x.valores?.[k]) || c.base?.[k]);
+  const celda = (k, v) => { const b = num(c.base?.[k]), a = num(v); if (a == null) return "—"; const d = b ? Math.round(((a - b) / b) * 100) : null; return `${esc(v)}${d != null ? ` <small class="${d >= 0 ? "sube" : "baja"}">${d >= 0 ? "+" : ""}${d}%</small>` : ""}`; };
+  return `<div class="card full-col"><h2>Evolución de los números</h2><p class="muted" style="font-size:.88rem">Un período por mes. El % compara contra los números de partida. Los agentes (sobre todo Medición) usan los últimos 6 períodos.</p>
+    ${h.length ? `<div class="tabla-casos"><table><thead><tr><th>Período</th>${claves.map(([, l]) => `<th>${esc(l)}</th>`).join("")}</tr></thead><tbody>
+      <tr><td><b>Partida</b></td>${claves.map(([k]) => `<td>${esc(c.base?.[k] || "—")}</td>`).join("")}</tr>
+      ${h.slice().reverse().map((x) => `<tr><td class="num">${esc(x.periodo)}</td>${claves.map(([k]) => `<td class="num">${celda(k, x.valores?.[k])}</td>`).join("")}</tr>`).join("")}</tbody></table></div>` : ""}
+    <details><summary><b>Agregar un período</b></summary><div class="form" style="margin-top:10px"><label class="campo">Período<input type="month" id="ev-periodo" value="${mesISO()}"></label>${BASE.map(([k, l]) => `<label class="campo">${l}<input type="text" id="ev-${k}"></label>`).join("")}</div><div class="fila"><button class="btn" type="button" id="ev-guardar">Guardar período</button></div></details>
+    <details><summary><b>Importar desde una planilla (CSV)</b></summary><p class="muted" style="font-size:.86rem">Exportá de Shopify, Tiendanube, GA4 o Meta y armá una planilla con una columna <code>periodo</code> (2026-11) y columnas con estos nombres: ${BASE.map(([k]) => `<code>${k}</code>`).join(" ")}. Pegala acá.</p><textarea id="ev-csv" placeholder="periodo,ventas_mes,conversion&#10;2026-10,71,1.2&#10;2026-11,84,1.4"></textarea><div class="fila"><button class="btn" type="button" id="ev-importar">Importar</button><span class="err" id="ev-err"></span></div></details>
+  </div>`;
+}
+function enlazarEvolucion(c) {
+  $("#ev-guardar")?.addEventListener("click", () => {
+    const periodo = $("#ev-periodo").value;
+    const valores = Object.fromEntries(BASE.map(([k]) => [k, $("#ev-" + k).value.trim()]).filter(([, v]) => v));
+    if (!periodo || !Object.keys(valores).length) { toast("Elegí el período y cargá al menos un número."); return; }
+    guardarPeriodo(S.clientes.get(c.id) || c, periodo, valores).then(() => { anotar(c.id, "Sistema", `Números de ${periodo} cargados`); toast("Período guardado"); }).catch(() => {});
+  });
+  $("#ev-importar")?.addEventListener("click", async () => {
+    const r = leerCSV($("#ev-csv").value);
+    if (r.error) { $("#ev-err").textContent = r.error; return; }
+    let cli = S.clientes.get(c.id) || c;
+    const hist = new Map((cli.historial || []).map((x) => [x.periodo, x]));
+    for (const p of r.periodos) hist.set(p.periodo, { ...p, fecha: ahora() });
+    await guardarCliente(c.id, { historial: [...hist.values()].sort((a, b) => a.periodo.localeCompare(b.periodo)).slice(-36) }).catch(() => {});
+    anotar(c.id, "Sistema", `Se importaron ${r.periodos.length} período(s) de números`);
+    toast(`${r.periodos.length} período(s) importados`);
+  });
+}
+
+/* ===================== Comercial ===================== */
+const MOTIVOS_BAJA = ["Precio", "No era el momento", "Eligió otra agencia o hacerlo solo", "Dejó de responder", "No era cliente ideal", "Terminó el servicio", "Resultados", "Otro"];
+const PREVENTA = ["Prospecto", "Propuesta enviada"];
+const EXTRAS_BASE = "Pack de 4 reels producidos | 120 | mensual\nSesión de fotos de producto | 180 | único\nPauta en una plataforma extra (Google o TikTok) | 200 | mensual\nConfiguración de medición (GA4 y píxel) | 150 | único";
+function extras() {
+  return String(S.config.extras ?? EXTRAS_BASE).split("\n").map((l) => l.split("|").map((x) => x.trim())).filter((x) => x[0] && num(x[1]) != null).map(([nombre, precio, tipo]) => ({ nombre, precio: num(precio), tipo: /unic|único|unico/i.test(tipo || "") ? "único" : "mensual" }));
+}
+function cotizar({ plan, elegidos, meses }) {
+  const p = planes().find((x) => x.id === plan) || planes()[0];
+  const ex = extras().filter((x) => elegidos.includes(x.nombre));
+  const mensualPlan = p.periodo === "por mes" ? p.precio : 0, unicoPlan = p.periodo === "por mes" ? 0 : p.precio;
+  const mensual = mensualPlan + ex.filter((x) => x.tipo === "mensual").reduce((a, x) => a + x.precio, 0);
+  const unico = unicoPlan + ex.filter((x) => x.tipo === "único").reduce((a, x) => a + x.precio, 0);
+  const total = mensual * meses + unico;
+  const texto = `Cotización: plan ${p.id} (${dinero(p.precio)} ${p.periodo})${ex.length ? ` + ${ex.map((x) => `${x.nombre} (${dinero(x.precio)} ${x.tipo === "único" ? "pago único" : "por mes"})`).join(", ")}` : ""}. Total mensual: ${dinero(mensual)}${unico ? `; pagos únicos: ${dinero(unico)}` : ""}; total de los primeros ${meses} meses: ${dinero(total)}. Usá exactamente estos montos.`;
+  return { p, ex, mensual, unico, total, meses, texto };
+}
+const ganado = (c) => !PREVENTA.includes(c.etapa || "Prospecto") && !(c.etapa === "Baja" && PREVENTA.includes(c.perdidoEn || "Prospecto"));
+const perdido = (c) => c.etapa === "Baja" && PREVENTA.includes(c.perdidoEn || "Prospecto");
+function vistaComercial() {
+  const cs = [...S.clientes.values()].filter((c) => !c.practica);
+  const valor = (c) => honorario(c);
+  const pros = cs.filter((c) => (c.etapa || "Prospecto") === "Prospecto"), prop = cs.filter((c) => c.etapa === "Propuesta enviada");
+  const gan = cs.filter(ganado), per = cs.filter(perdido);
+  const tasa = gan.length + per.length ? Math.round((gan.length / (gan.length + per.length)) * 100) : null;
+  const tarjeta = (c) => { const pp = c.proximoPaso || {}; const d = diasDesde(c.etapaDesde || c.creado); return `<button class="ent" type="button" data-caso="${esc(c.id)}"><b>${esc(c.marca)}</b><small>${esc(c.plan || "Sin plan")} · ${dinero(valor(c))}${d != null ? ` · ${d} días en la etapa` : ""}</small>${pp.texto ? `<small>${pp.fecha && pp.fecha < hoyISO() ? '<span class="chip bad">Vencido</span> ' : ""}${esc(pp.texto)}${pp.fecha ? ` · ${esc(pp.fecha)}` : ""}</small>` : '<small><span class="chip warn">Sin próximo contacto</span></small>'}</button>`; };
+  const col = (t, l) => `<div class="col-pipe"><h3>${t} <span class="muted num">${l.length}</span></h3>${l.map(tarjeta).join("") || '<p class="muted" style="font-size:.86rem">Nada acá.</p>'}</div>`;
+  const porOrigen = new Map();
+  for (const c of cs) { const o = (c.origen || "Sin dato").trim(); const x = porOrigen.get(o) || { leads: 0, gan: 0 }; x.leads++; if (ganado(c)) x.gan++; porOrigen.set(o, x); }
+  const motivos = new Map(); for (const c of cs.filter((c) => c.etapa === "Baja")) motivos.set(c.motivoBaja || "Sin motivo", (motivos.get(c.motivoBaja || "Sin motivo") || 0) + 1);
+  const ex = extras();
+  const q = S.cotizacion || { plan: planes()[3].id, elegidos: [], meses: 3, clienteId: pros[0]?.id || prop[0]?.id || "" };
+  const r = cotizar(q);
+  return `<div><span class="eyebrow">Ventas</span><h1>Comercial</h1></div>
+  <div class="kpis"><div class="kpi"><b class="num">${pros.length + prop.length}</b><span>oportunidades abiertas · ${dinero([...pros, ...prop].reduce((a, c) => a + valor(c), 0))}/mes en juego</span></div><div class="kpi"><b class="num">${tasa != null ? tasa + "%" : "—"}</b><span>tasa de cierre (${gan.length} ganados, ${per.length} perdidos)</span></div><div class="kpi"><b class="num">${prop.filter((c) => diasDesde(c.etapaDesde || c.creado) > 7).length}</b><span>propuestas con más de 7 días sin respuesta</span></div></div>
+  <div class="pipe">${col("Prospecto", pros)}${col("Propuesta enviada", prop)}${col("Ganados", gan.slice(0, 12))}${col("Perdidos", per.slice(0, 12))}</div>
+  <div class="grid2">
+    <div class="card"><h2>De dónde vienen</h2>${porOrigen.size ? `<div class="tabla-casos"><table><thead><tr><th>Origen</th><th>Leads</th><th>Ganados</th></tr></thead><tbody>${[...porOrigen].sort((a, b) => b[1].leads - a[1].leads).map(([o, x]) => `<tr><td>${esc(o)}</td><td class="num">${x.leads}</td><td class="num">${x.gan}</td></tr>`).join("")}</tbody></table></div>` : '<p class="muted">Cargá el origen en la ficha de cada cliente (referido, Instagram, web…).</p>'}</div>
+    <div class="card"><h2>Por qué se pierden o se van</h2>${motivos.size ? `<ul style="margin:0;padding-left:1.1em">${[...motivos].sort((a, b) => b[1] - a[1]).map(([m, n]) => `<li>${esc(m)}: <b class="num">${n}</b></li>`).join("")}</ul>` : '<p class="muted">Cuando pases un caso a Baja, el panel te pide el motivo. Acá se ve el patrón.</p>'}</div>
+  </div>
+  <form class="card" id="form-cot"><h2>Cotizador</h2><p class="muted" style="font-size:.86rem">Arma el precio con los planes y extras de Datos de la agencia${S.config.extras == null ? " (los extras son de ejemplo: cambialos ahí)" : ""}. La propuesta usa estos montos exactos.</p>
+    <div class="form">
+      <label class="campo">Cliente<select id="cot-cli"><option value="">Elegí…</option>${[...pros, ...prop, ...cs.filter((c) => !PREVENTA.includes(c.etapa || "Prospecto"))].map((c) => `<option value="${esc(c.id)}"${c.id === q.clienteId ? " selected" : ""}>${esc(c.marca)}</option>`).join("")}</select></label>
+      <label class="campo">Plan<select id="cot-plan">${planes().map((p) => `<option${p.id === q.plan ? " selected" : ""}>${esc(p.id)}</option>`).join("")}</select></label>
+      <label class="campo">Meses a cotizar<input type="number" id="cot-meses" min="1" max="24" value="${q.meses}"></label>
+      <fieldset class="campo full"><legend>Extras</legend>${ex.map((x, i) => `<label class="check"><input type="checkbox" data-extra="${i}"${q.elegidos.includes(x.nombre) ? " checked" : ""}> ${esc(x.nombre)} · ${dinero(x.precio)} ${x.tipo === "único" ? "pago único" : "por mes"}</label>`).join("") || '<span class="muted">No hay extras cargados.</span>'}</fieldset>
+    </div>
+    <div class="kpis"><div class="kpi"><b class="num">${dinero(r.mensual)}</b><span>por mes</span></div><div class="kpi"><b class="num">${dinero(r.unico)}</b><span>pagos únicos</span></div><div class="kpi"><b class="num">${dinero(r.total)}</b><span>total de ${r.meses} meses</span></div></div>
+    <div class="fila"><button class="btn pri" type="button" id="cot-propuesta"${S.sample ? "" : " disabled"}>Armar la propuesta con esta cotización</button><button class="btn" type="button" id="cot-guardar">Guardar en el caso</button><span class="err" id="cot-err"></span></div>
+  </form>`;
+}
+function enlazarComercial() {
+  document.querySelectorAll("[data-caso]").forEach((b) => b.addEventListener("click", () => abrirCliente(b.dataset.caso)));
+  const leer = () => ({ clienteId: $("#cot-cli").value, plan: $("#cot-plan").value, meses: Math.max(1, Math.min(24, Number($("#cot-meses").value) || 3)), elegidos: [...document.querySelectorAll("[data-extra]")].filter((x) => x.checked).map((x) => extras()[Number(x.dataset.extra)].nombre) });
+  $("#form-cot").addEventListener("change", () => { S.cotizacion = leer(); render(); });
+  $("#cot-guardar").addEventListener("click", async () => {
+    const q = leer(); if (!q.clienteId) { $("#cot-err").textContent = "Elegí el cliente."; return; }
+    const r = cotizar(q);
+    await guardarCliente(q.clienteId, { plan: q.plan, honorario: r.mensual, cotizacion: { ...q, mensual: r.mensual, unico: r.unico, total: r.total, fecha: ahora() } }).catch(() => {});
+    anotar(q.clienteId, "Decisión", r.texto); toast("Cotización guardada en el caso");
+  });
+  $("#cot-propuesta").addEventListener("click", () => {
+    const q = leer(); if (!q.clienteId) { $("#cot-err").textContent = "Elegí el cliente."; return; }
+    const r = cotizar(q);
+    S.prefill = { plan: q.plan, extra: r.texto };
+    abrirCliente(q.clienteId, "agentes"); S.agente = "propuesta"; render();
+  });
+}
+
+/* ===================== Finanzas ===================== */
+const COBRAN = ["Ingreso", "En ejecución", "Renovación"];
+function honorario(c) { return Number(c.honorario) || planes().find((p) => p.id === c.plan)?.precio || 0; }
+function estadoCobro(c, mes = mesISO()) {
+  if (c.practica || !COBRAN.includes(c.etapa)) return null;
+  const plan = planes().find((p) => p.id === c.plan);
+  if (plan && plan.periodo !== "por mes" && !c.honorario) return null;
+  const monto = honorario(c); if (!monto) return null;
+  const pagado = (c.cobros || []).filter((p) => p.mes === mes).reduce((a, p) => a + Number(p.monto || 0), 0);
+  const dia = Math.max(1, Math.min(28, Number(c.diaCobro || 10)));
+  let vence = `${mes}-${String(dia).padStart(2, "0")}`;
+  // Primer mes: si el cliente entró después del día de cobro, ese mes se cobra el día que entró.
+  const inicio = c.ganado ? fechaLocal(new Date(c.ganado)) : null;
+  if (inicio && inicio.slice(0, 7) === mes && inicio > vence) vence = inicio;
+  if (inicio && inicio.slice(0, 7) > mes) return null;
+  const estado = pagado >= monto ? "pagado" : fechaLocal() > vence ? "vencido" : "pendiente";
+  return { mes, monto, pagado, dia, vence, estado };
+}
+function vistaFinanzas() {
+  const cs = [...S.clientes.values()].filter((c) => estadoCobro(c));
+  const costoHora = Number(S.config.costoHora || 0);
+  const filas = cs.map((c) => { const e = estadoCobro(c); const min = minutosCliente(c.id); const costo = (min / 60) * costoHora; return { c, e, min, costo, margen: e.monto - costo }; });
+  const mrr = filas.reduce((a, f) => a + f.e.monto, 0), cobrado = filas.reduce((a, f) => a + f.e.pagado, 0);
+  const vencido = filas.filter((f) => f.e.estado === "vencido").reduce((a, f) => a + f.e.monto - f.e.pagado, 0);
+  const meses = [...new Set([...S.clientes.values()].flatMap((c) => (c.cobros || []).map((p) => p.mes)))].sort().slice(-6);
+  const chip = { pagado: "ok", pendiente: "neutro", vencido: "bad" };
+  return `<div><span class="eyebrow">Plata</span><h1>Cobros y margen</h1><p class="muted">Mes ${mesISO()}. El margen descuenta las horas registradas en Mi día${costoHora ? ` a ${dinero(costoHora)} la hora` : ' (cargá el costo por hora en Datos de la agencia)'}. El uso de Claude va por tu suscripción, no por cliente.</p></div>
+  <div class="kpis"><div class="kpi"><b class="num">${dinero(mrr)}</b><span>ingreso mensual recurrente</span></div><div class="kpi"><b class="num">${dinero(cobrado)}</b><span>cobrado este mes</span></div><div class="kpi"><b class="num">${dinero(vencido)}</b><span>vencido sin cobrar</span></div></div>
+  <div class="card" style="padding:0"><div class="tabla-casos"><table><thead><tr><th>Cliente</th><th>Honorario/mes</th><th>Día de cobro</th><th>Este mes</th><th>Horas</th><th>Margen</th><th></th></tr></thead><tbody>
+  ${filas.map(({ c, e, min, margen }) => `<tr><td><b>${esc(c.marca)}</b><br><small class="muted">${esc(c.plan || "")}</small></td>
+    <td><input type="number" class="in-chico" data-hon="${esc(c.id)}" value="${e.monto}" aria-label="Honorario de ${esc(c.marca)}"></td>
+    <td><input type="number" class="in-chico" data-dia-cobro="${esc(c.id)}" min="1" max="28" value="${e.dia}" aria-label="Día de cobro de ${esc(c.marca)}"></td>
+    <td><span class="chip ${chip[e.estado]}">${e.estado === "pagado" ? "Pagado" : e.estado === "vencido" ? `Vencido el ${Number(e.vence.slice(8))}` : `Vence el ${Number(e.vence.slice(8))}`}</span>${e.pagado && e.estado !== "pagado" ? `<br><small class="muted">pagó ${dinero(e.pagado)}</small>` : ""}</td>
+    <td class="num">${(min / 60).toFixed(1)}</td><td class="num">${costoHora ? `${dinero(margen)}<br><small class="muted">${e.monto ? Math.round((margen / e.monto) * 100) : 0}%</small>` : "—"}</td>
+    <td>${e.estado !== "pagado" ? `<button class="btn chico" type="button" data-pago="${esc(c.id)}">Registrar pago</button>` : ""}</td></tr>`).join("") || `<tr><td colspan="7" class="muted">No hay clientes que cobren por mes (etapas Ingreso, En ejecución o Renovación).</td></tr>`}
+  </tbody></table></div></div>
+  ${meses.length ? `<div class="card"><h2>Cobrado por mes</h2><div class="tabla-casos"><table><thead><tr>${meses.map((m) => `<th>${m}</th>`).join("")}</tr></thead><tbody><tr>${meses.map((m) => `<td class="num">${dinero([...S.clientes.values()].flatMap((c) => c.cobros || []).filter((p) => p.mes === m).reduce((a, p) => a + Number(p.monto || 0), 0))}</td>`).join("")}</tr></tbody></table></div></div>` : ""}`;
+}
+function enlazarFinanzas() {
+  document.querySelectorAll("[data-hon]").forEach((i) => i.addEventListener("change", () => guardarCliente(i.dataset.hon, { honorario: Number(i.value) || 0 }).then(() => toast("Honorario guardado")).catch(() => {})));
+  document.querySelectorAll("[data-dia-cobro]").forEach((i) => i.addEventListener("change", () => guardarCliente(i.dataset.diaCobro, { diaCobro: Math.max(1, Math.min(28, Number(i.value) || 10)) }).then(() => toast("Día de cobro guardado")).catch(() => {})));
+  document.querySelectorAll("[data-pago]").forEach((b) => b.addEventListener("click", async () => {
+    const c = S.clientes.get(b.dataset.pago); const e = estadoCobro(c); if (!e) return;
+    const monto = e.monto - e.pagado;
+    b.disabled = true;
+    await guardarCliente(c.id, { cobros: [...(c.cobros || []), { mes: e.mes, monto, fecha: ahora(), por: S.yo?.id || null }].slice(-60) }).catch(() => {});
+    anotar(c.id, "Sistema", `Pago registrado: ${dinero(monto)} (${e.mes})`); toast("Pago registrado");
+  }));
+}
+
+/* ===================== Calidad de los agentes ===================== */
+function statsAgente(tipo) {
+  const es = [...S.entregas.values()].filter((e) => e.tipo === tipo);
+  const cal = es.filter((e) => e.calidad && e.calidad.puntaje != null);
+  const dec = es.filter((e) => e.decisionEquipo);
+  const blando = dec.filter((e) => e.calidad?.aprobado && e.decisionEquipo === "cambios");
+  const duro = dec.filter((e) => e.calidad && !e.calidad.aprobado && e.decisionEquipo === "aprobar");
+  const cuenta = new Map();
+  for (const t of cal.flatMap((e) => e.calidad.correcciones || [])) { const k = normal(t).slice(0, 60); const x = cuenta.get(k) || { t, n: 0 }; x.n++; cuenta.set(k, x); }
+  return {
+    n: es.length, primera: cal.length ? Math.round((cal.filter((e) => e.calidad.historial?.[0]?.aprobado ?? e.calidad.aprobado).length / cal.length) * 100) : null,
+    puntaje: cal.length ? Math.round(cal.reduce((a, e) => a + e.calidad.puntaje, 0) / cal.length) : null,
+    dec: dec.length, cambios: dec.filter((e) => e.decisionEquipo === "cambios").length,
+    coincide: dec.length ? Math.round(((dec.length - blando.length - duro.length) / dec.length) * 100) : null,
+    blando, duro, pedidos: es.filter((e) => e.pedidoCambios).map((e) => ({ t: e.pedidoCambios, marca: S.clientes.get(e.clienteId)?.marca || "" })),
+    frecuentes: [...cuenta.values()].sort((a, b) => b.n - a.n).slice(0, 5),
+  };
+}
+function vistaCalidad() {
+  const tipos = Object.keys(AGENTES).filter((t) => !AGENTES[t].sinRevisor || [...S.entregas.values()].some((e) => e.tipo === t));
+  const st = Object.fromEntries(tipos.map((t) => [t, statsAgente(t)]));
+  const sel = S.calAgente && AGENTES[S.calAgente] ? S.calAgente : null;
+  const ins = S.config.instrucciones || {};
+  const fila = (t) => { const s = st[t]; const alerta = s.dec >= 3 && s.cambios / s.dec >= 0.4; return `<tr data-cal="${t}" tabindex="0"><td><b>${esc(AGENTES[t].nombre)}</b>${ins[t] ? ' <span class="chip ok">con instrucción</span>' : ""}</td><td class="num">${s.n}</td><td class="num">${s.puntaje ?? "—"}</td><td class="num">${s.primera != null ? s.primera + "%" : "—"}</td><td class="num">${s.dec ? `${s.cambios}/${s.dec}` : "—"}</td><td class="num">${s.coincide != null ? s.coincide + "%" : "—"}</td><td>${alerta ? '<span class="chip bad">Revisar</span>' : s.blando.length ? '<span class="chip warn">Control blando</span>' : s.n ? '<span class="chip ok">Bien</span>' : '<span class="chip neutro">Sin datos</span>'}</td></tr>`; };
+  let det = "";
+  if (sel) {
+    const s = st[sel] || statsAgente(sel);
+    det = `<div class="card" id="cal-det"><div class="fila" style="justify-content:space-between"><h2>${esc(AGENTES[sel].nombre)}</h2><button class="btn chico" type="button" id="cal-cerrar">Cerrar</button></div>
+      <div class="grid2">
+        <div><h3>Pedidos de cambio del equipo (${s.pedidos.length})</h3>${s.pedidos.length ? `<ul class="lista-chica">${s.pedidos.slice(-12).reverse().map((p) => `<li>${esc(p.t)} <span class="muted">· ${esc(p.marca)}</span></li>`).join("")}</ul>` : '<p class="muted">Ninguno todavía.</p>'}</div>
+        <div><h3>Lo que más corrige el control</h3>${s.frecuentes.length ? `<ul class="lista-chica">${s.frecuentes.map((f) => `<li>${esc(f.t)} <b class="num">×${f.n}</b></li>`).join("")}</ul>` : '<p class="muted">Sin observaciones.</p>'}</div>
+      </div>
+      ${s.blando.length || s.duro.length ? `<div class="aviso">Calibración: el control aprobó ${s.blando.length} entrega(s) a las que el equipo les pidió cambios${s.duro.length ? ` y rechazó ${s.duro.length} que el equipo aprobó tal cual` : ""}. ${s.blando.length > s.duro.length ? "El control está siendo blando: la instrucción de abajo también la lee el agente, así que apuntá a esos problemas." : ""}</div>` : ""}
+      <label class="campo full">Instrucción de la agencia para este agente<small>Se suma a cada entrega de este agente, en todos los clientes. Probala antes de guardarla.</small><textarea id="cal-ins" placeholder="Ej.: - Cada gancho tiene que nombrar el producto.&#10;- Nunca más de 3 hashtags.">${esc(S.calBorrador?.tipo === sel ? S.calBorrador.texto : ins[sel] || "")}</textarea></label>
+      ${S.calBorrador?.tipo === sel && S.calBorrador.diagnostico ? `<div class="aviso info"><b>Diagnóstico:</b> ${esc(S.calBorrador.diagnostico)}</div>` : ""}
+      <div class="fila"><button class="btn" type="button" id="cal-proponer"${S.sample ? "" : " disabled"}>${S.calPensando ? "Analizando…" : "Proponer con Claude"}</button><button class="btn" type="button" id="cal-probar"${S.sample ? "" : " disabled"}>Probar en la última entrega</button><button class="btn pri" type="button" id="cal-guardar">Guardar instrucción</button>${ins[sel] ? '<button class="btn" type="button" id="cal-quitar">Quitar</button>' : ""}</div>
+      <p class="muted" style="font-size:.85rem">Probar rehace la última entrega de este agente con la instrucción y la deja como versión de prueba (no cuenta en Mi día): compará con "Comparar con la versión anterior" y, si mejora, volvé acá y guardala.</p>
+    </div>`;
+  }
+  const co = coincidencia();
+  return `<div><span class="eyebrow">Control de calidad</span><h1>Calidad de los agentes</h1><p class="muted">Cada vez que aprobás o pedís cambios, el panel compara tu decisión con la del control automático. Si no coinciden, el control necesita ajuste.</p></div>
+  <div class="kpis"><div class="kpi"><b class="num">${co ? co.pct + "%" : "—"}</b><span>coincidencia del control con el equipo${co ? ` (${co.n} decisiones)` : ""}</span></div><div class="kpi"><b class="num">${Object.keys(ins).filter((k) => ins[k]).length}</b><span>agentes con instrucción de la agencia</span></div><div class="kpi"><b class="num">${tipos.filter((t) => st[t].dec >= 3 && st[t].cambios / st[t].dec >= 0.4).length}</b><span>agentes para revisar (40% o más de pedidos de cambio)</span></div></div>
+  ${det}
+  <div class="card" style="padding:0"><div class="tabla-casos"><table><thead><tr><th>Agente</th><th>Entregas</th><th>Puntaje medio</th><th>Aprobadas a la primera</th><th>Cambios pedidos</th><th>Coincidencia</th><th>Estado</th></tr></thead><tbody>${tipos.map(fila).join("")}</tbody></table></div></div>`;
+}
+async function proponerInstruccion(tipo) {
+  const s = statsAgente(tipo);
+  const nombreAg = AGENTES[tipo].nombre;
+  const lecciones = [...S.clientes.values()].flatMap((c) => (c.lecciones || []).map((l) => l.texto)).filter((t) => t.startsWith(nombreAg + ":"));
+  if (!s.pedidos.length && !s.frecuentes.length && !lecciones.length) { toast("Todavía no hay pedidos de cambio ni observaciones para analizar."); return; }
+  S.calPensando = true; render();
+  try {
+    const r = await S.sample.json(`Sos responsable de calidad de ${nombreAgencia()}, una agencia de marketing digital. Analizá los problemas repetidos del agente "${nombreAg}" y proponé UNA instrucción breve (entre 2 y 6 viñetas, en español rioplatense) para sumarle a ese agente, que evite esos problemas en todos los clientes. Basate solo en este material; no inventes reglas que no surjan de él. ${DATOS}
+
+<pedidos_del_equipo>
+${s.pedidos.map((p) => `- ${p.t}`).join("\n") || "(ninguno)"}
+</pedidos_del_equipo>
+<observaciones_del_control_de_calidad>
+${s.frecuentes.map((f) => `- (${f.n} veces) ${f.t}`).join("\n") || "(ninguna)"}
+</observaciones_del_control_de_calidad>
+<lecciones_por_cliente>
+${lecciones.slice(-20).map((t) => `- ${t}`).join("\n") || "(ninguna)"}
+</lecciones_por_cliente>
+<instruccion_actual>
+${S.config.instrucciones?.[tipo] || "(ninguna)"}
+</instruccion_actual>
+
+Respondé solo con JSON: {"diagnostico": "2 o 3 oraciones con el patrón que ves", "instruccion": "las viñetas, una por línea, empezando con - "}`, { modelTier: "complex", cache: false });
+    S.calBorrador = { tipo, texto: String(r?.instruccion || "").trim(), diagnostico: String(r?.diagnostico || "").trim() };
+  } catch (err) { toast(copia(err)); }
+  S.calPensando = false; render();
+}
+async function probarInstruccion(tipo, texto) {
+  const e = [...S.entregas.values()].filter((x) => x.tipo === tipo && x.estado !== "descartada" && !x.prueba).sort((a, b) => (b.creado || "").localeCompare(a.creado || ""))[0];
+  if (!e) { toast("Este agente no tiene entregas para probar. Generá una primero (podés usar el caso de práctica)."); return; }
+  const c = S.clientes.get(e.clienteId); if (!c) return;
+  const entrada = { ...(e.entrada || {}), _versionDe: e.id, _prueba: true, _pedido: `Rehacé la entrega aplicando esta instrucción nueva de la agencia (se está probando):\n${texto}` };
+  delete entrada.capturas;
+  if (tipo === "auditoria") entrada.texto = `${entrada.texto || ""}\n\nVersión anterior de la auditoría (no tenés las capturas de nuevo):\n${e.markdown}`.trim();
+  abrirCliente(c.id, "entregas");
+  await ejecutar(tipo, c, entrada);
+  if (!S.run) { S.comparar = true; render(); }
+}
+function enlazarCalidad() {
+  document.querySelectorAll("[data-cal]").forEach((tr) => { const ir = () => { S.calAgente = tr.dataset.cal; render(); $("#cal-det")?.scrollIntoView({ block: "start" }); }; tr.addEventListener("click", ir); tr.addEventListener("keydown", (ev) => { if (ev.key === "Enter") ir(); }); });
+  if (!S.calAgente) return;
+  const tipo = S.calAgente;
+  const texto = () => { const t = $("#cal-ins").value.trim(); S.calBorrador = { ...(S.calBorrador?.tipo === tipo ? S.calBorrador : {}), tipo, texto: t }; return t; };
+  $("#cal-cerrar").addEventListener("click", () => { S.calAgente = null; S.calBorrador = null; render(); });
+  $("#cal-proponer").addEventListener("click", () => { if (!S.calPensando) proponerInstruccion(tipo); });
+  $("#cal-probar").addEventListener("click", () => { const t = texto(); if (!t) { toast("Escribí o proponé una instrucción primero."); return; } probarInstruccion(tipo, t); });
+  $("#cal-guardar").addEventListener("click", async () => {
+    const t = texto();
+    const hist = [...(S.config.instruccionesHist || []), { tipo, texto: S.config.instrucciones?.[tipo] || "", fecha: ahora() }].slice(-30);
+    try { await guardarConfig({ instrucciones: { ...(S.config.instrucciones || {}), [tipo]: t }, instruccionesHist: hist }); S.calBorrador = null; toast(t ? "Instrucción guardada: se aplica desde la próxima entrega" : "Instrucción vacía guardada"); render(); } catch { toast("No se pudo guardar."); }
+  });
+  $("#cal-quitar")?.addEventListener("click", async () => {
+    const ins = { ...(S.config.instrucciones || {}) }; const prev = ins[tipo]; delete ins[tipo];
+    try { await guardarConfig({ instrucciones: ins, instruccionesHist: [...(S.config.instruccionesHist || []), { tipo, texto: prev, fecha: ahora() }].slice(-30) }); S.calBorrador = null; toast("Instrucción quitada"); render(); } catch { toast("No se pudo guardar."); }
+  });
+}
+
+/* ===================== Copia de seguridad ===================== */
+async function copiaCompleta() {
+  const col = async (p) => (await S.db.collection(p).get()).docs.map((d) => ({ id: d.id, ...d.data() }));
+  const clientes = await col("clientes");
+  for (const c of clientes) c._bitacora = await col(`clientes/${c.id}/bitacora`).catch(() => []);
+  const t = await S.db.doc("tiempos/agencia").get().catch(() => null);
+  return { formato: "kairos-panel", version: 1, fecha: ahora(), config: S.config, clientes, entregas: await col("entregas"), dias: await col("dias").catch(() => []), tiempos: t?.exists ? t.data() : null };
+}
+function verificarCopia(o) {
+  const err = [];
+  if (!o || o.formato !== "kairos-panel") err.push("No es una copia de este panel.");
+  else {
+    for (const k of ["clientes", "entregas", "dias"]) if (!Array.isArray(o[k])) err.push(`Falta la lista de ${k}.`);
+    if (Array.isArray(o.clientes) && o.clientes.some((c) => !c.id || !c.marca)) err.push("Hay clientes sin id o sin marca.");
+    if (Array.isArray(o.entregas) && o.entregas.some((e) => !e.id || !e.clienteId || typeof e.markdown !== "string")) err.push("Hay entregas incompletas.");
+    if (Array.isArray(o.entregas) && Array.isArray(o.clientes)) { const ids = new Set(o.clientes.map((c) => c.id)); const huerf = o.entregas.filter((e) => !ids.has(e.clienteId)).length; if (huerf) err.push(`${huerf} entrega(s) de clientes que no están en la copia.`); }
+  }
+  const bit = Array.isArray(o?.clientes) ? o.clientes.reduce((a, c) => a + (c._bitacora?.length || 0), 0) : 0;
+  return { ok: !err.length, err, resumen: o?.formato === "kairos-panel" ? `Copia del ${fechaHora(o.fecha)}: ${o.clientes?.length || 0} clientes, ${bit} anotaciones de bitácora, ${o.entregas?.length || 0} entregas, ${o.dias?.length || 0} días.` : "" };
+}
+async function restaurarCopia(o, avance) {
+  const sin = ({ id, _bitacora, ...r }) => r;
+  let n = 0; const total = o.clientes.length + o.entregas.length + o.dias.length + o.clientes.reduce((a, c) => a + (c._bitacora?.length || 0), 0);
+  const paso = () => avance(++n, total);
+  if (o.config) await S.db.doc("config/agencia").set(o.config);
+  if (o.tiempos) await S.db.doc("tiempos/agencia").set(o.tiempos);
+  for (const c of o.clientes) { await S.db.doc("clientes/" + c.id).set(sin(c)); paso(); for (const b of c._bitacora || []) { await S.db.doc(`clientes/${c.id}/bitacora/${b.id}`).set(sin(b)); paso(); } }
+  for (const e of o.entregas) { await S.db.doc("entregas/" + e.id).set(sin(e)); paso(); }
+  for (const d of o.dias) { await S.db.doc("dias/" + d.id).set(sin(d)); paso(); }
+  return n;
+}
+function vistaRespaldo() {
+  const u = S.config.ultimaCopia;
+  return `<div class="card" id="respaldo"><h2>Copia de seguridad</h2>
+    <p class="muted" style="font-size:.88rem">Descargá una copia completa (clientes, bitácoras, entregas, días, tiempos y configuración) una vez por semana y guardala fuera de claude.ai. Antes de confiar en una copia, verificala: lee el archivo y controla que esté completo, sin tocar nada.${u ? ` Última copia: <b>${fechaHora(u)}</b>.` : " <b>Todavía no descargaste ninguna.</b>"}</p>
+    <div class="fila"><button class="btn pri" type="button" id="copia-bajar">Descargar copia completa</button><label class="btn" for="copia-archivo">Elegir una copia…</label><input type="file" id="copia-archivo" accept=".json,application/json" hidden></div>
+    <div id="copia-res">${S.copiaLeida ? `<div class="aviso ${S.copiaLeida.v.ok ? "info" : ""}"><b>${S.copiaLeida.v.ok ? "La copia está completa." : "La copia tiene problemas:"}</b> ${esc(S.copiaLeida.v.resumen)}${S.copiaLeida.v.err.length ? `<ul>${S.copiaLeida.v.err.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}</div>${S.copiaLeida.v.ok ? `<div class="fila"><button class="btn peligro" type="button" id="copia-restaurar">Restaurar esta copia</button><span class="muted" style="font-size:.85rem">Reescribe los datos que están en la copia. Lo que no está en la copia no se borra.</span></div>` : ""}` : ""}</div>
+  </div>`;
+}
+function enlazarRespaldo() {
+  $("#copia-bajar").addEventListener("click", async (ev) => {
+    ev.target.disabled = true;
+    try {
+      const o = await copiaCompleta();
+      const v = verificarCopia(JSON.parse(JSON.stringify(o)));
+      await descargar(`copia-${slug(nombreAgencia())}-${fechaLocal()}.json`, JSON.stringify(o, null, 1));
+      await guardarConfig({ ultimaCopia: ahora() }).catch(() => {});
+      toast(v.ok ? "Copia descargada y verificada" : "Copia descargada, pero con problemas: revisala");
+    } catch { toast("No se pudo armar la copia."); }
+    ev.target.disabled = false;
+  });
+  $("#copia-archivo").addEventListener("change", async (ev) => {
+    const f = ev.target.files[0]; if (!f) return;
+    let o = null; try { o = JSON.parse(await f.text()); } catch {}
+    S.copiaLeida = { o, v: o ? verificarCopia(o) : { ok: false, err: ["El archivo no es un JSON válido."], resumen: "" } };
+    render();
+  });
+  $("#copia-restaurar")?.addEventListener("click", (ev) => {
+    const b = ev.target;
+    if (!b.dataset.seguro) { b.dataset.seguro = "1"; b.textContent = "Confirmar: restaurar ahora"; return; }
+    b.disabled = true;
+    restaurarCopia(S.copiaLeida.o, (n, t) => { b.textContent = `Restaurando ${n}/${t}…`; })
+      .then((n) => { S.copiaLeida = null; toast(`Copia restaurada: ${n} documentos`); render(); })
+      .catch(() => { toast("La restauración se cortó. Volvé a intentarlo: es seguro repetirla."); b.disabled = false; });
+  });
+}
+
+/* ===================== Diagnóstico del navegador ===================== */
+async function probarNavegador() {
+  if (!S.mcp) return { ok: false, t: "Esta vista no tiene acceso a herramientas locales. Abrí el panel en la app de escritorio de Claude." };
+  if (!S.navegador) return { ok: false, t: "El navegador de Claude no aparece. Funciona solo en la app de escritorio de Claude y para la cuenta dueña del panel. Si ya estás ahí, actualizá la app y volvé a abrir el panel." };
+  try {
+    const t = await Promise.race([leerWeb("https://example.com"), espera(30000).then(() => { throw { code: "timeout" }; })]);
+    const ok = /example domain/i.test(t);
+    return { ok, t: ok ? "Funciona: el navegador abrió una página de prueba y leyó su texto. La investigación web de los agentes está lista." : `El navegador respondió, pero no con el texto esperado: "${t.slice(0, 160)}…"` };
+  } catch (err) { return { ok: false, t: err?.code === "timeout" ? "El navegador no respondió en 30 segundos." : `El navegador devolvió un error (${err?.code || err?.message || "desconocido"}). Si la app te pidió permiso, aceptalo y probá de nuevo.` }; }
 }
 
 /* ===================== Arranque ===================== */
@@ -1804,6 +2357,7 @@ $("#btn-nuevo").addEventListener("click", () => { if (S.run && !S.run.error) ret
 $("#btn-dia").addEventListener("click", () => { if (S.run && !S.run.error) return toast("Esperá a que termine el agente."); S.vista = "dia"; render(); });
 $("#btn-inicio").addEventListener("click", () => { if (S.run && !S.run.error) return toast("Esperá a que termine el agente."); S.vista = "inicio"; render(); });
 $("#btn-config").addEventListener("click", () => { if (S.run && !S.run.error) return toast("Esperá a que termine el agente."); S.vista = "config"; render(); });
+["comercial", "finanzas", "calidad"].forEach((v) => $("#btn-" + v).addEventListener("click", () => { if (S.run && !S.run.error) return toast("Esperá a que termine el agente."); S.vista = v; render(); }));
 window.addEventListener("beforeunload", (ev) => { if (S.run && !S.run.error) { ev.preventDefault(); ev.returnValue = ""; } });
 
 async function iniciar() {
@@ -1833,6 +2387,7 @@ async function iniciar() {
     if (S.vista === "dia" && !S.dia && S.cargado.clientes) prepararDia();
     if (!ocupado()) render(); else pintarLista();
   }, () => {});
+  db.doc("tiempos/agencia").onSnapshot((d) => { S.tiempos = d.exists ? d.data() : {}; }, () => {});
   db.doc("config/agencia").onSnapshot((d) => {
     S.config = d.exists ? d.data() : {};
     $("#nombre-agencia").textContent = nombreAgencia();
