@@ -9,6 +9,8 @@ recurrente; los errores transitorios se reintentan; el gasto tiene un límite di
 intervienen solo cuando el sistema lo pide. La investigación detrás del diseño está en
 [`docs/INVESTIGACION_AGENTES.md`](docs/INVESTIGACION_AGENTES.md).
 
+**La forma más rápida de empezar:** el panel publicado en claude.ai (`claude-panel/index.html`). No necesita servidor ni API key: los agentes usan tu cuenta de Claude y los datos quedan guardados en el panel. Incluye fichas de clientes, 8 agentes con control de calidad y autocorrección, aprobación, pedido de cambios con lecciones y descarga de entregas para enviar al cliente.
+
 **¿Arrancás con un solo cliente?** Seguí [`docs/ARRANQUE_UN_CLIENTE.md`](docs/ARRANQUE_UN_CLIENTE.md): configuración mínima,
 puesta en marcha en una semana, horas por plan y cómo convertirlo en el caso que traiga a los siguientes.
 
