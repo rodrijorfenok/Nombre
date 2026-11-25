@@ -6,6 +6,7 @@
 <title>Kairos Creative</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <meta name="description" content="Agencia de marketing digital: crecimiento en redes sociales y optimización de conversión para tiendas online.">
+<script>(function(){var d=document.documentElement;try{if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;}catch(e){return;}d.classList.add('k-motion');setTimeout(function(){if(!window.__kListo){d.classList.remove('k-motion');d.classList.add('k-listo');var v=document.querySelector('.k-veil');if(v)v.classList.remove('intro');}},2500);})();</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
@@ -275,14 +276,124 @@ summary::after{font:400 1.4rem/1 var(--f-body);color:var(--muted)}
 footer{border-color:var(--line)}
 :focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:999px}
 ::selection{background:var(--accent-soft)}
-.hero-copy>*,.funnel{animation:entrar .8s cubic-bezier(.2,.7,.2,1) both}
-.hero-copy>*:nth-child(2){animation-delay:.08s}.hero-copy>*:nth-child(3){animation-delay:.16s}.hero-copy>*:nth-child(4){animation-delay:.24s}.hero-copy>*:nth-child(5){animation-delay:.3s}.funnel{animation-delay:.25s}
-@keyframes entrar{from{opacity:.001;transform:translateY(14px);filter:blur(6px)}to{opacity:1;transform:none;filter:none}}
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){.funnel,.pillar,.plan,details,form.lead-form,.calc-in,.chat,.addon,header.top{background:var(--solid)}}
-@media (prefers-reduced-motion: reduce){.hero-copy>*,.funnel{animation:none}.pillar:hover,.plan:hover,.btn:hover{transform:none}}
+@media (prefers-reduced-motion: reduce){.pillar:hover,.plan:hover,.btn:hover{transform:none}}
+
+/* ===== Movimiento Kairos: capas de luz, cursor, cortina, timeline y entregables ===== */
+.k-ambient{position:fixed;inset:-10vmax;z-index:0;pointer-events:none;overflow:hidden}
+.k-orb-w{position:absolute;will-change:transform}
+.k-orb{width:64vmax;height:64vmax;border-radius:50%;background:radial-gradient(closest-side,var(--orb),transparent 72%);opacity:.6;will-change:transform}
+.k-orb-w.o1{left:-18vmax;top:24vh}.k-orb-w.o1 .k-orb{--orb:var(--glow-1)}
+.k-orb-w.o2{right:-22vmax;top:-26vmax}.k-orb-w.o2 .k-orb{--orb:var(--glow-2);width:56vmax;height:56vmax}
+.k-orb-w.o3{left:30vw;bottom:-40vmax}.k-orb-w.o3 .k-orb{--orb:var(--glow-3)}
+main,footer{position:relative;z-index:1}
+.k-spot{position:fixed;left:0;top:0;width:720px;height:720px;margin:-360px 0 0 -360px;border-radius:50%;pointer-events:none;z-index:0;background:radial-gradient(closest-side,var(--spot),transparent);opacity:0;transition:opacity .6s}
+:root{--spot:rgba(184,208,222,.13)}
+@media (prefers-color-scheme: light){:root:not([data-theme="dark"]){--spot:rgba(255,255,255,.75)}}
+:root[data-theme="light"]{--spot:rgba(255,255,255,.75)}
+html.k-cursor-on .k-spot{opacity:1}
+
+/* Cursor personalizado (solo mouse) */
+.k-cursor{position:fixed;left:0;top:0;z-index:100;pointer-events:none;opacity:0;transition:opacity .3s}
+html.k-cursor-on .k-cursor{opacity:1}
+.k-dot,.k-ring{position:fixed;left:0;top:0;border-radius:50%;pointer-events:none}
+.k-dot{width:6px;height:6px;margin:-3px 0 0 -3px;background:#F0F5F7;mix-blend-mode:difference}
+.k-ring{width:38px;height:38px;margin:-19px 0 0 -19px;border:1px solid var(--line-fuerte);transition:width .35s cubic-bezier(.2,.7,.2,1),height .35s cubic-bezier(.2,.7,.2,1),margin .35s cubic-bezier(.2,.7,.2,1),background .3s,border-color .3s}
+.k-ring.activo{width:64px;height:64px;margin:-32px 0 0 -32px;background:var(--accent-soft);border-color:var(--accent);backdrop-filter:blur(2px)}
+.k-ring.presion{width:30px;height:30px;margin:-15px 0 0 -15px}
+html.k-fino.k-cursor-on,html.k-fino.k-cursor-on body,html.k-fino.k-cursor-on a,html.k-fino.k-cursor-on button,html.k-fino.k-cursor-on summary,html.k-fino.k-cursor-on label{cursor:none}
+html.k-fino.k-cursor-on input,html.k-fino.k-cursor-on textarea,html.k-fino.k-cursor-on select{cursor:auto}
+html.k-texto .k-cursor{opacity:0}
+
+/* Cortina de transición */
+.k-veil{position:fixed;inset:0;z-index:90;pointer-events:none;display:grid;place-items:center;color:#F0F5F7;clip-path:inset(100% 0% 0% 0%);background:radial-gradient(70% 90% at 0% 100%,rgba(184,208,222,.55),transparent 60%),radial-gradient(50% 60% at 100% 0%,rgba(115,148,172,.35),transparent 70%),linear-gradient(125deg,#354B60,#101820 70%)}
+html.k-motion .k-veil.intro{clip-path:inset(0% 0% 0% 0%)}
+.k-veil-in{display:grid;justify-items:center;gap:14px;overflow:hidden;padding:8px}
+.k-veil-txt{font:500 clamp(1.4rem,3vw,2.2rem)/1.1 var(--f-display);letter-spacing:-.03em}
+.k-veil small{font:500 .72rem/1 var(--f-body);letter-spacing:.2em;text-transform:uppercase;color:#B8D0DE}
+
+/* Barra superior: se esconde al bajar, línea de progreso */
+header.top{transition:transform .5s cubic-bezier(.2,.7,.2,1)}
+header.top.k-oculto{transform:translateY(calc(-100% - env(safe-area-inset-top,0px)))}
+.k-progress{position:absolute;left:0;right:0;bottom:-1px;height:1px;transform-origin:left;transform:scaleX(0);background:linear-gradient(90deg,var(--k-niebla),var(--k-hielo));box-shadow:0 0 10px var(--brillo)}
+
+/* Titulares divididos (máscaras por palabra y por letra) */
+.k-split .k-w{display:inline-block;overflow:hidden;vertical-align:top;padding:.1em .03em .14em;margin:-.1em -.03em -.14em}
+.k-split .k-wi,.k-split .k-c{display:inline-block;will-change:transform}
+h1.k-split{background:none;-webkit-background-clip:border-box;background-clip:border-box;color:var(--ink)}
+h1.k-split .k-wi{background:linear-gradient(100deg,var(--titulo-a) 30%,var(--titulo-b));-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero h1.k-split .k-wi em{background:linear-gradient(100deg,var(--titulo-b),var(--accent),var(--titulo-b));background-size:220% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:k-barrido 7s ease-in-out infinite}
+@keyframes k-barrido{0%,100%{background-position:0% 0}50%{background-position:100% 0}}
+.k-chars.k-vivo .k-c{transition:transform .6s cubic-bezier(.2,.7,.2,1);transition-delay:calc(var(--i,0) * 14ms)}
+.k-chars.k-vivo:hover .k-c{transform:translateY(-.07em)}
+.k-cta-line{display:block;height:1px;margin-top:22px;max-width:420px;transform-origin:left;background:linear-gradient(90deg,var(--k-hielo),transparent);box-shadow:0 0 14px var(--brillo)}
+
+/* Cinta cinética con los 8 pasos */
+.k-marquee{position:relative;z-index:1;display:flex;overflow:hidden;padding-block:26px;border-block:1px solid var(--line);white-space:nowrap;user-select:none}
+.k-mq-row{display:flex;align-items:center;flex:none;gap:0}
+.k-mq-row span{font:500 clamp(2.2rem,6vw,4.6rem)/1 var(--f-display);letter-spacing:-.04em;padding-inline:.35em;color:var(--ink)}
+.k-mq-row span:nth-of-type(even){color:transparent;-webkit-text-stroke:1px var(--line-fuerte)}
+.k-mq-row i{width:.55rem;height:.55rem;border-radius:50%;flex:none;background:linear-gradient(135deg,var(--k-hielo),var(--k-niebla));box-shadow:0 0 14px var(--brillo)}
+
+/* Tarjetas con profundidad y luz */
+.k-card{position:relative;transform-style:preserve-3d}
+.k-card::before{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:2;opacity:0;transition:opacity .4s;background:radial-gradient(420px circle at var(--mx,50%) var(--my,50%),rgba(240,245,247,.14),transparent 45%)}
+.k-card:hover::before{opacity:1}
+html.k-fino .pillar:hover,html.k-fino .plan:hover{transform:none}
+
+/* Proceso: timeline con progreso */
+.k-proc{display:grid;gap:22px}
+.k-proc-meta{display:flex;align-items:center;gap:22px}
+.k-proc-count{display:flex;align-items:baseline;gap:4px;font:500 clamp(2.6rem,5.4vw,4.4rem)/1 var(--f-display);letter-spacing:-.05em;font-variant-numeric:tabular-nums}
+.k-proc-count b{font-weight:500;background:linear-gradient(100deg,var(--titulo-a),var(--titulo-b));-webkit-background-clip:text;background-clip:text;color:transparent}
+.k-proc-count small{font-size:.38em;color:var(--muted);letter-spacing:0}
+.k-proc-line{position:relative;flex:1;height:2px;border-radius:2px;background:var(--line);overflow:hidden}
+.k-proc-line i{position:absolute;inset:0;transform-origin:left;transform:scaleX(0);background:linear-gradient(90deg,var(--k-acero),var(--k-niebla),var(--k-hielo));box-shadow:0 0 16px var(--brillo)}
+.steps.k-timeline{border-top:0}
+.k-timeline .step{opacity:.3;transform:translateY(8px);transition:opacity .6s cubic-bezier(.2,.7,.2,1),transform .6s cubic-bezier(.2,.7,.2,1)}
+.k-timeline .step.on{opacity:1;transform:none}
+.k-timeline .step .when::before{content:"";display:inline-block;width:9px;height:9px;margin-right:9px;border-radius:50%;vertical-align:-1px;border:1px solid var(--k-niebla);transition:background .4s,box-shadow .4s}
+.k-timeline .step.on .when::before{background:var(--k-hielo);border-color:var(--k-hielo)}
+.k-timeline .step.actual .when::before{box-shadow:0 0 0 5px var(--accent-soft),0 0 18px var(--brillo)}
+.k-timeline .step.actual h3{background:linear-gradient(100deg,var(--titulo-a),var(--titulo-b));-webkit-background-clip:text;background-clip:text;color:transparent}
+@media (max-width:899px){.k-proc-meta{position:sticky;top:calc(env(safe-area-inset-top,0px) + 10px);z-index:3;padding:12px 16px;border-radius:999px;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid var(--line)}.k-proc-count{font-size:1.8rem}}
+
+/* Entregables: carrusel horizontal */
+.portfolio .sec-head{margin-bottom:36px}
+.reel{position:relative;z-index:1;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x mandatory;scrollbar-width:none;padding-block:6px 20px}
+.reel::-webkit-scrollbar{display:none}
+.reel-track{list-style:none;margin:0;display:flex;gap:26px;width:max-content;padding-left:max(16px,calc((100vw - 1120px) / 2 + 16px),env(safe-area-inset-left,0px));padding-right:max(16px,calc((100vw - 1120px) / 2 + 16px),env(safe-area-inset-right,0px))}
+.obra{flex:none;width:min(76vw,340px);scroll-snap-align:center}
+.obra figure{margin:0;display:grid;gap:16px}
+.obra-img{aspect-ratio:4/5;max-width:100%;border-radius:22px;overflow:hidden;border:1px solid var(--line);box-shadow:var(--filo),var(--sombra);background:#101820}
+.obra-img svg{display:block;width:100%;height:100%}
+.obra figcaption{display:grid;gap:6px}
+.obra .when{font:500 .72rem/1 var(--f-body);letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+.obra h3{font-size:1.2rem}
+.obra p{color:var(--muted);font-size:.95rem}
+html.k-pinx #entregables{min-height:100vh;display:flex;flex-direction:column;justify-content:center;padding-block:72px 48px}
+html.k-pinx .reel{overflow:hidden;scroll-snap-type:none}
+html.k-pinx .obra{width:clamp(250px,calc((100vh - 400px) * .8),340px)}
+
+/* Microinteracciones del CTA final y de la calculadora */
+#l-submit::before{content:"→";order:2;transition:transform .35s cubic-bezier(.2,.7,.2,1)}
+#l-submit:hover::before{transform:translateX(5px)}
+.result:not([hidden]){animation:k-pop .6s cubic-bezier(.2,.7,.2,1)}
+@keyframes k-pop{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:none}}
+.out-total .big.k-pulso{animation:k-pulso .5s cubic-bezier(.2,.7,.2,1)}
+@keyframes k-pulso{40%{text-shadow:0 0 24px rgba(184,208,222,.7)}}
+details[open]>p{animation:k-faq .5s cubic-bezier(.2,.7,.2,1)}
+@keyframes k-faq{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+section[tabindex="-1"]:focus{outline:none}
+
+/* Antes de que cargue el motor de animación, la portada espera oculta (máximo 2,5 s) */
+html.k-motion .hero-copy>*,html.k-motion .funnel{visibility:hidden}
+html.k-listo .hero-copy>*,html.k-listo .funnel{visibility:visible}
+@media (prefers-reduced-motion: reduce){.k-veil,.k-cursor,.k-spot,.k-marquee{display:none}.hero h1 .k-wi em{animation:none}}
 </style>
 </head>
 <body>
+<div class="k-veil intro" aria-hidden="true"><div class="k-veil-in"><small>Kairos Creative</small><span class="k-veil-txt">Marketing de resultados</span></div></div>
 
 <header class="top">
   <div class="wrap">
@@ -409,6 +520,26 @@ footer{border-color:var(--line)}
         <p>Si seguís el plan al pie de la letra y no hay resultados, existe una política de devolución. Sus condiciones exactas (qué resultado se mide, en qué plazo y qué se devuelve) se firman junto con la propuesta.</p>
       </div>
     </div>
+  </section>
+
+  <section class="block portfolio" id="entregables">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="eyebrow">Entregables</span>
+        <h2>Así se ve lo que recibís en cada paso</h2>
+        <p class="lead">Cada agente entrega un documento revisado y aprobado por el equipo. Las vistas son ilustrativas: los documentos reales se arman con los datos de tu marca.</p>
+      </div>
+    </div>
+    <div class="reel" id="reel"><ul class="reel-track" id="reel-track">
+        <li class="obra"><figure><div class="obra-img"><svg viewBox="0 0 400 500" role="img" aria-label="Ilustración: Diagnóstico de ingreso" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="g1-0" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#354B60"/><stop offset="1" stop-color="#101820"/></linearGradient><radialGradient id="gl-0" cx="0.85" cy=".9" r=".8"><stop offset="0" stop-color="#B8D0DE" stop-opacity=".55"/><stop offset="1" stop-color="#B8D0DE" stop-opacity="0"/></radialGradient><linearGradient id="g2-0" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#7394AC"/><stop offset="1" stop-color="#B8D0DE"/></linearGradient></defs><rect width="400" height="500" fill="url(#g1-0)"/><rect width="400" height="500" fill="url(#gl-0)"/><rect x="40" y="60" width="320" height="380" rx="22" fill="#F0F5F7" fill-opacity=".06" stroke="#B8D0DE" stroke-opacity=".28"/><text x="64" y="104" font-family="Helvetica Neue,Inter,Helvetica,Arial,sans-serif" font-size="12" letter-spacing="2" fill="#B8D0DE">PASO 1</text><text x="64" y="132" font-family="Helvetica Neue,Inter,Helvetica,Arial,sans-serif" font-size="19" font-weight="500" fill="#F0F5F7">Diagnóstico de ingreso</text><rect x="64" y="146" width="90" height="2" rx="1" fill="#B8D0DE" fill-opacity=".6"/><circle cx="92" cy="200" r="9" fill="#B8D0DE" stroke="#B8D0DE" stroke-opacity=".7"/><rect x="114" y="195" width="170" height="10" rx="5" fill="#F0F5F7" fill-opacity="0.55"/><circle cx="92" cy="242" r="9" fill="#B8D0DE" stroke="#B8D0DE" stroke-opacity=".7"/><rect x="114" y="237" width="152" height="10" rx="5" fill="#F0F5F7" fill-opacity="0.55"/><circle cx="92" cy="284" r="9" fill="#B8D0DE" stroke="#B8D0DE" stroke-opacity=".7"/><rect x="114" y="279" width="134" height="10" rx="5" fill="#F0F5F7" fill-opacity="0.55"/><circle cx="92" cy="326" r="9" fill="none" stroke="#B8D0DE" stroke-opacity=".7"/><rect x="114" y="321" width="116" height="10" rx="5" fill="#F0F5F7" fill-opacity="0.2"/><circle cx="92" cy="368" r="9" fill="none" stroke="#B8D0DE" stroke-opacity=".7"/><rect x="114" y="363" width="98" height="10" rx="5" fill="#F0F5F7" fill-opacity="0.2"/></svg></div><figcaption><span class="when">Paso 1</span><h3>Diagnóstico de ingreso</h3><p>Situación actual, qué te frena y qué datos faltan.</p></figcaption></figure></li>
+        <li class="obra"><figure><div class="obra-img"><svg viewBox="0 0 400 500" role="img" aria-label="Ilustración: Investigación profunda" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="g1-1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#354B60"/><stop offset="1" stop-color="#101820"/></linearGradient><radialGradient id="gl-1" cx="0.15" cy=".9" r=".8"><stop offset="0" stop-color="#B8D0DE" stop-opacity=".55"/><stop offset="1" stop-color="#B8D0DE" stop-opacity="0"/></radialGradient><linearGradient id="g2-1" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#7394AC"/><stop offset="1" stop-color="#B8D0DE"/></linearGradient></defs><rect width="400" height="500" fill="url(#g1-1)"/><rect width="400" height="500" fill="url(#gl-1)"/><rect x="40" y="60" width="320" height="380" rx="22" fill="#F0F5F7" fill-opacity=".06" stroke="#B8D0DE" stroke-opacity=".28"/><text x="64" y="104" font-family="Helvetica Neue,Inter,Helvetica,Arial,sans-serif" font-size="12" letter-spacing="2" fill="#B8D0DE">PASO 2</text><text x="64" y="132" font-family="Helvetica Neue,Inter,Helvetica,Arial,sans-serif" font-size="19" font-weight="500" fill="#F0F5F7">Investigación profunda</text><rect x="64" y="146" width="90" height="2" rx="1" fill="#B8D0DE" fill-opacity=".6"/><circle cx="200" cy="285" r="120" fill="none" stroke="#B8D0DE" stroke-opacity="0.32"/><circle cx="200" cy="285" r="86" fill="none" stroke="#B8D0DE" stroke-opacity="0.4"/><circle cx="200" cy="285" r="52" fill="none" stroke="#B8D0DE" stroke-opacity="0.52"/><circle cx="160" cy="250" r="5" fill="#F0F5F7" fill-opacity=".8"/><circle cx="236" cy="232" r="5" fill="#F0F5F7" fill-opacity=".8"/><circle cx="250" cy="310" r="5" fill="#F0F5F7" fill-opacity=".8"/><circle cx="176" cy="330" r="5" fill="#F0F5F7" fill-opacity=".8"/><circle cx="212" cy="282" r="5" fill="#F0F5F7" fill-opacity=".8"/><circle cx="130" cy="300" r="5" fill="#F0F5F7" fill-opacity=".8"/><circle cx="280" cy="262" r="5" fill="#F0F5F7" fill-opacity=".8"/></svg></div><figcaption><span class="when">Paso 2</span><h3>Investigación profunda</h3><p>Mercado, público objetivo y competencia.</p></figcaption></figure></li>
+        <li class="obra"><figure><div class="obra-img"><svg viewBox="0 0 400 500" role="img" aria-label="Ilustración: Auditoría de marca" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="g1-2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#354B60"/><stop offset="1" stop-color="#101820"/></linearGradient><radialGradient id="gl-2" cx="0.85" cy=".9" r=".8"><stop offset="0" stop-color="#B8D0DE" stop-opacity=".55"/><stop offset="1" stop-color="#B8D0DE" stop-opacity="0"/></radialGradient><linearGradient id="g2-2" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#7394AC"/><stop offset="1" stop-color="#B8D0DE"/></linearGradient></defs><rect width="400" height="500" fill="url(#g1-2)"/><rect width="400" height="500" fill="url(#gl-2)"/><rect x="40" y="60" width="320" height="380" rx="22" fill="#F0F5F7" fill-opacity=".06" stroke="#B8D0DE" stroke-opacity=".28"/><text x="64" y="104" font-family="Helvetica Neue,Inter,Helvetica,Arial,sans-serif" font-size="12" letter-spacing="2" fill="#B8D0DE">PASO 3</text><text x="64" y="132" font-family="Helvetica Neue,Inter,Helvetica,Arial,sans-serif" font-size="19" font-weight="500" fill="#F0F5F7">Auditoría de marca</text><rect x="64" y="146" width="90" height="2" rx="1" fill="#B8D0DE" fill-opacity=".6"/><polygon points="200,180 310,290 200,400 90,290" fill="none" stroke="#B8D0DE" stroke-opacity=".3"/><polygon points="200,235 255,290 200,345 145,290" fill="none" stroke="#B8D0DE" stroke-opacity=".25"/><line x1="200" y1="180" x2="200" y2="400" stroke="#B8D0DE" stroke-opacity=".25"/><line x1="90" y1="290" x2="310" y2="290" stroke="#B8D0DE" stroke-opacity=".25"/><polygon class="k-draw" points="200,210 292,290 200,350 130,290" fill="url(#g2-2)" fill-opacity=".55" stroke="#F0F5F7" stroke-width="1.5"/><text x="200" y="168" text-anchor="middle" font-family="Helvetica Neue,Inter,Helvetica,Arial,sans-serif" font-size="12" fill="#B8D0DE">Identidad</text><text x="318" y="294" text-anchor="start" font-family="Helvetica Neue,Inter,Helvetica,Arial,sans-serif" font-size="12" fill="#B8D0DE">Presencia</text><text x="200" y="422" text-anchor="middle" font-family="Helvetica Neue,Inter,Helvetica,Arial,sans-serif" font-size="12" fill="#B8D0DE">Percepción</text><text x="82" y="294" text-anchor="end" font-family="Helvetica Neue,Inter,Helvetica,Arial,sans-serif" font-size="12" fill="#B8D0DE">Performance</text></svg></div><figcaption><span class="when">Paso 3</span><h3>Auditoría de marca</h3><p>Identidad, percepción, presencia digital y performance.</p></figcaption></figure></li>
+        <li class="obra"><figure><div class="obra-img"><svg viewBox="0 0 400 500" role="img" aria-label="Ilustración: FODA + competencia" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="g1-3" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#354B60"/><stop offset="1" stop-color="#101820"/></linearGradient><radialGradient id="gl-3" cx="0.15" cy=".9" r=".8"><stop offset="0" stop-color="#B8D0DE" stop-opacity=".55"/><stop offset="1" stop-color="#B8D0DE" stop-opacity="0"/></radialGradient><linearGradient id="g2-3" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#7394AC"/><stop offset="1" stop-color="#B8D0DE"/></linearGradient></defs><rect width="400" height="500" fill="url(#g1-3)"/><rect width="400" height="500" fill="url(#gl-3)"/><rect x="40" y="60" width="320" height="380" rx="22" fill="#F0F5F7" fill-opacity=".06" stroke="#B8D0DE" stroke-opacity=".28"/><text x="64" y="104" font-family="Helvetica Neue,Inter,Helvetica,Arial,sans-serif" font-size="12" letter-spacing="2" fill="#B8D0DE">PASO 4</text><text x="64" y="132" font-family="Helvetica Neue,Inter,Helvetica,Arial,sans-serif" font-size="19" font-weight="500" fill="#F0F5F7">FODA + competencia</text><rect x="64" y="146" width="90" height="2" rx="1" fill="#B8D0DE" fill-opacity=".6"/><rect x="80" y="190" width="114" height="104" rx="14" fill="#F0F5F7" fill-opacity="0.24" stroke="#B8D0DE" stroke-opacity=".3"/><text x="96" y="224" font-family="Helvetica Neue,Inter,Helvetica,Arial,sans-serif" font-size="22" font-weight="500" fill="#F0F5F7">F</text><rect x="96" y="246" width="70" height="7" rx="3.5" fill="#B8D0DE" fill-opacity=".45"/><rect x="96" y="262" width="48" height="7" rx="3.5" fill="#B8D0DE" fill-opacity=".3"/><rect x="206" y="190" width="114" height="104" rx="14" fill="#F0F5F7" fill-opacity="0.14" stroke="#B8D0DE" stroke-opacity=".3"/><text x="222" y="224" font-family="Helvetica Neue,Inter,Helvetica,Arial,sans-serif" font-size="22" font-weight="500" fill="#F0F5F7">O</text><rect x="222" y="246" width="70" height="7" rx="3.5" fill="#B8D0DE" fill-opacity=".45"/><rect x="222" y="262" width="48" height="7" rx="3.5" fill="#B8D0DE" fill-opacity=".3"/><rect x="80" y="306" width="114" height="104" rx="14" fill="#F0F5F7" fill-opacity="0.14" stroke="#B8D0DE" stroke-opacity=".3"/><text x="96" y="340" font-family="Helvetica Neue,Inter,Helvetica,Arial,sans-serif" font-size="22" font-weight="500" fill="#F0F5F7">D</text><rect x="96" y="362" width="70" height="7" rx="3.5" fill="#B8D0DE" fill-opacity=".45"/><rect x="96" y="378" width="48" height="7" rx="3.5" fill="#B8D0DE" fill-opacity=".3"/><rect x="206" y="306" width="114" height="104" rx="14" fill="#F0F5F7" fill-opacity="0.24" stroke="#B8D0DE" stroke-opacity=".3"/><text x="222" y="340" font-family="Helvetica Neue,Inter,Helvetica,Arial,sans-serif" font-size="22" font-weight="500" fill="#F0F5F7">A</text><rect x="222" y="362" width="70" height="7" rx="3.5" fill="#B8D0DE" fill-opacity=".45"/><rect x="222" y="378" width="48" height="7" rx="3.5" fill="#B8D0DE" fill-opacity=".3"/></svg></div><figcaption><span class="when">Paso 4</span><h3>FODA + competencia</h3><p>Debilidades, oportunidades y ventajas reales.</p></figcaption></figure></li>
+        <li class="obra"><figure><div class="obra-img"><svg viewBox="0 0 400 500" role="img" aria-label="Ilustración: Hipótesis" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="g1-4" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#354B60"/><stop offset="1" stop-color="#101820"/></linearGradient><radialGradient id="gl-4" cx="0.85" cy=".9" r=".8"><stop offset="0" stop-color="#B8D0DE" stop-opacity=".55"/><stop offset="1" stop-color="#B8D0DE" stop-opacity="0"/></radialGradient><linearGradient id="g2-4" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#7394AC"/><stop offset="1" stop-color="#B8D0DE"/></linearGradient></defs><rect width="400" height="500" fill="url(#g1-4)"/><rect width="400" height="500" fill="url(#gl-4)"/><rect x="40" y="60" width="320" height="380" rx="22" fill="#F0F5F7" fill-opacity=".06" stroke="#B8D0DE" stroke-opacity=".28"/><text x="64" y="104" font-family="Helvetica Neue,Inter,Helvetica,Arial,sans-serif" font-size="12" letter-spacing="2" fill="#B8D0DE">PASO 5</text><text x="64" y="132" font-family="Helvetica Neue,Inter,Helvetica,Arial,sans-serif" font-size="19" font-weight="500" fill="#F0F5F7">Hipótesis</text><rect x="64" y="146" width="90" height="2" rx="1" fill="#B8D0DE" fill-opacity=".6"/><path class="k-draw" d="M90 300 Q145 230 200 230 T310 300" fill="none" stroke="#B8D0DE" stroke-width="1.5" stroke-dasharray="4 6"/><circle cx="90" cy="300" r="26" fill="url(#g2-4)" fill-opacity=".5" stroke="#F0F5F7" stroke-opacity=".7"/><text x="90" y="352" text-anchor="middle" font-family="Helvetica Neue,Inter,Helvetica,Arial,sans-serif" font-size="13" fill="#F0F5F7">Dato</text><circle cx="200" cy="230" r="26" fill="url(#g2-4)" fill-opacity=".5" stroke="#F0F5F7" stroke-opacity=".7"/><text x="200" y="282" text-anchor="middle" font-family="Helvetica Neue,Inter,Helvetica,Arial,sans-serif" font-size="13" fill="#F0F5F7">Señal</text><circle cx="310" cy="300" r="26" fill="url(#g2-4)" fill-opacity=".5" stroke="#F0F5F7" stroke-opacity=".7"/><text x="310" y="352" text-anchor="middle" font-family="Helvetica Neue,Inter,Helvetica,Arial,sans-serif" font-size="13" fill="#F0F5F7">Hipótesis</text></svg></div><figcaption><span class="when">Paso 5</span><h3>Hipótesis</h3><p>Dato → Señal → Hipótesis, con acciones concretas.</p></figcaption></figure></li>
+        <li class="obra"><figure><div class="obra-img"><svg viewBox="0 0 400 500" role="img" aria-label="Ilustración: Plan de 90 días" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="g1-5" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#354B60"/><stop offset="1" stop-color="#101820"/></linearGradient><radialGradient id="gl-5" cx="0.15" cy=".9" r=".8"><stop offset="0" stop-color="#B8D0DE" stop-opacity=".55"/><stop offset="1" stop-color="#B8D0DE" stop-opacity="0"/></radialGradient><linearGradient id="g2-5" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#7394AC"/><stop offset="1" stop-color="#B8D0DE"/></linearGradient></defs><rect width="400" height="500" fill="url(#g1-5)"/><rect width="400" height="500" fill="url(#gl-5)"/><rect x="40" y="60" width="320" height="380" rx="22" fill="#F0F5F7" fill-opacity=".06" stroke="#B8D0DE" stroke-opacity=".28"/><text x="64" y="104" font-family="Helvetica Neue,Inter,Helvetica,Arial,sans-serif" font-size="12" letter-spacing="2" fill="#B8D0DE">PASO 6</text><text x="64" y="132" font-family="Helvetica Neue,Inter,Helvetica,Arial,sans-serif" font-size="19" font-weight="500" fill="#F0F5F7">Plan de 90 días</text><rect x="64" y="146" width="90" height="2" rx="1" fill="#B8D0DE" fill-opacity=".6"/><line x1="70" y1="290" x2="330" y2="290" stroke="#B8D0DE" stroke-opacity=".35" stroke-width="2"/><line class="k-draw" x1="70" y1="290" x2="250" y2="290" stroke="#F0F5F7" stroke-width="2"/><circle cx="70" cy="290" r="8" fill="#F0F5F7" stroke="#B8D0DE"/><circle cx="157" cy="290" r="8" fill="#F0F5F7" stroke="#B8D0DE"/><circle cx="244" cy="290" r="8" fill="#F0F5F7" stroke="#B8D0DE"/><circle cx="330" cy="290" r="6" fill="#354B60" stroke="#B8D0DE"/><text x="113" y="270" text-anchor="middle" font-family="Helvetica Neue,Inter,Helvetica,Arial,sans-serif" font-size="12" fill="#B8D0DE">Mes 1</text><rect x="79" y="312" width="68" height="8" rx="4" fill="#F0F5F7" fill-opacity="0.40"/><rect x="79" y="332" width="54" height="8" rx="4" fill="#F0F5F7" fill-opacity="0.30"/><rect x="79" y="352" width="40" height="8" rx="4" fill="#F0F5F7" fill-opacity="0.20"/><text x="200" y="270" text-anchor="middle" font-family="Helvetica Neue,Inter,Helvetica,Arial,sans-serif" font-size="12" fill="#B8D0DE">Mes 2</text><rect x="166" y="312" width="68" height="8" rx="4" fill="#F0F5F7" fill-opacity="0.40"/><rect x="166" y="332" width="54" height="8" rx="4" fill="#F0F5F7" fill-opacity="0.30"/><rect x="166" y="352" width="40" height="8" rx="4" fill="#F0F5F7" fill-opacity="0.20"/><text x="287" y="270" text-anchor="middle" font-family="Helvetica Neue,Inter,Helvetica,Arial,sans-serif" font-size="12" fill="#B8D0DE">Mes 3</text><rect x="253" y="312" width="68" height="8" rx="4" fill="#F0F5F7" fill-opacity="0.40"/><rect x="253" y="332" width="54" height="8" rx="4" fill="#F0F5F7" fill-opacity="0.30"/><rect x="253" y="352" width="40" height="8" rx="4" fill="#F0F5F7" fill-opacity="0.20"/></svg></div><figcaption><span class="when">Paso 6</span><h3>Plan de 90 días</h3><p>Objetivos SMART, calendario y métricas.</p></figcaption></figure></li>
+        <li class="obra"><figure><div class="obra-img"><svg viewBox="0 0 400 500" role="img" aria-label="Ilustración: Pauta y control de inversión" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="g1-6" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#354B60"/><stop offset="1" stop-color="#101820"/></linearGradient><radialGradient id="gl-6" cx="0.85" cy=".9" r=".8"><stop offset="0" stop-color="#B8D0DE" stop-opacity=".55"/><stop offset="1" stop-color="#B8D0DE" stop-opacity="0"/></radialGradient><linearGradient id="g2-6" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#7394AC"/><stop offset="1" stop-color="#B8D0DE"/></linearGradient></defs><rect width="400" height="500" fill="url(#g1-6)"/><rect width="400" height="500" fill="url(#gl-6)"/><rect x="40" y="60" width="320" height="380" rx="22" fill="#F0F5F7" fill-opacity=".06" stroke="#B8D0DE" stroke-opacity=".28"/><text x="64" y="104" font-family="Helvetica Neue,Inter,Helvetica,Arial,sans-serif" font-size="12" letter-spacing="2" fill="#B8D0DE">PASO 7</text><text x="64" y="132" font-family="Helvetica Neue,Inter,Helvetica,Arial,sans-serif" font-size="19" font-weight="500" fill="#F0F5F7">Pauta y control de inversión</text><rect x="64" y="146" width="90" height="2" rx="1" fill="#B8D0DE" fill-opacity=".6"/><rect x="80" y="200" width="240" height="18" rx="9" fill="#F0F5F7" fill-opacity=".08"/><rect class="k-bar" x="80" y="200" width="210" height="18" rx="9" fill="url(#g2-6)"/><rect x="80" y="246" width="240" height="18" rx="9" fill="#F0F5F7" fill-opacity=".08"/><rect class="k-bar" x="80" y="246" width="170" height="18" rx="9" fill="url(#g2-6)"/><rect x="80" y="292" width="240" height="18" rx="9" fill="#F0F5F7" fill-opacity=".08"/><rect class="k-bar" x="80" y="292" width="120" height="18" rx="9" fill="url(#g2-6)"/><rect x="80" y="338" width="240" height="18" rx="9" fill="#F0F5F7" fill-opacity=".08"/><rect class="k-bar" x="80" y="338" width="70" height="18" rx="9" fill="url(#g2-6)"/><line x1="220" y1="186" x2="220" y2="374" stroke="#F0F5F7" stroke-dasharray="3 5" stroke-opacity=".8"/><text x="226" y="392" font-family="Helvetica Neue,Inter,Helvetica,Arial,sans-serif" font-size="11" fill="#B8D0DE">umbral</text></svg></div><figcaption><span class="when">Paso 7</span><h3>Pauta y control de inversión</h3><p>Reglas para escalar, mantener o cortar.</p></figcaption></figure></li>
+        <li class="obra"><figure><div class="obra-img"><svg viewBox="0 0 400 500" role="img" aria-label="Ilustración: Medición y resultados" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="g1-7" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#354B60"/><stop offset="1" stop-color="#101820"/></linearGradient><radialGradient id="gl-7" cx="0.15" cy=".9" r=".8"><stop offset="0" stop-color="#B8D0DE" stop-opacity=".55"/><stop offset="1" stop-color="#B8D0DE" stop-opacity="0"/></radialGradient><linearGradient id="g2-7" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#7394AC"/><stop offset="1" stop-color="#B8D0DE"/></linearGradient></defs><rect width="400" height="500" fill="url(#g1-7)"/><rect width="400" height="500" fill="url(#gl-7)"/><rect x="40" y="60" width="320" height="380" rx="22" fill="#F0F5F7" fill-opacity=".06" stroke="#B8D0DE" stroke-opacity=".28"/><text x="64" y="104" font-family="Helvetica Neue,Inter,Helvetica,Arial,sans-serif" font-size="12" letter-spacing="2" fill="#B8D0DE">PASO 8</text><text x="64" y="132" font-family="Helvetica Neue,Inter,Helvetica,Arial,sans-serif" font-size="19" font-weight="500" fill="#F0F5F7">Medición y resultados</text><rect x="64" y="146" width="90" height="2" rx="1" fill="#B8D0DE" fill-opacity=".6"/><line x1="70" y1="210" x2="330" y2="210" stroke="#B8D0DE" stroke-opacity=".14"/><line x1="70" y1="255" x2="330" y2="255" stroke="#B8D0DE" stroke-opacity=".14"/><line x1="70" y1="300" x2="330" y2="300" stroke="#B8D0DE" stroke-opacity=".14"/><line x1="70" y1="345" x2="330" y2="345" stroke="#B8D0DE" stroke-opacity=".14"/><path d="M70 345 C120 340 140 315 175 312 S235 270 260 255 S305 215 330 205 L330 345 Z" fill="url(#g2-7)" fill-opacity=".35"/><path class="k-draw" d="M70 345 C120 340 140 315 175 312 S235 270 260 255 S305 215 330 205" fill="none" stroke="#F0F5F7" stroke-width="2"/><circle cx="330" cy="205" r="6" fill="#F0F5F7"/><circle cx="330" cy="205" r="13" fill="#F0F5F7" fill-opacity=".18"/></svg></div><figcaption><span class="when">Paso 8</span><h3>Medición y resultados</h3><p>Engagement, métricas clave y retorno.</p></figcaption></figure></li>
+    </ul></div>
   </section>
 
   <section class="block alt" id="calculadora">
@@ -719,6 +850,310 @@ footer{border-color:var(--line)}
       })
       .catch(function(){ espera.remove(); burbuja('Se cortó la conexión. Probá de nuevo o dejanos tus datos en el formulario.', 'bot'); });
   });
+})();
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script>
+/* Movimiento Kairos: GSAP + ScrollTrigger. Sin GSAP o con movimiento reducido, el sitio queda estático y completo. */
+(function(){
+  var root = document.documentElement;
+  if (!root.classList.contains('k-motion')) return;
+  function sinMovimiento(){ root.classList.remove('k-motion'); root.classList.add('k-listo'); var v = document.querySelector('.k-veil'); if (v) v.classList.remove('intro'); }
+  function cargar(src, ok){ var s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = sinMovimiento; document.head.appendChild(s); }
+  function arrancar(){ if (window.gsap && window.ScrollTrigger) { try { init(); } catch (e) { sinMovimiento(); if (window.console) console.warn(e); } } else sinMovimiento(); }
+  // Primero el CDN; si no está disponible, la copia local del servidor.
+  if (window.gsap && window.ScrollTrigger) arrancar();
+  else cargar('vendor/gsap.min.js', function(){ cargar('vendor/ScrollTrigger.min.js', arrancar); });
+
+  function init(){
+    var g = window.gsap, ST = window.ScrollTrigger;
+    g.registerPlugin(ST);
+    var fino = matchMedia('(hover: hover) and (pointer: fine)').matches;
+    if (fino) root.classList.add('k-fino');
+    var $ = function(s, r){ return (r || document).querySelector(s); };
+    var $$ = function(s, r){ return [].slice.call((r || document).querySelectorAll(s)); };
+    var mm = g.matchMedia();
+    root.classList.add('k-listo');
+    window.__kListo = true;
+
+    /* ---------- Titulares: división en palabras o letras, con máscara ---------- */
+    function dividir(el, modo){
+      if (!el || el.getAttribute('data-k-split')) return [];
+      el.setAttribute('data-k-split', modo);
+      el.classList.add('k-split');
+      if (modo === 'c') el.classList.add('k-chars');
+      el.setAttribute('aria-label', el.textContent.replace(/\s+/g, ' ').trim());
+      var piezas = [], n = 0;
+      (function recorrer(nodo){
+        [].slice.call(nodo.childNodes).forEach(function(c){
+          if (c.nodeType === 1 && modo === 'w' && c.textContent.trim().indexOf(' ') < 0) {
+            // Una palabra con formato (como <em>) se anima entera, junto con la puntuación que la sigue.
+            var w0 = document.createElement('span'); w0.className = 'k-w'; w0.setAttribute('aria-hidden', 'true');
+            var i0 = document.createElement('span'); i0.className = 'k-wi';
+            c.parentNode.insertBefore(w0, c); i0.appendChild(c); w0.appendChild(i0); piezas.push(i0);
+            var sig = w0.nextSibling, m = sig && sig.nodeType === 3 && sig.textContent.match(/^[^\s]+/);
+            if (m) { i0.appendChild(document.createTextNode(m[0])); sig.textContent = sig.textContent.slice(m[0].length); }
+            return;
+          }
+          if (c.nodeType === 1) return recorrer(c);
+          if (c.nodeType !== 3) return;
+          var frag = document.createDocumentFragment();
+          c.textContent.split(/(\s+)/).forEach(function(t){
+            if (!t) return;
+            if (/^\s+$/.test(t)) { frag.appendChild(document.createTextNode(' ')); return; }
+            var w = document.createElement('span'); w.className = 'k-w'; w.setAttribute('aria-hidden', 'true');
+            var i = document.createElement('span'); i.className = 'k-wi';
+            if (modo === 'c') t.split('').forEach(function(ch){ var s = document.createElement('span'); s.className = 'k-c'; s.textContent = ch; s.style.setProperty('--i', n++); i.appendChild(s); piezas.push(s); });
+            else { i.textContent = t; piezas.push(i); }
+            w.appendChild(i); frag.appendChild(w);
+          });
+          c.parentNode.replaceChild(frag, c);
+        });
+      })(el);
+      return piezas;
+    }
+
+    /* ---------- Capas: luz ambiental, spotlight, cursor, cortina ---------- */
+    var amb = document.createElement('div'); amb.className = 'k-ambient'; amb.setAttribute('aria-hidden', 'true');
+    amb.innerHTML = '<div class="k-orb-w o1"><div class="k-orb"></div></div><div class="k-orb-w o2"><div class="k-orb"></div></div><div class="k-orb-w o3"><div class="k-orb"></div></div>';
+    document.body.insertBefore(amb, document.body.firstChild);
+    var orbes = $$('.k-orb', amb), envolturas = $$('.k-orb-w', amb);
+    orbes.forEach(function(o, i){
+      g.to(o, { x: function(){ return g.utils.random(-90, 90); }, y: function(){ return g.utils.random(-70, 70); }, scale: function(){ return g.utils.random(.9, 1.12); }, duration: 13 + i * 5, ease: 'sine.inOut', repeat: -1, yoyo: true, repeatRefresh: true });
+    });
+    // Cada sección mueve la luz a otra posición: la transición entre secciones se siente en la iluminación.
+    var poses = [[0, 0], [8, -14], [-6, 10], [12, 6], [-10, -8], [4, 14], [-4, -4], [10, -10]];
+    $$('main > section').forEach(function(sec, i){
+      ST.create({ trigger: sec, start: 'top 55%', end: 'bottom 55%', onToggle: function(s){ if (!s.isActive) return; var p = poses[i % poses.length];
+        g.to(envolturas[0], { xPercent: p[0], yPercent: p[1], duration: 2.2, ease: 'power2.inOut', overwrite: 'auto' });
+        g.to(envolturas[1], { xPercent: -p[1], yPercent: p[0], duration: 2.6, ease: 'power2.inOut', overwrite: 'auto' });
+        g.to(envolturas[2], { xPercent: p[1] / 2, yPercent: -p[0], duration: 3, ease: 'power2.inOut', overwrite: 'auto' }); } });
+    });
+
+    var veil = $('.k-veil'), veilTxt = $('.k-veil-txt'), veilSub = $('.k-veil small');
+
+    if (fino) {
+      var spot = document.createElement('div'); spot.className = 'k-spot'; spot.setAttribute('aria-hidden', 'true');
+      document.body.insertBefore(spot, amb.nextSibling);
+      var cur = document.createElement('div'); cur.className = 'k-cursor'; cur.setAttribute('aria-hidden', 'true');
+      cur.innerHTML = '<span class="k-ring"></span><span class="k-dot"></span>';
+      document.body.appendChild(cur);
+      var dot = $('.k-dot', cur), ring = $('.k-ring', cur);
+      var dx = g.quickSetter(dot, 'x', 'px'), dy = g.quickSetter(dot, 'y', 'px');
+      var rx = g.quickTo(ring, 'x', { duration: .45, ease: 'power3' }), ry = g.quickTo(ring, 'y', { duration: .45, ease: 'power3' });
+      var sx = g.quickTo(spot, 'x', { duration: 1.1, ease: 'power3' }), sy = g.quickTo(spot, 'y', { duration: 1.1, ease: 'power3' });
+      var ax = g.quickTo(amb, 'x', { duration: 2, ease: 'power2' }), ay = g.quickTo(amb, 'y', { duration: 2, ease: 'power2' });
+      window.addEventListener('pointermove', function(e){
+        if (e.pointerType && e.pointerType !== 'mouse') return;
+        root.classList.add('k-cursor-on');
+        dx(e.clientX); dy(e.clientY); rx(e.clientX); ry(e.clientY); sx(e.clientX); sy(e.clientY);
+        ax((e.clientX / innerWidth - .5) * -30); ay((e.clientY / innerHeight - .5) * -24);
+      }, { passive: true });
+      document.addEventListener('pointerover', function(e){
+        var t = e.target.closest && e.target.closest('a,button,summary,label,input,select,textarea,.k-card');
+        var campo = !!(t && t.matches('input,select,textarea'));
+        ring.classList.toggle('activo', !!t && !campo);
+        root.classList.toggle('k-texto', campo);
+      });
+      document.addEventListener('pointerdown', function(){ ring.classList.add('presion'); });
+      document.addEventListener('pointerup', function(){ ring.classList.remove('presion'); });
+      document.documentElement.addEventListener('mouseleave', function(){ root.classList.remove('k-cursor-on'); });
+    }
+
+    /* ---------- Barra superior ---------- */
+    var header = $('header.top');
+    var prog = document.createElement('span'); prog.className = 'k-progress'; prog.setAttribute('aria-hidden', 'true'); header.appendChild(prog);
+    var setProg = g.quickSetter(prog, 'scaleX');
+    ST.create({ start: 0, end: 'max', onUpdate: function(s){
+      setProg(s.progress);
+      header.classList.toggle('k-oculto', s.direction === 1 && s.scroll() > 480 && !header.contains(document.activeElement));
+    } });
+
+    /* ---------- Portada: entrada coreografiada ---------- */
+    var hero = $('.hero');
+    var palabras = dividir($('h1', hero), 'w');
+    var tl = g.timeline({ defaults: { ease: 'expo.out' } });
+    if (veil && veil.classList.contains('intro')) {
+      tl.fromTo(veilSub, { autoAlpha: 0, y: 10 }, { autoAlpha: 1, y: 0, duration: .35 }, 0)
+        .to(veil, { clipPath: 'inset(0% 0% 100% 0%)', duration: .75, ease: 'expo.inOut', onComplete: function(){ veil.classList.remove('intro'); g.set(veil, { clipPath: 'inset(100% 0% 0% 0%)' }); } }, .15);
+    }
+    tl.fromTo($('.eyebrow', hero), { clipPath: 'inset(0% 100% 0% 0%)' }, { clipPath: 'inset(0% 0% 0% 0%)', duration: 1, clearProps: 'clipPath' }, .45)
+      .from(palabras, { yPercent: 118, rotate: 4, duration: 1.2, stagger: .06 }, .5)
+      .from($('.lead', hero), { y: 26, autoAlpha: 0, duration: 1 }, .85)
+      .from($$('.hero-ctas .btn'), { y: 22, autoAlpha: 0, duration: .9, stagger: .09 }, .95)
+      .from($$('.hero-proof span'), { y: 12, autoAlpha: 0, duration: .8, stagger: .07 }, 1.05)
+      .fromTo($('.funnel'), { clipPath: 'inset(16% 12% 16% 12% round 28px)', scale: .95, autoAlpha: 0 }, { clipPath: 'inset(0% 0% 0% 0% round 28px)', scale: 1, autoAlpha: 1, duration: 1.4, clearProps: 'clipPath,scale' }, .6)
+      .from($$('.funnel .bar i'), { scaleX: 0, transformOrigin: 'left center', duration: 1.3, stagger: .09, ease: 'power3.out', clearProps: 'transform' }, 1)
+      .from($$('.funnel .stage-row, .funnel-foot'), { y: 10, autoAlpha: 0, duration: .8, stagger: .06 }, 1);
+    // Al salir de la portada, el texto y el embudo se separan en profundidad.
+    mm.add('(min-width: 900px)', function(){
+      g.to('.hero-copy', { yPercent: -10, ease: 'none', scrollTrigger: { trigger: hero, start: 'top top', end: 'bottom top', scrub: true } });
+      g.to('.funnel', { yPercent: 8, ease: 'none', scrollTrigger: { trigger: hero, start: 'top top', end: 'bottom top', scrub: true } });
+    });
+
+    /* ---------- Cinta cinética con los 8 pasos ---------- */
+    var nombres = $$('#metodo .step h3').map(function(h){ return h.textContent; });
+    if (nombres.length) {
+      var cinta = document.createElement('div'); cinta.className = 'k-marquee'; cinta.setAttribute('aria-hidden', 'true');
+      var fila = '<div class="k-mq-row">' + nombres.map(function(n){ var s = document.createElement('span'); s.textContent = n; return s.outerHTML + '<i></i>'; }).join('') + '</div>';
+      cinta.innerHTML = fila + fila;
+      hero.parentNode.insertBefore(cinta, hero.nextSibling);
+      var filas = $$('.k-mq-row', cinta);
+      var bucle = g.to(filas, { xPercent: -100, duration: 46, ease: 'none', repeat: -1 });
+      var sentido = 1, skew = g.quickTo(cinta, 'skewX', { duration: .5, ease: 'power3' });
+      ST.create({ trigger: cinta, start: 'top bottom', end: 'bottom top', onToggle: function(s){ s.isActive ? bucle.play() : bucle.pause(); }, onUpdate: function(s){
+        var v = s.getVelocity(); sentido = s.direction;
+        g.to(bucle, { timeScale: sentido * (1 + Math.min(Math.abs(v) / 500, 5)), duration: .3, overwrite: true });
+        skew(g.utils.clamp(-7, 7, v / -260));
+      } });
+      ST.addEventListener('scrollEnd', function(){ g.to(bucle, { timeScale: sentido, duration: 1.2, overwrite: true }); skew(0); });
+    }
+
+    /* ---------- Titulares de sección y bloques: revelado con máscara ---------- */
+    var pendientes = [];
+    $$('.sec-head, .contact-copy').forEach(function(sh){
+      var cta = !!sh.closest('#contacto');
+      var h2 = $('h2', sh), eb = $('.eyebrow', sh), lead = $('.lead', sh);
+      var piezas = dividir(h2, cta ? 'c' : 'w');
+      var t = g.timeline({ paused: true, defaults: { ease: 'expo.out' } });
+      if (eb) t.fromTo(eb, { clipPath: 'inset(0% 100% 0% 0%)' }, { clipPath: 'inset(0% 0% 0% 0%)', duration: .9, clearProps: 'clipPath' }, 0);
+      if (cta) t.from(piezas, { yPercent: 110, rotationX: -70, transformOrigin: '50% 100%', duration: 1.1, stagger: .016, onComplete: function(){ g.set(piezas, { clearProps: 'transform' }); h2.classList.add('k-vivo'); } }, .05);
+      else t.from(piezas, { yPercent: 115, rotate: 3, duration: 1.1, stagger: .045 }, .05);
+      if (lead) t.from(lead, { y: 22, autoAlpha: 0, duration: .9 }, .3);
+      if (cta) { var linea = document.createElement('span'); linea.className = 'k-cta-line'; linea.setAttribute('aria-hidden', 'true'); h2.after(linea); t.fromTo(linea, { scaleX: 0 }, { scaleX: 1, duration: 1.4, ease: 'expo.inOut' }, .4); }
+      pendientes.push({ el: sh, tl: t });
+      ST.create({ trigger: sh, start: 'top 86%', once: true, onEnter: function(){ t.play(); } });
+    });
+
+    var bloques = $$('.pillar, .diferencial, .calc-in, .calc-out, .plan, .addon, .faq details, form.lead-form');
+    g.set(bloques, { clipPath: 'inset(0% 0% 100% 0%)', y: 44 });
+    bloques.forEach(function(b){ b.setAttribute('data-k-pend', ''); });
+    function revelar(lista){
+      lista = lista.filter(function(b){ return b.hasAttribute('data-k-pend'); });
+      lista.forEach(function(b){ b.removeAttribute('data-k-pend'); });
+      if (!lista.length) return;
+      g.to(lista, { clipPath: 'inset(0% 0% 0% 0%)', y: 0, duration: 1.2, ease: 'expo.out', stagger: .1, overwrite: 'auto', onComplete: function(){ g.set(lista, { clearProps: 'clipPath,transform' }); } });
+      lista.forEach(function(b){ if (b.matches('form.lead-form')) g.from($$('label, .btn', b), { y: 18, autoAlpha: 0, duration: .8, stagger: .05, ease: 'expo.out', delay: .2 }); });
+    }
+    ST.batch(bloques, { start: 'top 90%', once: true, onEnter: revelar });
+    // Lo que quedó arriba (por un salto de ancla o al recargar más abajo) se muestra de inmediato.
+    function ponerAlDia(){
+      bloques.forEach(function(b){ if (b.hasAttribute('data-k-pend') && b.getBoundingClientRect().top < innerHeight * .9) revelar([b]); });
+      pendientes.forEach(function(p){ if (p.tl.progress() === 0 && p.el.getBoundingClientRect().top < innerHeight * .86) p.tl.play(); });
+    }
+    window.addEventListener('load', ponerAlDia);
+
+    /* ---------- Proceso: timeline con progreso y scroll fijado ---------- */
+    var pasos = $('#metodo .steps');
+    if (pasos) {
+      var proc = document.createElement('div'); proc.className = 'k-proc';
+      pasos.parentNode.insertBefore(proc, pasos);
+      var meta = document.createElement('div'); meta.className = 'k-proc-meta'; meta.setAttribute('aria-hidden', 'true');
+      meta.innerHTML = '<span class="k-proc-count"><b>01</b><small>/ 0' + $$('.step', pasos).length + '</small></span><span class="k-proc-line"><i></i></span>';
+      proc.appendChild(meta); proc.appendChild(pasos);
+      pasos.classList.add('k-timeline');
+      var items = $$('.step', pasos), cuenta = $('b', meta), linea = $('i', meta), total = items.length;
+      var setLinea = g.quickSetter(linea, 'scaleX');
+      var marcar = function(p){
+        var k = Math.min(total, Math.max(1, Math.ceil(p * total + .0001)));
+        items.forEach(function(s, i){ s.classList.toggle('on', i < k); s.classList.toggle('actual', i === k - 1); });
+        cuenta.textContent = (k < 10 ? '0' : '') + k; setLinea(Math.max(p, 1 / total / 2));
+      };
+      marcar(0);
+      mm.add('(min-width: 900px)', function(){
+        ST.create({ trigger: proc, start: 'top 20%', end: '+=150%', pin: true, scrub: true, anticipatePin: 1, onUpdate: function(s){ marcar(s.progress); } });
+      });
+      mm.add('(max-width: 899px)', function(){
+        ST.create({ trigger: pasos, start: 'top 70%', end: 'bottom 60%', scrub: true, onUpdate: function(s){ marcar(s.progress); } });
+      });
+    }
+
+    /* ---------- Entregables: revelado cinematográfico y recorrido horizontal ---------- */
+    var reel = $('#reel'), pista = $('#reel-track');
+    if (reel && pista) {
+      var obras = $$('.obra', pista);
+      mm.add('(min-width: 900px)', function(){
+        root.classList.add('k-pinx');
+        var distancia = function(){ return Math.max(0, pista.scrollWidth - document.documentElement.clientWidth); };
+        var viaje = g.to(pista, { x: function(){ return -distancia(); }, ease: 'none', scrollTrigger: { trigger: '#entregables', start: 'top top', end: function(){ return '+=' + distancia(); }, pin: true, scrub: .8, invalidateOnRefresh: true, anticipatePin: 1 } });
+        obras.forEach(function(o){
+          var img = $('.obra-img', o), svg = $('svg', img), cap = $('figcaption', o);
+          var st = { trigger: o, containerAnimation: viaje, start: 'left 98%', end: 'left 52%', scrub: true };
+          g.fromTo(img, { clipPath: 'inset(0% 0% 100% 0% round 22px)' }, { clipPath: 'inset(0% 0% 0% 0% round 22px)', ease: 'power2.out', scrollTrigger: st });
+          g.fromTo(svg, { scale: 1.3, yPercent: 6 }, { scale: 1, yPercent: 0, ease: 'none', scrollTrigger: st });
+          g.fromTo(cap, { y: 26, autoAlpha: 0 }, { y: 0, autoAlpha: 1, ease: 'power2.out', scrollTrigger: { trigger: o, containerAnimation: viaje, start: 'left 85%', end: 'left 60%', scrub: true } });
+        });
+        return function(){ root.classList.remove('k-pinx'); };
+      });
+      mm.add('(max-width: 899px)', function(){
+        obras.forEach(function(o, i){
+          var img = $('.obra-img', o);
+          g.fromTo(img, { clipPath: 'inset(0% 0% 100% 0% round 22px)' }, { clipPath: 'inset(0% 0% 0% 0% round 22px)', duration: 1.3, delay: Math.min(i, 2) * .12, ease: 'expo.out', clearProps: 'clipPath', scrollTrigger: { trigger: reel, start: 'top 80%', once: true } });
+          g.from($('svg', img), { scale: 1.25, duration: 1.6, ease: 'expo.out', delay: Math.min(i, 2) * .12, scrollTrigger: { trigger: reel, start: 'top 80%', once: true } });
+        });
+      });
+    }
+
+    /* ---------- Tarjetas 3D y botones magnéticos (solo con mouse) ---------- */
+    if (fino) {
+      $$('.pillar, .plan, .funnel, .obra-img, .calc-in').forEach(function(c){
+        c.classList.add('k-card');
+        var fuerza = c.matches('.funnel, .calc-in') ? 4 : 7;
+        g.set(c, { transformPerspective: 1000 });
+        var rX = g.quickTo(c, 'rotationX', { duration: .7, ease: 'power3' }), rY = g.quickTo(c, 'rotationY', { duration: .7, ease: 'power3' }), tY = g.quickTo(c, 'y', { duration: .7, ease: 'power3' });
+        c.addEventListener('pointermove', function(e){
+          var r = c.getBoundingClientRect(), x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+          rY((x - .5) * fuerza); rX((.5 - y) * fuerza); tY(c.matches('.pillar, .plan') ? -6 : 0);
+          c.style.setProperty('--mx', (x * 100).toFixed(1) + '%'); c.style.setProperty('--my', (y * 100).toFixed(1) + '%');
+        });
+        c.addEventListener('pointerleave', function(){ rX(0); rY(0); tY(0); });
+      });
+      $$('.btn').forEach(function(b){
+        if (b.closest('.chat') || b.classList.contains('chat-btn')) return;
+        var mX = g.quickTo(b, 'x', { duration: .6, ease: 'elastic.out(1, .45)' }), mY = g.quickTo(b, 'y', { duration: .6, ease: 'elastic.out(1, .45)' });
+        b.addEventListener('pointermove', function(e){ var r = b.getBoundingClientRect(); mX((e.clientX - (r.left + r.width / 2)) * .3); mY((e.clientY - (r.top + r.height / 2)) * .45); });
+        b.addEventListener('pointerleave', function(){ mX(0); mY(0); });
+      });
+    }
+
+    /* ---------- Calculadora: el total responde a cada cambio ---------- */
+    var calc = $('#calc'), total$ = $('#o-extra');
+    if (calc && total$) calc.addEventListener('input', function(){ total$.classList.remove('k-pulso'); void total$.offsetWidth; total$.classList.add('k-pulso'); });
+
+    /* ---------- Transiciones entre secciones (navegación interna) ---------- */
+    var enTransicion = false;
+    document.addEventListener('click', function(e){
+      var a = e.target.closest && e.target.closest('a[href^="#"]');
+      if (!a || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || enTransicion || !veil) return;
+      var id = a.getAttribute('href').slice(1), destino = id && document.getElementById(id);
+      if (!destino) return;
+      e.preventDefault();
+      enTransicion = true;
+      var eb = $('.eyebrow', destino);
+      veilTxt.textContent = id === 'inicio' ? 'Kairos Creative' : (eb ? eb.textContent : a.textContent).trim();
+      veilSub.textContent = 'Kairos Creative';
+      g.timeline({ onComplete: function(){ enTransicion = false; g.set(veil, { pointerEvents: 'none' }); } })
+        .set(veil, { clipPath: 'inset(100% 0% 0% 0%)', pointerEvents: 'auto' })
+        .to(veil, { clipPath: 'inset(0% 0% 0% 0%)', duration: .5, ease: 'expo.inOut' })
+        .fromTo([veilSub, veilTxt], { yPercent: 120, autoAlpha: 0 }, { yPercent: 0, autoAlpha: 1, duration: .45, stagger: .05, ease: 'expo.out' }, '-=.22')
+        .add(function(){
+          var y = id === 'inicio' ? 0 : destino.getBoundingClientRect().top + window.pageYOffset;
+          root.style.scrollBehavior = 'auto'; window.scrollTo(0, y); root.style.scrollBehavior = '';
+          ST.update(); ponerAlDia(); header.classList.remove('k-oculto');
+          try { history.pushState(null, '', '#' + id); } catch (err) {}
+          if (!destino.hasAttribute('tabindex')) destino.setAttribute('tabindex', '-1');
+          destino.focus({ preventScroll: true });
+        }, '+=.08')
+        .to([veilTxt, veilSub], { yPercent: -120, autoAlpha: 0, duration: .35, ease: 'expo.in' }, '+=.05')
+        .to(veil, { clipPath: 'inset(0% 0% 100% 0%)', duration: .6, ease: 'expo.inOut' }, '-=.15');
+    });
+
+    // Las secciones fijadas agregan altura: ordenar los disparadores por posición y recalcular.
+    ST.sort(); ST.refresh();
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(function(){ ST.sort(); ST.refresh(); });
+    window.addEventListener('load', function(){ ST.sort(); ST.refresh(); ponerAlDia(); });
+  }
 })();
 </script>
 </body>
