@@ -409,7 +409,7 @@ const ONBOARDING = [
   ["accesos_tienda", "Acceso a la tienda o sitio"], ["accesos_meta", "Acceso a Meta Business (socio)"], ["accesos_ga4", "Acceso a Google Analytics 4"],
   ["pixel", "Píxel y eventos de conversión verificados"], ["accesos_redes", "Acceso a Instagram/TikTok"], ["kickoff", "Reunión de ingreso hecha"], ["base", "Números de partida anotados"],
 ];
-const BASE = [["ventas_mes", "Ventas por mes"], ["facturacion_mes", "Facturación mensual"], ["sesiones_mes", "Visitas por mes"], ["conversion", "Tasa de conversión (%)"], ["ticket", "Ticket promedio"], ["seguidores", "Seguidores en Instagram"], ["engagement", "Engagement promedio (%)"], ["inversion_pauta", "Inversión mensual en pauta"], ["roas", "ROAS actual"]];
+const BASE = [["ventas_mes", "Ventas por mes"], ["facturacion_mes", "Facturación mensual"], ["sesiones_mes", "Visitas por mes"], ["conversion", "Tasa de conversión (%)"], ["ticket", "Ticket promedio"], ["seguidores", "Seguidores en Instagram"], ["engagement", "Engagement promedio (%)"], ["inversion_pauta", "Inversión mensual en pauta"], ["roas", "ROAS actual"], ["margen", "Margen bruto (%)"], ["cac", "Costo de adquisición por cliente (CAC)"], ["recompra", "Tasa de recompra (%)"]];
 
 function contextoCliente(c) {
   const brief = ["marca", "rubro", "url", "redes", "publico", "tono", "productos", "competidores", "objetivo", "plan"].filter((k) => c[k]).map((k) => `- ${k}: ${c[k]}`).join("\n");
